@@ -1,8 +1,8 @@
 {
-  "name": "argyle-backend",
+  "name": "gfi-backend-service",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "description": "Backend service for the GFI platform - built with NestJS and integrated with BullMQ, MongoDB, Redis, and Swagger. Setup by Jatin Gupta (SDE-1).",
+  "author": "Jatin Gupta <jatin.gupta@melonleaf.com>",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

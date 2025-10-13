@@ -16,13 +16,14 @@ export class CompanyUser {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
 
-  @Prop({ enum: AccountStatus, default: AccountStatus.ACTIVE })
+  @Prop({ type: String,enum: AccountStatus, default: AccountStatus.ACTIVE })
   status: AccountStatus;
 
   @Prop({ required: true })
   password: string;
 
   @Prop({
+    type: String,
     required: true,
     enum: CompanyUserRole,
     default: CompanyUserRole.ADMIN,
