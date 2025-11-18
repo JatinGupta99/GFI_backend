@@ -1,10 +1,4 @@
-export enum CompanyUserRole{
-    ADMIN = 'admin',
-    USER = 'user',
-}
-
-export enum AccountStatus{
-    ACTIVE = 'active',
-    INACTIVE = 'inactive',  
-    SUSPENDED = 'suspended',
+export enum CompanyUserRole {
+  AGENT='AGENT',
+  ADMIN='ADMIN'
 }

@@ -4,12 +4,13 @@ import * as bcrypt from 'bcrypt';
 import { CompanyUserRepository } from './repository/company-user.repository';
 import { CreateCompanyUserDto } from './dto/create-company-user.dto';
 import { UpdateCompanyUserDto } from './dto/update-company-user.dto';
+import { SignupDto } from '../auth/dto/signup.dto';
 
 @Injectable()
 export class CompanyUserService {
   constructor(private readonly repo: CompanyUserRepository) {}
 
-  async create(dto: CreateCompanyUserDto) {
+  async create(dto: SignupDto) {
     return this.repo.create(dto);
   }
 

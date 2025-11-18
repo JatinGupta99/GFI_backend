@@ -1,8 +1,8 @@
-import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength } from 'class-validator';
 import { CompanyUserRole } from '../../../common/enums/common-enums';
+import { IsStrongPassword } from '../../../common/validators/isStrongPassword';
 
-export class CreateCompanyUserDto {
+export class SignupDto {
   @IsString()
   @IsNotEmpty()
   name: string;
@@ -11,10 +11,11 @@ export class CreateCompanyUserDto {
   @IsNotEmpty()
   email: string;
 
+  @IsString()
   @IsNotEmpty()
-  @MinLength(6)
+  @IsStrongPassword()
   password: string;
 
-  @IsString()
-  role: CompanyUserRole;
+  @IsEnum(CompanyUserRole)
+  role: CompanyUserRole=CompanyUserRole.AGENT;
 }

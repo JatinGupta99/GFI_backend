@@ -1,21 +1,24 @@
-import { createBullBoard } from '@bull-board/api';
-import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
-import { ExpressAdapter } from '@bull-board/express';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { Queue } from 'bullmq';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Set global API prefix
   app.setGlobalPrefix('api');
+
+  app.enableCors({
+    origin: ['http://localhost:4000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  });
 
   // Setup Swagger
   setupSwagger(app);
@@ -29,7 +32,6 @@ async function bootstrap() {
 
   logger.info(`🚀 Server running at http://localhost:${port}/api`);
   logger.info(`📘 Swagger docs available at http://localhost:${port}/docs`);
-  logger.info(`🔧 Bull Board running at http://localhost:${port}/admin/queues`);
 }
 
 function setupSwagger(app: any) {
@@ -57,7 +59,7 @@ function setupGlobalMiddlewares(app: any) {
 
   // Global logging interceptor using Winston logger
   const logger = app.get(WINSTON_MODULE_PROVIDER) as Logger;
-  app.useGlobalInterceptors(new LoggingInterceptor(logger));
+  app.useGlobalInterceptors(new LoggingInterceptor(logger), new TransformInterceptor());
 
   // Global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
