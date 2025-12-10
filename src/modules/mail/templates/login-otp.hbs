@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login OTP</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.5;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      background-color: #fafafa;
+    }
+    h1 {
+      color: #0a2540;
+    }
+    .otp {
+      font-size: 24px;
+      font-weight: bold;
+      color: #0a2540;
+      margin: 20px 0;
+    }
+    .footer {
+      font-size: 12px;
+      color: #777;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Hello {{name}},</h1>
+    <p>You requested to login to your account. Use the following OTP to complete your login:</p>
+    <div class="otp">{{otp}}</div>
+    <p>This OTP will expire in 2 minutes. Do not share it with anyone.</p>
+    <div class="footer">
+      &copy; {{year}} Your Company. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>

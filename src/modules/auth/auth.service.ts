@@ -1,73 +1,66 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { CompanyUserService } from '../company-user/company-user.service';
+import { ResetTokenType } from '../../common/enums/common-enums';
+import { CompanyUserRepository } from '../company-user/repository/company-user.repository';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SignupDto } from './dto/signup.dto';
-import { JwtPayload } from './interface/jwt.interface';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { UserResetToken } from './schema/user-reset-token.schema';
+import { UserTokenService } from './user-token.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly jwtExpiresIn: string;
 
   constructor(
-    private readonly companyUserService: CompanyUserService,
+    private readonly companyUserRepo: CompanyUserRepository,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly userTokenService: UserTokenService,
   ) {
     this.jwtExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '1h';
   }
 
   async signup(dto: SignupDto) {
-    const existing = await this.companyUserService.findByEmail(dto.email);
+    const existing = await this.companyUserRepo.findByEmail(dto.email);
     if (existing) throw new BadRequestException('Email already exists');
-    const user = await this.companyUserService.create({
-      ...dto,
-      password: dto.password,
-    });
+
+    const user = await this.companyUserRepo.createWithPassword(dto);
 
     return {
-      message: 'User registered successfully',
-      user: { id: user._id, email: user.email, role: user.role },
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
     };
   }
 
-  async login(loginDetails: LoginDto) {
-    const user = await this.companyUserService.findByEmail(loginDetails.email);
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+  async login(dto: LoginDto) {
+    const user = await this.companyUserRepo.findByEmail(dto.email);
+    if (!user || !(await bcrypt.compare(dto.password, user.password))) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
-    const valid = await bcrypt.compare(loginDetails.password, user.password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    await this.userTokenService.sendOtp(
+      user._id.toString(),
+      user.email,
+      user.name,
+    );
 
-    const payload: JwtPayload = {
-      sub: (user._id as string).toString(),
-      email: user.email,
-      role: user.role,
-      avatar: user.avatar,
-    };
-
-    const access_token = this.jwtService.sign(payload, {
-      expiresIn: this.jwtExpiresIn,
-    });
-
-    return {
-      access_token,
-      expires_in: this.parseExpiresIn(this.jwtExpiresIn),
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar,
-      },
-    };
+    return { email: user.email };
   }
 
   private parseExpiresIn(expiresIn: string): number {
@@ -75,52 +68,60 @@ export class AuthService {
     if (!match) return 3600;
     const value = parseInt(match[1], 10);
     const unit = match[2];
-    switch (unit) {
-      case 's':
-        return value;
-      case 'm':
-        return value * 60;
-      case 'h':
-        return value * 3600;
-      case 'd':
-        return value * 86400;
-      default:
-        return 3600;
-    }
+    return unit === 's'
+      ? value
+      : unit === 'm'
+        ? value * 60
+        : unit === 'h'
+          ? value * 3600
+          : value * 86400;
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
-    const user = await this.companyUserService.findByEmail(dto.email);
-    if (!user) throw new NotFoundException('User not found');
+    const user = await this.companyUserRepo.findByEmail(dto.email);
+    if (!user) {
+      return null;
+    }
 
-    const resetToken = this.jwtService.sign(
-      { sub: user._id, email: user.email },
-      { expiresIn: '15m' },
+    await this.userTokenService.requestToken(
+      user._id.toString(),
+      user.email,
+      user.name,
+      ResetTokenType.RESET,
     );
 
-    // TODO: Send email with this token (using MailService)
-    // Example: await this.mailService.sendPasswordReset(user.email, resetToken);
-
-    return {
-      message: 'Password reset link sent to your email',
-      resetToken,
-    };
+    return null;
   }
 
-  async resetPassword(dto: ResetPasswordDto) {
-    try {
-      const payload = this.jwtService.verify(dto.token);
-      const user = await this.companyUserService.findByEmail(payload.email);
-      if (!user) throw new NotFoundException('User not found');
+  async resetPassword(dto: ResetPasswordDto, type: ResetTokenType) {
+    const tokenRecord = (await this.userTokenService.validateToken(
+      dto.token,
+      type,
+    )) as UserResetToken;
+    const user = await this.companyUserRepo.findByEmail(tokenRecord.email);
+    if (!user) throw new NotFoundException('User not found');
 
-      const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
-      await this.companyUserService.update(user._id as string, {
-        password: hashedPassword,
-      });
+    await this.companyUserRepo.update(user._id.toString(), {
+      password: dto.newPassword,
+    });
+    await this.userTokenService.markTokenUsed(tokenRecord._id.toString(), type);
 
-      return { message: 'Password updated successfully' };
-    } catch (err) {
-      throw new BadRequestException('Invalid or expired token');
-    }
+    return null;
+  }
+
+  async sendOtp(email: string) {
+    const user = await this.companyUserRepo.findByEmail(email);
+    if (!user) throw new NotFoundException('User not found');
+
+    return this.userTokenService.sendOtp(
+      user._id.toString(),
+      user.email,
+      user.name,
+    );
+  }
+
+  async verifyOtp(dto: VerifyOtpDto) {
+    const { otp, email } = dto;
+    return this.userTokenService.verifyOtp(otp, email);
   }
 }

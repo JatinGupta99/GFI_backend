@@ -4,35 +4,45 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
-import { Response, Request } from 'express';
+import { Response } from 'express';
+import { ResponseBuilder } from '../helpers/response.builder';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest();
 
-    let status: number;
-    let message: string | string[];
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let message = 'Internal server error';
+    let errors = null;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
-      const res = exception.getResponse();
-      message = typeof res === 'string' ? res : (res as any).message || 'Error';
-    } else {
-      status = HttpStatus.INTERNAL_SERVER_ERROR;
-      message = 'Internal server error';
-      console.error('Unexpected Error:', exception);
+      const exceptionResponse = exception.getResponse();
+
+      if (typeof exceptionResponse === 'string') {
+        message = exceptionResponse;
+      } else if (typeof exceptionResponse === 'object') {
+        message =
+          (exceptionResponse as any).message || exception.message;
+        errors = (exceptionResponse as any).errors || null;
+      }
+    } else if (exception instanceof Error) {
+      message = exception.message;
+      this.logger.error(
+        `Unhandled exception: ${exception.message}`,
+        exception.stack,
+      );
     }
 
-    response.status(status).json({
-      statusCode: status,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      method: request.method,
-      message,
-    });
+    response
+      .status(status)
+      .json(ResponseBuilder.error(message, errors, { path: request.url }));
   }
 }

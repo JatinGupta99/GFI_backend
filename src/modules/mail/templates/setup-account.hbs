@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Set Up Your Account</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f7f7f7;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+      background-color: #ffffff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333333;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    p {
+      font-size: 16px;
+      color: #555555;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      font-size: 16px;
+      color: #ffffff;
+      background-color: #007BFF;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+    .footer {
+      margin-top: 30px;
+      font-size: 12px;
+      color: #888888;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Hello {{name}},</h1>
+    <p>
+      Your account has been created. Please click the button below to set your password and complete your account setup:
+    </p>
+    <p style="text-align:center;">
+      <a href="{{setupLink}}" class="btn">Set Your Password</a>
+    </p>
+    <p>
+      If you did not expect this email, you can safely ignore it.
+    </p>
+    <div class="footer">
+      &copy; {{year}} Your Company. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>

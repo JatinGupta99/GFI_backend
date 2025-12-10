@@ -39,7 +39,7 @@ export class LoggingInterceptor implements NestInterceptor {
       tap({
         next: () => {
           const responseTime = Date.now() - now;
-          this.logger.info(`✅ Response Sent`, {
+          this.logger.info(` Response Sent`, {
             method,
             url: originalUrl,
             statusCode: response.statusCode,
@@ -48,7 +48,7 @@ export class LoggingInterceptor implements NestInterceptor {
         },
         error: (err) => {
           const responseTime = Date.now() - now;
-          this.logger.error(`❌ Request Failed`, {
+          this.logger.error(` Request Failed`, {
             method,
             url: originalUrl,
             statusCode: err?.status || 500,
