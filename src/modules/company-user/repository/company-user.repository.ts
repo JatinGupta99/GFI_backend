@@ -84,7 +84,7 @@ export class CompanyUserRepository {
       if (emailExists) throw new BadRequestException('Email already in use');
     }
 
-    const updated = await this.model.findByIdAndUpdate(id, dto, { new: true }).select('-password');
+    const updated = await this.model.findByIdAndUpdate(id, {...dto,phone_no:dto.phoneNo}, { new: true }).select('-password');
     if (!updated) throw new NotFoundException('User not found');
     return updated;
   }

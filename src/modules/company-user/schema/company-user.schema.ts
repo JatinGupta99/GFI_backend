@@ -24,6 +24,9 @@ export class CompanyUser {
   @Prop({ required: false, default: '' })
   password: string;
 
+  @Prop({ required: false, default: '' })
+  phone_no: string;
+
   @Prop({ required: false, default: null })
   avatar: string;
 

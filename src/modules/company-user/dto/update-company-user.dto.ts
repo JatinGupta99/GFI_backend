@@ -9,4 +9,8 @@ export class UpdateCompanyUserDto extends PartialType(CreateCompanyUserDto) {
     @MinLength(6, { message: 'Password must be at least 6 characters long' })
     @IsStrongPassword()
     password?: string;
+
+    @IsString()
+    @IsOptional()
+    phoneNo?:string;
 }
