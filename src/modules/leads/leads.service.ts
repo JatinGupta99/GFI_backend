@@ -29,20 +29,10 @@ export class LeadsService {
       ];
     }
 
-    const [items, total] = await Promise.all([
+    return await Promise.all([
       this.repo.find(filter, skip, limit),
       this.repo.count(filter),
     ]);
-
-    return {
-      data: items,
-      meta: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
-      },
-    };
   }
 
   async findOne(id: string) {

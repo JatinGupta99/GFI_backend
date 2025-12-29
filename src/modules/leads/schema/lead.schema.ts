@@ -18,26 +18,38 @@ export class Lead {
   })
   email!: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, default: '' })
   cellPhone?: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, default: '' })
   workPhone?: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, default: '' })
+  jobTitle?: string;
+
+  @Prop({ trim: true, default: '' })
+  spouseName?: string;
+
+  @Prop({ trim: true, default: '' })
   businessName?: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, default: '' })
   mailingAddress?: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, default: '' })
+  residentialAddress?: string;
+
+  @Prop({ trim: true, default: '' })
   use?: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, default: '' })
   property?: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, default: '' })
   suite?: string;
+
+  @Prop({ trim: true, default: 'Note' })
+  notes?: string;
 
   @Prop({
     type: String,
@@ -46,9 +58,6 @@ export class Lead {
     index: true,
   })
   status!: LeadStatus;
-
-  @Prop({ trim: true, default: 'Note' })
-  notes?: string;
 }
 
 export type LeadDocument = Lead & Document;

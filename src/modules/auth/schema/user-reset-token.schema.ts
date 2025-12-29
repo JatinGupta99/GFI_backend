@@ -29,4 +29,5 @@ export class UserResetToken {
   type: ResetTokenType;
 }
 
-export const UserResetTokenSchema = SchemaFactory.createForClass(UserResetToken);
+export const UserResetTokenSchema =
+  SchemaFactory.createForClass(UserResetToken);

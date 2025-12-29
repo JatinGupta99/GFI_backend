@@ -1,8 +1,8 @@
-import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { Types } from "mongoose";
-import { Suite } from "../../suites/schema/suite.schema";
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Types } from 'mongoose';
+import { Suite } from '../../suites/schema/suite.schema';
 
-@Schema({ timestamps: true,versionKey:false })
+@Schema({ timestamps: true, versionKey: false })
 export class Property {
   @Prop({ required: true })
   name: string;

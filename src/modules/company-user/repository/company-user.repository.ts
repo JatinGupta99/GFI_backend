@@ -1,16 +1,25 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as bcrypt from 'bcrypt';
 import { Model, isValidObjectId } from 'mongoose';
 import { SignupDto } from '../../auth/dto/signup.dto';
 import { UpdateCompanyUserDto } from '../dto/update-company-user.dto';
-import { CompanyUser, CompanyUserDocument } from '../schema/company-user.schema';
+import {
+  CompanyUser,
+  CompanyUserDocument,
+} from '../schema/company-user.schema';
 import { CreateCompanyUserDto } from '../dto/create-company-user.dto';
 import { QueryCompanyUserDto } from '../dto/query-company-user.dto';
 
 @Injectable()
 export class CompanyUserRepository {
-  constructor(@InjectModel(CompanyUser.name) private model: Model<CompanyUserDocument>) { }
+  constructor(
+    @InjectModel(CompanyUser.name) private model: Model<CompanyUserDocument>,
+  ) {}
 
   async create(dto: CreateCompanyUserDto) {
     const user = new this.model(dto);
@@ -84,7 +93,9 @@ export class CompanyUserRepository {
       if (emailExists) throw new BadRequestException('Email already in use');
     }
 
-    const updated = await this.model.findByIdAndUpdate(id, {...dto,phone_no:dto.phoneNo}, { new: true }).select('-password');
+    const updated = await this.model
+      .findByIdAndUpdate(id, { ...dto, phone_no: dto.phoneNo }, { new: true })
+      .select('-password');
     if (!updated) throw new NotFoundException('User not found');
     return updated;
   }

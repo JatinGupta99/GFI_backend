@@ -44,9 +44,7 @@ export class LeadsController {
   }
 
   @Post('bulk/status')
-  bulkStatus(
-    @Body() body: { ids: string[]; status: LeadStatus },
-  ) {
+  bulkStatus(@Body() body: { ids: string[]; status: LeadStatus }) {
     return this.service.bulkUpdateStatus(body.ids, body.status);
   }
 }

@@ -12,7 +12,7 @@ export class CompanyUserService {
   constructor(
     private readonly repo: CompanyUserRepository,
     private readonly userTokenService: UserTokenService,
-  ) { }
+  ) {}
 
   async create(dto: CreateCompanyUserDto) {
     const existing = await this.findByEmail(dto.email);

@@ -6,18 +6,16 @@ import {
   IsString,
   Matches,
   MaxLength,
-} from "class-validator";
-import { LeadStatus } from "../../../common/enums/common-enums";
-import { Transform } from "class-transformer";
+} from 'class-validator';
+import { LeadStatus } from '../../../common/enums/common-enums';
+import { Transform } from 'class-transformer';
 
 const trim = () =>
-  Transform(({ value }) =>
-    typeof value === "string" ? value.trim() : value,
-  );
+  Transform(({ value }) => (typeof value === 'string' ? value.trim() : value));
 
 const toLower = () =>
   Transform(({ value }) =>
-    typeof value === "string" ? value.toLowerCase().trim() : value,
+    typeof value === 'string' ? value.toLowerCase().trim() : value,
   );
 
 const E164_REGEX = /^\+?[1-9]\d{1,14}$/;
@@ -44,14 +42,14 @@ export class CreateLeadDto {
   @trim()
   @IsOptional()
   @Matches(E164_REGEX, {
-    message: "cellPhone must be in E.164-ish format (e.g. +123456789).",
+    message: 'cellPhone must be in E.164-ish format (e.g. +123456789).',
   })
   cellPhone?: string;
 
   @trim()
   @IsOptional()
   @Matches(E164_REGEX, {
-    message: "workPhone must be in E.164-ish format (e.g. +123456789).",
+    message: 'workPhone must be in E.164-ish format (e.g. +123456789).',
   })
   workPhone?: string;
 
@@ -87,5 +85,5 @@ export class CreateLeadDto {
   @trim()
   @IsOptional()
   @MaxLength(2000)
-  notes: string = "Note";
+  notes: string = 'Note';
 }

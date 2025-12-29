@@ -26,4 +26,4 @@ import { AuthSharedModule } from './auth-shared.module';
   providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
 })
-export class AuthModule { }
+export class AuthModule {}

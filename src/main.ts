@@ -8,6 +8,7 @@ import { AllExceptionsFilter } from './common/filters/all-exception.filter';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -66,6 +67,7 @@ function setupGlobalRegistrations(app: any) {
   app.useGlobalInterceptors(
     new LoggingInterceptor(logger),
     new ResponseInterceptor(reflector),
+    new TransformInterceptor(),
   );
 
   app.useGlobalFilters(

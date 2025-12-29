@@ -1,9 +1,5 @@
 export class ResponseBuilder {
-  static success<T>(
-    message: string,
-    data: T,
-    meta: Record<string, any> = {},
-  ) {
+  static success<T>(message: string, data: T, meta: Record<string, any> = {}) {
     return {
       status: 'success',
       message,

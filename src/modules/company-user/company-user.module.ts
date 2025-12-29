@@ -9,10 +9,12 @@ import { AuthSharedModule } from '../auth/auth-shared.module';
 @Module({
   imports: [
     AuthSharedModule,
-    MongooseModule.forFeature([{ name: CompanyUser.name, schema: CompanyUserSchema }]),
+    MongooseModule.forFeature([
+      { name: CompanyUser.name, schema: CompanyUserSchema },
+    ]),
   ],
   controllers: [CompanyUserController],
   providers: [CompanyUserService, CompanyUserRepository],
   exports: [CompanyUserService, CompanyUserRepository],
 })
-export class CompanyUserModule { }
+export class CompanyUserModule {}

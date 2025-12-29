@@ -6,7 +6,6 @@ import { CreateLeadDto } from '../dto/create-lead.dto';
 import { UpdateLeadDto } from '../dto/update-lead.dto';
 import { LeadStatus } from '../../../common/enums/common-enums';
 
-
 @Injectable()
 export class LeadsRepository {
   constructor(

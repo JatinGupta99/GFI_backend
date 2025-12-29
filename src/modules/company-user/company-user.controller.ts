@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -11,7 +22,7 @@ import { UpdateCompanyUserDto } from './dto/update-company-user.dto';
 @ApiTags('Company User')
 @Controller('company-user')
 export class CompanyUserController {
-  constructor(private readonly service: CompanyUserService) { }
+  constructor(private readonly service: CompanyUserService) {}
 
   @Post()
   @ResponseMessage('User created successfully. Setup email sent.')
@@ -34,7 +45,9 @@ export class CompanyUserController {
 
   @Get(':id')
   @ResponseMessage('User retrieved successfully')
-  findOne(@Param('id', new ValidateObjectIdPipe('Company User ID')) id: string) {
+  findOne(
+    @Param('id', new ValidateObjectIdPipe('Company User ID')) id: string,
+  ) {
     return this.service.findOne(id);
   }
 

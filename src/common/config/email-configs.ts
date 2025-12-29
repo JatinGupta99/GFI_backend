@@ -1,4 +1,4 @@
-import { EmailType } from "../enums/common-enums";
+import { EmailType } from '../enums/common-enums';
 
 export interface EmailConfig<T = any> {
   subject: string | ((data: T) => string);
@@ -22,6 +22,6 @@ export const EmailConfigs: Record<EmailType, EmailConfig> = {
   [EmailType.LOGIN_OTP]: {
     subject: 'Your Login Verification Code',
     template: 'login-otp',
-    required: ['email', 'name', 'otp','year'],
+    required: ['email', 'name', 'otp', 'year'],
   },
 };

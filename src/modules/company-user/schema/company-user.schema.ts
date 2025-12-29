@@ -1,7 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as bcrypt from 'bcrypt';
-import { AccountStatus, CompanyUserRole } from '../../../common/enums/common-enums';
+import {
+  AccountStatus,
+  CompanyUserRole,
+} from '../../../common/enums/common-enums';
 
 export type CompanyUserDocument = CompanyUser & Document;
 

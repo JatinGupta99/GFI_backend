@@ -29,7 +29,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly userTokenService: UserTokenService,
   ) {
-    this.jwtExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '1h';
+    this.jwtExpiresIn =
+      this.configService.get<string>('JWT_EXPIRES_IN') || '1h';
   }
 
   async signup(dto: SignupDto) {
@@ -122,6 +123,20 @@ export class AuthService {
 
   async verifyOtp(dto: VerifyOtpDto) {
     const { otp, email } = dto;
-    return this.userTokenService.verifyOtp(otp, email);
+    await this.userTokenService.verifyOtp(otp, email);
+
+    const user = await this.companyUserRepo.findByEmail(email);
+    if (!user) throw new NotFoundException('User not found');
+
+    const payload = {
+      sub: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+    };
+
+    const access_token = this.jwtService.sign(payload);
+
+    return { access_token };
   }
 }

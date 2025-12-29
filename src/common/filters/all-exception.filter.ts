@@ -59,7 +59,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message = response;
     } else if (response?.message) {
       // message can be: string | string[]
-      message = Array.isArray(response.message) ? 'Validation failed' : response.message;
+      message = Array.isArray(response.message)
+        ? 'Validation failed'
+        : response.message;
       errors = Array.isArray(response.message) ? response.message : null;
     }
 

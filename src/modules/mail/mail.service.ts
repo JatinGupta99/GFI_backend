@@ -1,9 +1,12 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MailerService } from '@nestjs-modules/mailer';
 import { EmailConfigs } from '../../common/config';
 import { EmailType } from '../../common/enums/common-enums';
-
 
 @Injectable()
 export class MailService {
@@ -15,11 +18,14 @@ export class MailService {
     private readonly mailerService: MailerService,
     private readonly configService: ConfigService,
   ) {
-    this.frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    this.frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
   }
 
   async send(type: EmailType, payload: any) {
-    this.logger.debug(`send() called with type: ${type}, email: ${payload.email}`);
+    this.logger.debug(
+      `send() called with type: ${type}, email: ${payload.email}`,
+    );
 
     const config = this.EmailConfigs[type];
     if (!config) {
@@ -31,16 +37,21 @@ export class MailService {
       ...payload,
       year: new Date().getFullYear(),
       resetLink: payload?.token
-        ? `${this.frontendUrl}/auth/reset-password?token=${encodeURIComponent(payload.token)}`
+        ? `${this.frontendUrl}/auth/set-new-password?token=${encodeURIComponent(payload.token)}`
         : undefined,
       setupLink: payload?.token
         ? `${this.frontendUrl}/auth/setup-password?token=${encodeURIComponent(payload.token)}`
         : undefined,
     };
 
-    const subject = typeof config.subject === 'function' ? config.subject(payload) : config.subject;
+    const subject =
+      typeof config.subject === 'function'
+        ? config.subject(payload)
+        : config.subject;
 
-    this.logger.debug(`Email details - To: ${payload.email}, Subject: ${subject}, Template: ${config.template}`);
+    this.logger.debug(
+      `Email details - To: ${payload.email}, Subject: ${subject}, Template: ${config.template}`,
+    );
     if (data.resetLink) {
       this.logger.debug(`Reset link: ${data.resetLink}`);
     }

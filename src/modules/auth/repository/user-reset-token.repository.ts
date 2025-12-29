@@ -2,7 +2,10 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ResetTokenType } from '../../../common/enums/common-enums';
-import { UserResetToken, UserResetTokenDocument } from '../schema/user-reset-token.schema';
+import {
+  UserResetToken,
+  UserResetTokenDocument,
+} from '../schema/user-reset-token.schema';
 
 @Injectable()
 export class UserResetTokenRepository {
@@ -18,7 +21,10 @@ export class UserResetTokenRepository {
     expiresAt: Date,
     type: ResetTokenType,
   ) {
-    await this.model.updateMany({ userId, used: false }, { used: true, usedAt: new Date() });
+    await this.model.updateMany(
+      { userId, used: false },
+      { used: true, usedAt: new Date() },
+    );
     return new this.model({ userId, email, token, expiresAt, type }).save();
   }
 
@@ -36,6 +42,9 @@ export class UserResetTokenRepository {
   }
 
   removeExpiredTokens() {
-    return this.model.deleteMany({ expiresAt: { $lt: new Date() }, used: false });
+    return this.model.deleteMany({
+      expiresAt: { $lt: new Date() },
+      used: false,
+    });
   }
 }

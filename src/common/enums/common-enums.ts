@@ -1,9 +1,9 @@
 export enum CompanyUserRole {
-  OWNER='Owner',
-  LEASING='Leasing',
-  PROPERTY_MANAGER='Property Manager',
-  ACQUISITION='Acquisitions',
-  SUPER_ADMIN='Super Admin'
+  OWNER = 'Owner',
+  LEASING = 'Leasing',
+  PROPERTY_MANAGER = 'Property Manager',
+  ACQUISITION = 'Acquisitions',
+  SUPER_ADMIN = 'Super Admin',
 }
 
 export enum EmailType {
@@ -11,20 +11,29 @@ export enum EmailType {
   SETUP_ACCOUNT = 'SETUP_ACCOUNT',
   LOGIN_OTP = 'LOGIN_OTP',
 }
-
+export enum LeadType {
+  GENERAL = 'general',
+  BUSINESS = 'business',
+}
 export enum LeadStatus {
-  LEASE_NEGOTIATION = 'Lease Negotiation',
   LOI_NEGOTIATION = 'LOI Negotiation',
-  OUT_FOR_EXECUTION = 'Out for Execution',
+  LEASE_NEGOTIATION = 'Lease Negotiation',
   QUALIFYING = 'Qualifying',
+  OUT_FOR_EXECUTION = 'Out for Execution',
   NO_CONTACT = 'No Contact',
   RENEWAL_NEGOTIATION = 'Renewal Negotiation',
   DRAFTING_AMENDMENT = 'Drafting Amendment',
   LOST = 'Lost',
   PROSPECT = 'Prospect',
+  NEW = 'new',
+  CONTACTED = 'contacted',
+  QUALIFIED = 'qualified',
+  SITE_VISIT_SCHEDULED = 'site_visit_scheduled',
+  PROPOSAL_SENT = 'proposal_sent',
+  NEGOTIATION = 'negotiation',
+  CONTRACT_SENT = 'contract_sent',
+  WON = 'won',
 }
-
-
 export enum AccountStatus {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',

@@ -1,11 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsString,
-  MinLength,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
   @ApiProperty({
@@ -29,13 +24,13 @@ export class LoginDto {
 
 export class LoginResponseDto {
   @ApiProperty({
-    example: 'eyJhbGciOiJIUzI1NiIsInR...'
+    example: 'eyJhbGciOiJIUzI1NiIsInR...',
   })
   access_token: string;
 
   @ApiProperty({
     example: 3600,
-    description: 'Token validity in seconds'
+    description: 'Token validity in seconds',
   })
   expires_in: number;
 }
