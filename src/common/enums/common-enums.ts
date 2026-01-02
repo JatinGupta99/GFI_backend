@@ -1,5 +1,6 @@
 export enum CompanyUserRole {
   OWNER = 'Owner',
+  USER = 'User',
   LEASING = 'Leasing',
   PROPERTY_MANAGER = 'Property Manager',
   ACQUISITION = 'Acquisitions',

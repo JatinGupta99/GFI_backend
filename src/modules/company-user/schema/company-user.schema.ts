@@ -44,6 +44,9 @@ export class CompanyUser {
 
   @Prop({ type: String, default: null })
   deletedBy: string;
+
+  @Prop({ type: String, default: null })
+  properties?: string;
 }
 
 export const CompanyUserSchema = SchemaFactory.createForClass(CompanyUser);

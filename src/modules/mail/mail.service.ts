@@ -37,10 +37,10 @@ export class MailService {
       ...payload,
       year: new Date().getFullYear(),
       resetLink: payload?.token
-        ? `${this.frontendUrl}/auth/set-new-password?token=${encodeURIComponent(payload.token)}`
+        ? `${this.frontendUrl}/auth/reset-new-password?token=${encodeURIComponent(payload.token)}`
         : undefined,
       setupLink: payload?.token
-        ? `${this.frontendUrl}/auth/setup-password?token=${encodeURIComponent(payload.token)}`
+        ? `${this.frontendUrl}/auth/set-new-password?token=${encodeURIComponent(payload.token)}`
         : undefined,
     };
 

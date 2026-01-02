@@ -21,6 +21,7 @@ import { UpdateCompanyUserDto } from './dto/update-company-user.dto';
 
 @ApiTags('Company User')
 @Controller('company-user')
+@UseGuards(JwtAuthGuard)
 export class CompanyUserController {
   constructor(private readonly service: CompanyUserService) {}
 
@@ -31,7 +32,6 @@ export class CompanyUserController {
   }
 
   @Get('/profile')
-  @UseGuards(JwtAuthGuard)
   @ResponseMessage('Profile retrieved successfully')
   getProfile(@Req() req) {
     return this.service.findOne(req.user.userId);
