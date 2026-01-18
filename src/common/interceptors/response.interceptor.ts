@@ -12,7 +12,7 @@ import { RESPONSE_MESSAGE_KEY } from '../decorators/response-message.decorator';
 
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor {
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) { }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
@@ -20,6 +20,15 @@ export class ResponseInterceptor implements NestInterceptor {
         // If already formatted with 'status' property, return as-is
         if (data && typeof data === 'object' && 'status' in data) {
           return data;
+        }
+
+        let finalData = data;
+        let finalMeta = {};
+
+        // Check if data is from TransformInterceptor
+        if (data && typeof data === 'object' && 'statusCode' in data && 'data' in data) {
+          finalData = data.data;
+          finalMeta = data.meta || {};
         }
 
         // Get custom message from decorator or use default
@@ -30,7 +39,7 @@ export class ResponseInterceptor implements NestInterceptor {
           ) || this.getDefaultMessage(context);
 
         // Wrap response
-        return ResponseBuilder.success(message, data);
+        return ResponseBuilder.success(message, finalData, finalMeta);
       }),
     );
   }

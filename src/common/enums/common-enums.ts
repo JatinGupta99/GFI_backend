@@ -6,7 +6,13 @@ export enum CompanyUserRole {
   ACQUISITION = 'Acquisitions',
   SUPER_ADMIN = 'Super Admin',
 }
-
+export enum MediaEntityType {
+  LEAD = 'lead',
+  PROPERTY = 'property',
+  USER = 'user',
+  COMPANY = 'company',
+  MEDIA = 'media',
+}
 export enum EmailType {
   PASSWORD_RESET = 'PASSWORD_RESET',
   SETUP_ACCOUNT = 'SETUP_ACCOUNT',
@@ -45,4 +51,16 @@ export enum ResetTokenType {
   RESET = 'RESET',
   SETUP = 'SETUP',
   OTP = 'OTP',
+}
+
+export enum SortOrder {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}
+
+export enum MediaEntityType {
+  USERS = 'users',
+  LEADS = 'leads',
+  EVENTS = 'events',
+  GENERAL = 'general',
 }

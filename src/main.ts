@@ -1,4 +1,5 @@
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
@@ -12,17 +13,14 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+
   app.setGlobalPrefix('api', {
     exclude: ['docs', 'admin/queues'],
   });
 
   app.enableCors({
-    origin: [
-      'http://localhost:4000',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-    ],
+    origin: configService.get<string[]>('frontend.corsOrigins'),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   });
@@ -32,7 +30,7 @@ async function bootstrap() {
   setupGlobalRegistrations(app);
 
   const logger = app.get<Logger>(WINSTON_MODULE_PROVIDER);
-  const port = process.env.PORT ?? 4000;
+  const port = configService.get<number>('port') || 4000;
   await app.listen(port);
 
   logger.info(`Server running at http://localhost:${port}/api`);

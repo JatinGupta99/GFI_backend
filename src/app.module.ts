@@ -5,16 +5,21 @@ import { WinstonModule } from 'nest-winston';
 import { winstonConfig } from './common/utils/logger.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompanyUserModule } from './modules/company-user/company-user.module';
-import { configuration } from './common/config';
+import { configuration } from './config/configuration';
 import { DatabaseModule } from './database/database.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { ConfigService } from '@nestjs/config';
+
 @Module({
   imports: [
-    WinstonModule.forRoot(winstonConfig),
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
+    WinstonModule.forRootAsync({
+      useFactory: (configService: ConfigService) => winstonConfig(configService),
+      inject: [ConfigService],
+    }),
     DatabaseModule,
     AuthModule,
     LeadsModule,
@@ -27,4 +32,4 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

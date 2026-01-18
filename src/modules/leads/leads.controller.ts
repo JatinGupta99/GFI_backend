@@ -14,12 +14,15 @@ import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { LeadStatus } from '../../common/enums/common-enums';
 
-@Controller('leads')
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { UserId } from '../../common/decorators/user-id.decorator copy';
+
+@Controller('leasing/active-leads')
 export class LeadsController {
-  constructor(private readonly service: LeadsService) {}
+  constructor(private readonly service: LeadsService) { }
 
   @Get()
-  findAll(@Query() query: any) {
+  findAll(@Query() query: PaginationQueryDto) {
     return this.service.findAll(query);
   }
 
@@ -29,8 +32,8 @@ export class LeadsController {
   }
 
   @Post()
-  create(@Body() dto: CreateLeadDto) {
-    return this.service.create(dto);
+  create(@Body() dto: CreateLeadDto, @UserId() userId: string) {
+    return this.service.create(dto, userId);
   }
 
   @Patch(':id')

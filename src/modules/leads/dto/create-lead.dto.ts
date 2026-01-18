@@ -1,89 +1,53 @@
 import {
   IsEmail,
   IsEnum,
-  IsNotEmpty,
   IsOptional,
   IsString,
-  Matches,
-  MaxLength,
+  IsNumber,
+  ValidateNested,
+  IsArray,
 } from 'class-validator';
 import { LeadStatus } from '../../../common/enums/common-enums';
-import { Transform } from 'class-transformer';
-
-const trim = () =>
-  Transform(({ value }) => (typeof value === 'string' ? value.trim() : value));
-
-const toLower = () =>
-  Transform(({ value }) =>
-    typeof value === 'string' ? value.toLowerCase().trim() : value,
-  );
-
-const E164_REGEX = /^\+?[1-9]\d{1,14}$/;
+import { Type } from 'class-transformer';
+import { GeneralDetailsDto } from './sub-dtos/general.dto';
+import { BusinessDetailsDto } from './sub-dtos/business.dto';
+import { FinancialDetailsDto } from './sub-dtos/financial.dto';
+import { DealTermsDto } from './sub-dtos/deal-terms.dto';
+import { DraftingDetailsDto } from './sub-dtos/drafting.dto';
+import { ReferenceInfoDto } from './sub-dtos/reference.dto';
+import { AccountingDetailsDto } from './sub-dtos/accounting.dto';
+import { BrokerInfoDto } from './sub-dtos/broker.dto';
+import { FileInfoDto } from './sub-dtos/file.dto';
+import { ActivityLogDto } from './sub-dtos/activity.dto';
 
 export class CreateLeadDto {
-  @trim()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  firstName: string;
+  @IsOptional() @IsString() prospect?: string;
+  @IsOptional() @IsString() property?: string;
+  @IsOptional() @IsString() suite?: string;
+  @IsOptional() @IsNumber() sf?: number;
+  @IsOptional() @IsString() use?: string;
+  @IsOptional() @IsEnum(LeadStatus) status?: LeadStatus;
 
-  @trim()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  lastName: string;
+  @IsOptional() @ValidateNested() @Type(() => GeneralDetailsDto) general?: GeneralDetailsDto;
+  @IsOptional() @ValidateNested() @Type(() => BusinessDetailsDto) business?: BusinessDetailsDto;
+  @IsOptional() @ValidateNested() @Type(() => FinancialDetailsDto) financial?: FinancialDetailsDto;
+  @IsOptional() @ValidateNested() @Type(() => DealTermsDto) dealTerms?: DealTermsDto;
+  @IsOptional() @ValidateNested() @Type(() => DraftingDetailsDto) drafting?: DraftingDetailsDto;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => ReferenceInfoDto) references?: ReferenceInfoDto[];
+  @IsOptional() @ValidateNested() @Type(() => AccountingDetailsDto) accounting?: AccountingDetailsDto;
+  @IsOptional() @ValidateNested() @Type(() => BrokerInfoDto) broker?: BrokerInfoDto;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => FileInfoDto) files?: FileInfoDto[];
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => ActivityLogDto) activities?: ActivityLogDto[];
 
-  @toLower()
-  @IsEmail()
-  @IsNotEmpty()
-  @MaxLength(254)
-  email: string;
+  @IsOptional() @IsString() createdBy?: string;
+  @IsOptional() @IsString() lastModifiedBy?: string;
 
-  @trim()
-  @IsOptional()
-  @Matches(E164_REGEX, {
-    message: 'cellPhone must be in E.164-ish format (e.g. +123456789).',
-  })
-  cellPhone?: string;
-
-  @trim()
-  @IsOptional()
-  @Matches(E164_REGEX, {
-    message: 'workPhone must be in E.164-ish format (e.g. +123456789).',
-  })
-  workPhone?: string;
-
-  @trim()
-  @IsOptional()
-  @MaxLength(200)
-  businessName?: string;
-
-  @trim()
-  @IsOptional()
-  @MaxLength(300)
-  mailingAddress?: string;
-
-  @trim()
-  @IsOptional()
-  @MaxLength(100)
-  use?: string;
-
-  @trim()
-  @IsOptional()
-  @MaxLength(200)
-  property?: string;
-
-  @trim()
-  @IsOptional()
-  @MaxLength(50)
-  suite?: string;
-
-  @IsOptional()
-  @IsEnum(LeadStatus)
-  status: LeadStatus = LeadStatus.PROSPECT;
-
-  @trim()
-  @IsOptional()
-  @MaxLength(2000)
-  notes: string = 'Note';
+  // --- Backward Compatibility (Flat Fields) ---
+  @IsOptional() @IsString() firstName?: string;
+  @IsOptional() @IsString() lastName?: string;
+  @IsOptional() @IsEmail() email?: string;
+  @IsOptional() @IsString() cellPhone?: string;
+  @IsOptional() @IsString() workPhone?: string;
+  @IsOptional() @IsString() businessName?: string;
+  @IsOptional() @IsString() mailingAddress?: string;
 }

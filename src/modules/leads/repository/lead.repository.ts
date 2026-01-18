@@ -10,12 +10,12 @@ import { LeadStatus } from '../../../common/enums/common-enums';
 export class LeadsRepository {
   constructor(
     @InjectModel(Lead.name) private readonly leadModel: Model<LeadDocument>,
-  ) {}
+  ) { }
 
-  async find(filter: any, skip: number, limit: number) {
+  async find(filter: any, skip: number, limit: number, sort: any = { createdAt: -1 }) {
     return this.leadModel
       .find(filter)
-      .sort({ createdAt: -1 })
+      .sort(sort)
       .skip(skip)
       .limit(limit)
       .lean()

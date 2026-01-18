@@ -1,55 +1,33 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import { LeadStatus } from '../../../common/enums/common-enums';
+import { GeneralDetailsSchema, GeneralDetails } from './sub-schemas/general.schema';
+import { BusinessDetailsSchema, BusinessDetails } from './sub-schemas/business.schema';
+import { FinancialDetailsSchema, FinancialDetails } from './sub-schemas/financial.schema';
+import { DealTermsSchema, DealTerms } from './sub-schemas/deal-terms.schema';
+import { FileInfoSchema, FileInfo } from './sub-schemas/file.schema';
+import { ActivityLogSchema, ActivityLog } from './sub-schemas/activity.schema';
+import { ReferenceInfoSchema, ReferenceInfo } from './sub-schemas/reference.schema';
+import { DraftingDetailsSchema, DraftingDetails } from './sub-schemas/drafting.schema';
+import { AccountingDetailsSchema, AccountingDetails } from './sub-schemas/accounting.schema';
+import { BrokerInfoSchema, BrokerInfo } from './sub-schemas/broker.schema';
 
 @Schema({ timestamps: true })
 export class Lead {
-  @Prop({ required: true, trim: true })
-  firstName!: string;
+  @Prop({ default: '' })
+  prospect: string;
 
-  @Prop({ required: true, trim: true })
-  lastName!: string;
+  @Prop({ default: '' })
+  property: string;
 
-  @Prop({
-    required: true,
-    trim: true,
-    lowercase: true,
-    index: true,
-  })
-  email!: string;
+  @Prop({ default: '' })
+  suite: string;
 
-  @Prop({ trim: true, default: '' })
-  cellPhone?: string;
+  @Prop({ default: 0 })
+  sf: number;
 
-  @Prop({ trim: true, default: '' })
-  workPhone?: string;
-
-  @Prop({ trim: true, default: '' })
-  jobTitle?: string;
-
-  @Prop({ trim: true, default: '' })
-  spouseName?: string;
-
-  @Prop({ trim: true, default: '' })
-  businessName?: string;
-
-  @Prop({ trim: true, default: '' })
-  mailingAddress?: string;
-
-  @Prop({ trim: true, default: '' })
-  residentialAddress?: string;
-
-  @Prop({ trim: true, default: '' })
-  use?: string;
-
-  @Prop({ trim: true, default: '' })
-  property?: string;
-
-  @Prop({ trim: true, default: '' })
-  suite?: string;
-
-  @Prop({ trim: true, default: 'Note' })
-  notes?: string;
+  @Prop({ default: '' })
+  use: string;
 
   @Prop({
     type: String,
@@ -57,7 +35,43 @@ export class Lead {
     default: LeadStatus.PROSPECT,
     index: true,
   })
-  status!: LeadStatus;
+  status: LeadStatus;
+
+  @Prop({ type: GeneralDetailsSchema, default: () => ({}) })
+  general: GeneralDetails;
+
+  @Prop({ type: BusinessDetailsSchema, default: () => ({}) })
+  business: BusinessDetails;
+
+  @Prop({ type: FinancialDetailsSchema, default: () => ({}) })
+  financial: FinancialDetails;
+
+  @Prop({ type: DealTermsSchema, default: () => ({}) })
+  dealTerms: DealTerms;
+
+  @Prop({ type: DraftingDetailsSchema, default: () => ({}) })
+  drafting: DraftingDetails;
+
+  @Prop({ type: [ReferenceInfoSchema], default: [] })
+  references: ReferenceInfo[];
+
+  @Prop({ type: AccountingDetailsSchema, default: () => ({}) })
+  accounting: AccountingDetails;
+
+  @Prop({ type: BrokerInfoSchema, default: () => ({}) })
+  broker: BrokerInfo;
+
+  @Prop({ type: [FileInfoSchema], default: [] })
+  files: FileInfo[];
+
+  @Prop({ type: [ActivityLogSchema], default: [] })
+  activities: ActivityLog[];
+
+  @Prop({ default: '' })
+  createdBy: string;
+
+  @Prop({ default: '' })
+  lastModifiedBy: string;
 }
 
 export type LeadDocument = Lead & Document;

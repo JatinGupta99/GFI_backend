@@ -5,6 +5,9 @@ import {
   AccountStatus,
   CompanyUserRole,
 } from '../../../common/enums/common-enums';
+import { configuration } from '../../../config/configuration';
+
+const config = configuration();
 
 export type CompanyUserDocument = CompanyUser & Document;
 
@@ -53,7 +56,7 @@ export const CompanyUserSchema = SchemaFactory.createForClass(CompanyUser);
 
 CompanyUserSchema.pre<CompanyUserDocument>('save', async function (next) {
   if (!this.isModified('password')) return next();
-  const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
+  const saltRounds = config.auth.bcryptSaltRounds;
   const salt = await bcrypt.genSalt(saltRounds);
   this.password = await bcrypt.hash(this.password, salt);
   this.passwordChangedAt = new Date();
@@ -66,14 +69,14 @@ CompanyUserSchema.pre('findOneAndUpdate', async function (next) {
   if (!update) return next();
 
   if (update.password) {
-    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
+    const saltRounds = config.auth.bcryptSaltRounds;
     const salt = await bcrypt.genSalt(saltRounds);
     update.password = await bcrypt.hash(update.password, salt);
     update.passwordChangedAt = new Date();
   }
 
   if (update.$set && update.$set.password) {
-    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
+    const saltRounds = config.auth.bcryptSaltRounds;
     const salt = await bcrypt.genSalt(saltRounds);
     update.$set.password = await bcrypt.hash(update.$set.password, salt);
     update.$set.passwordChangedAt = new Date();
