@@ -19,7 +19,7 @@ import { QueryCompanyUserDto } from '../dto/query-company-user.dto';
 export class CompanyUserRepository {
   constructor(
     @InjectModel(CompanyUser.name) private model: Model<CompanyUserDocument>,
-  ) {}
+  ) { }
 
   async create(dto: CreateCompanyUserDto) {
     const user = new this.model(dto);
@@ -94,7 +94,7 @@ export class CompanyUserRepository {
     }
 
     const updated = await this.model
-      .findByIdAndUpdate(id, { ...dto, phone_no: dto.phoneNo }, { new: true })
+      .findByIdAndUpdate(id, { ...dto }, { new: true })
       .select('-password');
     if (!updated) throw new NotFoundException('User not found');
     return updated;

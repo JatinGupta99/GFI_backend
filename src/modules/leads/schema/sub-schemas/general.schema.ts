@@ -49,6 +49,9 @@ export class GeneralDetails {
 
     @Prop({ default: '' })
     suite: string;
+
+    @Prop({ default: '' })
+    sf: string;
 }
 
 export const GeneralDetailsSchema = SchemaFactory.createForClass(GeneralDetails);

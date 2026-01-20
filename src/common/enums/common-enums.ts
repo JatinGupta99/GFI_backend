@@ -1,10 +1,11 @@
-export enum CompanyUserRole {
-  OWNER = 'Owner',
-  USER = 'User',
-  LEASING = 'Leasing',
-  PROPERTY_MANAGER = 'Property Manager',
-  ACQUISITION = 'Acquisitions',
-  SUPER_ADMIN = 'Super Admin',
+export enum UserRole {
+  MANAGEMENT = 'MANAGEMENT',
+  ADMIN = 'ADMIN',
+  LEASING = 'LEASING',
+  PROPERTY_MANAGEMENT = 'PROPERTY_MANAGEMENT',
+  LEGAL = 'LEGAL',
+  ACCOUNTING = 'ACCOUNTING',
+  VIEWER = 'VIEWER',
 }
 export enum MediaEntityType {
   LEAD = 'lead',
@@ -56,6 +57,30 @@ export enum ResetTokenType {
 export enum SortOrder {
   ASC = 'ASC',
   DESC = 'DESC',
+}
+
+export enum PropertyList {
+  DELTONA_COMMONS = 'Deltona Commons',
+  LAKE_CAY_COMMONS = 'Lake Cay Commons',
+  STONEYBROOK_WEST_VILLAGE_1 = 'Stoneybrook West Village 1',
+  STONEYBROOK_WEST_VILLAGE_2 = 'Stoneybrook West Village 2',
+  FAIRWAY_OAKS = 'Fairway Oaks',
+  NORTHBAY_COMMERCE = 'Northbay Commerce',
+  AVENIR_TOWN_CENTER = 'Avenir Town Center',
+  PROMENADE_SHOPPING_CENTER = 'Promenade Shopping Center',
+  RIVERSIDE_SQUARE = 'Riverside Square',
+  SUNRISE_WEST = 'Sunrise West',
+  PINE_PLAZA = 'Pine Plaza',
+  BISCAYNE_MIDPOINT = 'Biscayne (Midpoint)',
+  DIXIE_POINTE = 'Dixie Pointe',
+  RAYFORD_RIDGE = 'Rayford Ridge',
+  LEXINGTON_PLAZA = 'Lexington Plaza',
+  WEST_OAKS_CENTRE = 'West Oaks Centre',
+  PEARLAND_CORNERS = 'Pearland Corners',
+  CHAMPION_FOREST = 'Champion Forest',
+  CROSSROADS_SHOPPING_CENTER = 'Crossroads Shopping Center',
+  RICHWOOD = 'Richwood',
+  GRAND_AVENUE_CENTER = 'Grand Avenue Center',
 }
 
 export enum MediaEntityType {

@@ -23,7 +23,7 @@ import { UpdateCompanyUserDto } from './dto/update-company-user.dto';
 @Controller('company-user')
 @UseGuards(JwtAuthGuard)
 export class CompanyUserController {
-  constructor(private readonly service: CompanyUserService) {}
+  constructor(private readonly service: CompanyUserService) { }
 
   @Post()
   @ResponseMessage('User created successfully. Setup email sent.')
@@ -35,6 +35,11 @@ export class CompanyUserController {
   @ResponseMessage('Profile retrieved successfully')
   getProfile(@Req() req) {
     return this.service.findOne(req.user.userId);
+  }
+  @Get('attachments/download-url')
+  @ResponseMessage('Download URL generated successfully')
+  getAttachmentDownloadUrl(@Query('key') key: string) {
+    return this.service.getAttachmentDownloadUrl(key);
   }
 
   @Get()
@@ -65,4 +70,16 @@ export class CompanyUserController {
   remove(@Param('id', new ValidateObjectIdPipe('Company User ID')) id: string) {
     return this.service.remove(id);
   }
+
+
+  @Post(':id/attachments/upload-url')
+  @ResponseMessage('Upload URL generated successfully')
+  getUploadUrl(
+    @Param('id', new ValidateObjectIdPipe('User ID')) id: string,
+    @Body('contentType') contentType: string,
+  ) {
+    return this.service.getUploadUrl(id, contentType);
+  }
+
+
 }

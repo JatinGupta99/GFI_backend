@@ -21,11 +21,6 @@ import { FileInfoDto } from './sub-dtos/file.dto';
 import { ActivityLogDto } from './sub-dtos/activity.dto';
 
 export class CreateLeadDto {
-  @IsOptional() @IsString() prospect?: string;
-  @IsOptional() @IsString() property?: string;
-  @IsOptional() @IsString() suite?: string;
-  @IsOptional() @IsNumber() sf?: number;
-  @IsOptional() @IsString() use?: string;
   @IsOptional() @IsEnum(LeadStatus) status?: LeadStatus;
 
   @IsOptional() @ValidateNested() @Type(() => GeneralDetailsDto) general?: GeneralDetailsDto;
@@ -50,4 +45,8 @@ export class CreateLeadDto {
   @IsOptional() @IsString() workPhone?: string;
   @IsOptional() @IsString() businessName?: string;
   @IsOptional() @IsString() mailingAddress?: string;
+  @IsOptional() @IsString() property?: string;
+  @IsOptional() @IsString() suite?: string;
+  @IsOptional() @IsString() use?: string;
+  @IsOptional() @IsString() sf?: string;
 }

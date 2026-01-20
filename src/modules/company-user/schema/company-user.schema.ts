@@ -3,7 +3,8 @@ import { Document } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import {
   AccountStatus,
-  CompanyUserRole,
+  UserRole,
+  PropertyList,
 } from '../../../common/enums/common-enums';
 import { configuration } from '../../../config/configuration';
 
@@ -21,8 +22,8 @@ export class CompanyUser {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
 
-  @Prop({ enum: CompanyUserRole, default: CompanyUserRole.OWNER })
-  role: CompanyUserRole;
+  @Prop({ enum: UserRole, default: UserRole.VIEWER })
+  role: UserRole;
 
   @Prop({ enum: AccountStatus, default: AccountStatus.ACTIVE })
   status: AccountStatus;
@@ -48,8 +49,8 @@ export class CompanyUser {
   @Prop({ type: String, default: null })
   deletedBy: string;
 
-  @Prop({ type: String, default: null })
-  properties?: string;
+  @Prop({ type: [String], enum: PropertyList, default: [] })
+  properties?: PropertyList[];
 }
 
 export const CompanyUserSchema = SchemaFactory.createForClass(CompanyUser);

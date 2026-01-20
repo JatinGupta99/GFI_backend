@@ -14,7 +14,8 @@ export class GeneralDetailsDto {
     @IsOptional() @IsString() city?: string;
     @IsOptional() @IsString() state?: string;
     @IsOptional() @IsString() zip?: string;
-    @IsOptional() @IsString() use?: string;
     @IsOptional() @IsString() property?: string;
+    @IsOptional() @IsString() use?: string;
     @IsOptional() @IsString() suite?: string;
+    @IsOptional() @IsString() sf?: string;
 }

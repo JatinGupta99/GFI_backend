@@ -22,8 +22,8 @@ export class LeadsService {
       const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 
       filter.$or = [
-        { prospect: regex },
-        { property: regex },
+        { 'general.prospect': regex },
+        { 'general.property': regex },
         { 'general.firstName': regex },
         { 'general.lastName': regex },
         { 'general.email': regex },
@@ -88,6 +88,7 @@ export class LeadsService {
       suite: 'suite',
       use: 'use',
       property: 'property',
+      sf: 'sf',
     };
 
     for (const [legacyKey, targetKey] of Object.entries(LEGACY_GENERAL_FIELD_MAP)) {
@@ -95,10 +96,6 @@ export class LeadsService {
       if (legacyValue !== undefined && general[targetKey] === undefined) {
         general[targetKey] = legacyValue;
       }
-    }
-
-    if (!data.prospect && (general.firstName || general.lastName)) {
-      data.prospect = `${general.firstName ?? ''} ${general.lastName ?? ''}`.trim();
     }
 
     data.createdBy = userId;

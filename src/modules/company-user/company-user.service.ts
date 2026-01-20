@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { CompanyUserRepository } from './repository/company-user.repository';
 import { CreateCompanyUserDto } from './dto/create-company-user.dto';
@@ -6,13 +6,16 @@ import { UpdateCompanyUserDto } from './dto/update-company-user.dto';
 import { ResetTokenType } from '../../common/enums/common-enums';
 import { UserTokenService } from '../auth/user-token.service';
 import { QueryCompanyUserDto } from './dto/query-company-user.dto';
+import { isValidObjectId } from 'mongoose';
+import { MediaService } from '../media/media.service';
 
 @Injectable()
 export class CompanyUserService {
   constructor(
     private readonly repo: CompanyUserRepository,
     private readonly userTokenService: UserTokenService,
-  ) {}
+    private readonly mediaService: MediaService,
+  ) { }
 
   async create(dto: CreateCompanyUserDto) {
     const existing = await this.findByEmail(dto.email);
@@ -68,6 +71,52 @@ export class CompanyUserService {
   async remove(id: string) {
     await this.repo.remove(id);
     return null;
+  }
+
+
+  private ensureValidObjectId(id: string) {
+    if (!isValidObjectId(id)) throw new BadRequestException('Invalid user ID');
+  }
+  async getAttachmentDownloadUrl(key: string) {
+    const url = await this.mediaService.generateDownloadUrl(key);
+    return {
+      statusCode: 200,
+      message: 'Download URL generated',
+      data: { url },
+    };
+  }
+  async getUploadUrl(userId: string, contentType: string) {
+    this.ensureValidObjectId(userId);
+    const user = await this.repo.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    const ext = contentType.split('/')[1] || 'bin';
+    const fileId = crypto.randomUUID();
+    const fileKey = `users/${userId}/profile-image/${fileId}.${ext}`;
+
+    const { key, url } = await this.mediaService.generateUploadUrl(fileKey, contentType);
+
+    return {
+      statusCode: 200,
+      message: 'Signed URL generated',
+      data: {
+        key,
+        url,
+      },
+    };
+  }
+
+  async getReadUrl(userId: string) {
+    this.ensureValidObjectId(userId);
+    const user = await this.repo.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    if (!user.avatar) {
+      throw new NotFoundException('User has no profile image');
+    }
+
+    const url = await this.mediaService.generateDownloadUrl(user.avatar);
+    return { statusCode: 200, url };
   }
 
   async validateUser(email: string, password: string) {

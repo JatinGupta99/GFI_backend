@@ -14,20 +14,9 @@ import { BrokerInfoSchema, BrokerInfo } from './sub-schemas/broker.schema';
 
 @Schema({ timestamps: true })
 export class Lead {
-  @Prop({ default: '' })
-  prospect: string;
-
-  @Prop({ default: '' })
-  property: string;
-
-  @Prop({ default: '' })
-  suite: string;
 
   @Prop({ default: 0 })
   sf: number;
-
-  @Prop({ default: '' })
-  use: string;
 
   @Prop({
     type: String,
