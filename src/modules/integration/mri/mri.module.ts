@@ -1,4 +1,9 @@
 import { Module } from '@nestjs/common';
+import { MriService } from './mri.service';
+import { MriController } from './mri.controller';
 
-@Module({})
+@Module({
+  controllers: [MriController],
+  providers: [MriService],
+})
 export class MriModule {}
