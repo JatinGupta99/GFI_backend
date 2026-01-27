@@ -52,10 +52,9 @@ export class RentRollService {
                     this.safeFetch(() => this.optionsService.fetch(lease.LeaseID), []),
                     this.safeFetch(() => this.chargesService.fetch(lease.LeaseID), []),
                     this.safeFetch(() => this.arService.fetch(lease.MasterOccupantID), []),
-                    this.safeFetch(() => this.notesService.fetch(lease.LeaseID), []),
+                    this.safeFetch(() => this.notesService.fetch(propertyId, lease.LeaseID), []),
                 ]);
 
-                // Financial Calculations
                 const baseRentCharges = charges.filter(c =>
                     ['RNT', 'RENT', 'BASE'].includes(c.ChargeCode?.toUpperCase())
                 );
@@ -79,7 +78,7 @@ export class RentRollService {
                     annualRentPerSF: Number(annualRentPerSF.toFixed(2)),
                     nnnPerSF: Number(nnnPerSF.toFixed(2)),
                     arBalance: Number(ar.reduce((sum, item) => sum + (item.Balance || 0), 0).toFixed(2)),
-                    notes: notes.map(n => n.NoteText).join('; ') || '',
+                    notes: notes.map(n => n.text).join('; ') || '',
                     optionTerm: options.map(o => `${o.StartDate} - ${o.EndDate}`).join('; ') || '',
                 };
 
