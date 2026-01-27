@@ -75,4 +75,13 @@ export const configuration = () => ({
     auth: {
         bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10),
     },
+
+    mri: {
+        clientId: process.env.CLIENT_ID || '',
+        databaseName: process.env.DATABASE_NAME || '',
+        userId: process.env.WEB_SERVICE_USER_ID || '',
+        password: process.env.WEB_SERVICE_USER_PASSWORD || '',
+        developerKey: process.env.DEVELOPER_API_KEY || '',
+        apiUrl: process.env.MRI_API_URL || 'https://pmx7api.cloud.mrisoftware.com/mriapiservices/api.asp',
+    },
 });

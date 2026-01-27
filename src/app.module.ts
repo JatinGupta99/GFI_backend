@@ -9,6 +9,7 @@ import { configuration } from './config/configuration';
 import { DatabaseModule } from './database/database.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { RentRollModule } from './modules/rent-roll/rent-roll.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -26,6 +27,7 @@ import { ConfigService } from '@nestjs/config';
     LeadsModule,
     CompanyUserModule,
     TasksModule,
+    RentRollModule,
   ],
   providers: [
     {
