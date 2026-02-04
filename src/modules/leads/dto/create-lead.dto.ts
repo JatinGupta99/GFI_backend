@@ -27,8 +27,10 @@ export class CreateLeadDto {
   @IsOptional() @ValidateNested() @Type(() => BusinessDetailsDto) business?: BusinessDetailsDto;
   @IsOptional() @ValidateNested() @Type(() => FinancialDetailsDto) financial?: FinancialDetailsDto;
   @IsOptional() @ValidateNested() @Type(() => DealTermsDto) dealTerms?: DealTermsDto;
+  @IsOptional() @ValidateNested() @Type(() => DraftingDetailsDto) current_negotiation?: DraftingDetailsDto;
+  @IsOptional() @ValidateNested() @Type(() => DraftingDetailsDto) budget_negotiation?: DraftingDetailsDto;
   @IsOptional() @ValidateNested() @Type(() => DraftingDetailsDto) drafting?: DraftingDetailsDto;
-  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => ReferenceInfoDto) references?: ReferenceInfoDto[];
+  @IsOptional() @ValidateNested() @Type(() => ReferenceInfoDto) references?: ReferenceInfoDto;
   @IsOptional() @ValidateNested() @Type(() => AccountingDetailsDto) accounting?: AccountingDetailsDto;
   @IsOptional() @ValidateNested() @Type(() => BrokerInfoDto) broker?: BrokerInfoDto;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => FileInfoDto) files?: FileInfoDto[];
@@ -36,17 +38,4 @@ export class CreateLeadDto {
 
   @IsOptional() @IsString() createdBy?: string;
   @IsOptional() @IsString() lastModifiedBy?: string;
-
-  // --- Backward Compatibility (Flat Fields) ---
-  @IsOptional() @IsString() firstName?: string;
-  @IsOptional() @IsString() lastName?: string;
-  @IsOptional() @IsEmail() email?: string;
-  @IsOptional() @IsString() cellPhone?: string;
-  @IsOptional() @IsString() workPhone?: string;
-  @IsOptional() @IsString() businessName?: string;
-  @IsOptional() @IsString() mailingAddress?: string;
-  @IsOptional() @IsString() property?: string;
-  @IsOptional() @IsString() suite?: string;
-  @IsOptional() @IsString() use?: string;
-  @IsOptional() @IsString() sf?: string;
 }

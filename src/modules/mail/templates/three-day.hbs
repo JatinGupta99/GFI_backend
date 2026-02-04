@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{subject}}</title>
+    {{> styles}}
+</head>
+
+<body>
+    <div class="container">
+        {{> header}}
+
+        <div class="content">
+            <div class="notice-header">3-Day Notice</div>
+
+            <p style="margin-bottom: 20px;"><strong>{{currentDate}}</strong></p>
+
+            <p>
+                <strong>{{tenantName}}</strong><br>
+                {{#if tenantAddress}}{{tenantAddress}}{{/if}}
+            </p>
+
+            <p>Via Email</p>
+
+            <p style="font-weight: bold; margin-top: 20px; margin-bottom: 20px;">
+                RE: 3 DAY NOTICE TO PAY OUTSTANDING BALANCE OR DELIVER POSSESSION {{propertyName}}
+            </p>
+
+            <p class="greeting">Dear {{firstName}},</p>
+
+            <p>
+                Notwithstanding any previous Notices provided, you are hereby notified that, as of the date above, you
+                are indebted to the Landlord in the sum of ${{outstandingBalance}} for rent plus late fee of
+                ${{lateFee}} through {{monthEnd}}, and use of the Premises, {{premisesAddress}} thru today's date, now
+                occupied by you and demand payment of all outstanding balance or possession of the premises within 3
+                days (excluding Saturday, Sunday and legal Holidays) From The date of delivery of this notice, to wit on
+                or before the <strong>{{expirationDate}}</strong>.
+            </p>
+
+            <p style="font-weight: bold; font-size: 16px;">
+                Total amount owed: ${{totalAmount}}
+            </p>
+
+            <p style="font-weight: bold; margin-top: 20px;">
+                LANDLORD DOES NOT ACCEPT PARTIAL PAYMENTS
+            </p>
+
+            <p>
+                PLEASE MAKE ALL CHECKS PAYABLE TO: <strong>{{payTo}}</strong>
+            </p>
+
+            <p>Thank you for your prompt attention to this matter.</p>
+
+            <div class="closing">
+                <p>
+                    <strong>{{managerName}}</strong><br>
+                    {{managerTitle}}<br>
+                    Global Fund Investments
+                </p>
+            </div>
+
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px dashed #e2e8f0; font-size: 13px;">
+                <p style="font-weight: bold;">Contact for Tenant:-</p>
+                <p>
+                    <strong>{{tenantName}}</strong><br>
+                    <strong>{{propertyName}}</strong><br>
+                    <strong>{{tenantAddress}}</strong><br>
+                    <strong>{{tenantMail}}</strong><br>
+                    <strong>{{tenantContact}}</strong>
+                </p>
+            </div>
+        </div>
+
+        {{> footer}}
+    </div>
+</body>
+
+</html>

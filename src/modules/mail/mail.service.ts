@@ -61,7 +61,9 @@ export class MailService {
 
       await this.mailerService.sendMail({
         to: payload.email,
+        cc: payload.cc,
         subject,
+        attachments: payload.attachments, // Support for email attachments
         template: config.template,
         context: data,
       });

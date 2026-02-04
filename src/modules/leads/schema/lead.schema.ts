@@ -15,9 +15,6 @@ import { BrokerInfoSchema, BrokerInfo } from './sub-schemas/broker.schema';
 @Schema({ timestamps: true })
 export class Lead {
 
-  @Prop({ default: 0 })
-  sf: number;
-
   @Prop({
     type: String,
     enum: Object.values(LeadStatus),
@@ -39,10 +36,13 @@ export class Lead {
   dealTerms: DealTerms;
 
   @Prop({ type: DraftingDetailsSchema, default: () => ({}) })
-  drafting: DraftingDetails;
+  current_negotiation: DraftingDetails;
 
-  @Prop({ type: [ReferenceInfoSchema], default: [] })
-  references: ReferenceInfo[];
+  @Prop({ type: DraftingDetailsSchema, default: () => ({}) })
+  budget_negotiation: DraftingDetails;
+
+  @Prop({ type: ReferenceInfoSchema, default: () => ({}) })
+  references: ReferenceInfo;
 
   @Prop({ type: AccountingDetailsSchema, default: () => ({}) })
   accounting: AccountingDetails;

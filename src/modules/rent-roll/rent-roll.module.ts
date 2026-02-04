@@ -7,6 +7,7 @@ import { MriOptionsService } from './mri/mri-options.service';
 import { MriChargesService } from './mri/mri-charges.service';
 import { MriArService } from './mri/mri-ar.service';
 import { MriNotesService } from './mri/mri-notes.service';
+import { MriVacantSuitesService } from './mri/mri-vacant-suites.service';
 
 import { RentRollService } from './rent-roll.service';
 import { RentRollController } from './rent-roll.controller';
@@ -26,11 +27,13 @@ import { RentRollController } from './rent-roll.controller';
         MriArService,
         MriNotesService,
         RentRollService,
+        MriVacantSuitesService
     ],
     controllers: [
         RentRollController,
     ],
     exports: [
+        MriVacantSuitesService,
         MriCoreService,
         MriLeasesService,
         MriOptionsService,

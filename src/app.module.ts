@@ -10,10 +10,14 @@ import { DatabaseModule } from './database/database.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { RentRollModule } from './modules/rent-roll/rent-roll.module';
+import { PropertyAssetsModule } from './modules/property-assets/property-assets.module';
+import { PropertiesModule } from './modules/properties/properties.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { ConfigService } from '@nestjs/config';
+import { PropertyManagementModule } from './modules/property-management/property-management.module';
+
 
 @Module({
   imports: [
@@ -28,6 +32,10 @@ import { ConfigService } from '@nestjs/config';
     CompanyUserModule,
     TasksModule,
     RentRollModule,
+    PropertyAssetsModule,
+    PropertiesModule,
+    PropertyManagementModule,
+
   ],
   providers: [
     {

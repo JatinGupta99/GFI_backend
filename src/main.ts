@@ -10,10 +10,18 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { PropertySeeder } from './modules/properties/seeds/property.seed';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+
+  // Run seeding in background, don't block app startup
+  const propertySeeder = app.get(PropertySeeder);
+  console.log('🌱 Starting property seeding...');
+  propertySeeder.seed().catch((error) => {
+    console.error('❌ Failed to seed properties:', error);
+  });
 
   app.setGlobalPrefix('api', {
     exclude: ['docs', 'admin/queues'],

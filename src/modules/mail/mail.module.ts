@@ -28,12 +28,12 @@ import { MailService } from './mail.service';
         const logger = new Logger('MailModule');
         logger.log(
           '📧 Mailer Transport Config: ' +
-            JSON.stringify({
-              host: transportConfig.host,
-              port: transportConfig.port,
-              secure: transportConfig.secure,
-              authUser: transportConfig.auth.user,
-            }),
+          JSON.stringify({
+            host: transportConfig.host,
+            port: transportConfig.port,
+            secure: transportConfig.secure,
+            authUser: transportConfig.auth.user,
+          }),
         );
 
         return {
@@ -44,7 +44,17 @@ import { MailService } from './mail.service';
           template: {
             dir: join(__dirname, 'templates'),
             adapter: new HandlebarsAdapter(),
-            options: { strict: true },
+            options: {
+              strict: true,
+            },
+          },
+          options: {
+            partials: {
+              dir: join(__dirname, 'templates', 'partials'),
+              options: {
+                strict: true,
+              },
+            },
           },
         };
       },
@@ -53,4 +63,4 @@ import { MailService } from './mail.service';
   providers: [MailService],
   exports: [MailService],
 })
-export class MailModule {}
+export class MailModule { }

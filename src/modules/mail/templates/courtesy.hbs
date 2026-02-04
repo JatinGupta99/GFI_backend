@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{subject}}</title>
+    {{> styles}}
+</head>
+
+<body>
+    <div class="container">
+        {{> header}}
+
+        <div class="content">
+            <div class="notice-header">Courtesy Notice</div>
+
+            <p class="greeting">Hi {{firstName}},</p>
+
+            <p>
+                As of today, we have not received your rent for the month. I've attached a courtesy statement for your
+                review. Please send your rent check immediately to avoid further actions.
+            </p>
+
+            <div
+                style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 6px; margin: 20px 0;">
+                <p
+                    style="font-weight: bold; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px; color: #1e293b;">
+                    Property Details:
+                </p>
+                <p style="margin: 0; line-height: 1.8;">
+                    <strong>{{propertyName}}</strong><br>
+                    {{premisesAddress}}
+                </p>
+            </div>
+
+            <p>Please let me know if you have any questions or if payment has already been sent.</p>
+
+            <div class="closing">
+                <p>Thanks,</p>
+                <p>
+                    <strong>{{userName}}</strong><br>
+                    {{userTitle}}<br>
+                    Global Fund Investments
+                </p>
+            </div>
+        </div>
+
+        {{> footer}}
+    </div>
+</body>
+
+</html>

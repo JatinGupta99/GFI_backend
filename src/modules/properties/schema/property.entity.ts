@@ -1,17 +1,29 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Types } from 'mongoose';
-import { Suite } from '../../suites/schema/suite.schema';
+import { Document } from 'mongoose';
+import { PropertyName } from '../enums/property-name.enum';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Property {
-  @Prop({ required: true })
-  name: string;
+  @Prop({
+    type: String,
+    required: true,
+    unique: true,
+    index: true,
+  })
+  propertyId: string;
 
-  @Prop({ required: true })
-  region: string; // FL, TX
+  @Prop({
+    type: String,
+    required: true,
+    enum: Object.values(PropertyName),
+  })
+  propertyName: PropertyName;
 
-  @Prop({ type: [{ type: Types.ObjectId, ref: 'Suite' }] })
-  suites: Suite[];
+  @Prop({
+    type: String,
+    required: true,
+  })
+  region: string;
 }
 
 export type PropertyDocument = Property & Document;

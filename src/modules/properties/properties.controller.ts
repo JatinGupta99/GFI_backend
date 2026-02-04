@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -13,7 +14,7 @@ import { UpdatePropertyDto } from './dto/update-property.dto';
 
 @Controller('properties')
 export class PropertiesController {
-  constructor(private readonly propertiesService: PropertiesService) {}
+  constructor(private readonly propertiesService: PropertiesService) { }
 
   @Post()
   create(@Body() createPropertyDto: CreatePropertyDto) {
@@ -27,7 +28,7 @@ export class PropertiesController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.propertiesService.findOne(+id);
+    return this.propertiesService.findOne(id);
   }
 
   @Patch(':id')
@@ -35,11 +36,17 @@ export class PropertiesController {
     @Param('id') id: string,
     @Body() updatePropertyDto: UpdatePropertyDto,
   ) {
-    return this.propertiesService.update(+id, updatePropertyDto);
+    return this.propertiesService.update(id, updatePropertyDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.propertiesService.remove(+id);
+    return this.propertiesService.remove(id);
+  }
+
+  @Get(':id/vacant-suites')
+  getVacantSuites(@Param('id') id: string, @Query('afterDate') afterDate?: string) {
+    return this.propertiesService.getVacantSuites(id, afterDate);
   }
 }
+

@@ -24,4 +24,24 @@ export const EmailConfigs: Record<EmailType, EmailConfig> = {
     template: 'login-otp',
     required: ['email', 'name', 'otp', 'year'],
   },
+  [EmailType.GENERAL]: {
+    subject: (data) => data?.subject || 'Notification from Global FI',
+    template: 'general',
+    required: ['email'],
+  },
+  [EmailType.COURTESY]: {
+    subject: (data) => data?.subject || 'Courtesy Notice',
+    template: 'courtesy',
+    required: ['email'],
+  },
+  [EmailType.THREE_DAY]: {
+    subject: (data) => data?.subject || '3-Day Notice',
+    template: 'three-day',
+    required: ['email'],
+  },
+  [EmailType.ATTORNEY]: {
+    subject: (data) => data?.subject || 'Attorney Notice',
+    template: 'attorney',
+    required: ['email'],
+  },
 };

@@ -19,7 +19,7 @@ import { BulkUpdateStatusDto } from './dto/bulk-update-status.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { ValidateObjectIdPipe } from '../../common/utils/parse-mongo.utils';
-import { UserId } from '../../common/decorators/user-id.decorator copy';
+import { UserId } from '../../common/decorators/user-id.decorator';
 
 @ApiTags('Tasks')
 @Controller('tasks')
@@ -35,7 +35,7 @@ export class TasksController {
 
     @Patch('bulk-status-update')
     @ResponseMessage('Tasks updated successfully')
-    bulkUpdateStatus(@Body() bulkUpdateStatusDto: BulkUpdateStatusDto, @UserId() userId: string) {
+    bulkUpdateStatus(@Body() bulkUpdateStatusDto: BulkUpdateStatusDto, @UserId('userId') userId: string) {
         return this.tasksService.bulkUpdateStatus(
             bulkUpdateStatusDto.ids,
             bulkUpdateStatusDto.isCompleted,
@@ -74,7 +74,7 @@ export class TasksController {
 
     @Post(':id/toggle-status')
     @ResponseMessage('Task status toggled successfully')
-    toggleStatus(@Param('id', new ValidateObjectIdPipe('Task ID')) id: string, @UserId() userId: string) {
+    toggleStatus(@Param('id', new ValidateObjectIdPipe('Task ID')) id: string, @UserId('userId') userId: string) {
         return this.tasksService.toggleStatus(id, userId);
     }
 

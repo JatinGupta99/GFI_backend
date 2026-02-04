@@ -1,48 +1,58 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
 @Schema({ _id: false })
+@Schema({ _id: false })
+export class Assets {
+    @Prop({ default: false })
+    checkingSavings: boolean;
+
+    @Prop({ default: false })
+    stocksBonds: boolean;
+
+    @Prop({ default: false })
+    retirementAccounts: boolean;
+
+    @Prop({ default: '' })
+    automobiles: string;
+
+    @Prop({ default: '' })
+    realEstateResidence: string;
+
+    @Prop({ default: '' })
+    realEstateInvestment: string;
+
+    @Prop({ default: '' })
+    otherAssets: string;
+}
+
+@Schema({ _id: false })
+export class Liabilities {
+    @Prop({ default: '' })
+    creditCardBalances: string;
+
+    @Prop({ default: '' })
+    taxesPayable: string;
+
+    @Prop({ default: '' })
+    mortgagesDue: string;
+
+    @Prop({ default: '' })
+    otherLiabilities: string;
+}
+
+@Schema({ _id: false })
 export class FinancialDetails {
-    @Prop({ default: 0 })
-    assetsCheckingAcct: number;
+    @Prop({ type: Assets, default: () => ({}) })
+    assets: Assets;
 
-    @Prop({ default: 0 })
-    assetsSavingsAcct: number;
-
-    @Prop({ default: 0 })
-    assetsStocksBonds: number;
-
-    @Prop({ default: 0 })
-    assetsRealEstate: number;
-
-    @Prop({ default: 0 })
-    totalAssets: number;
-
-    @Prop({ default: 0 })
-    totalLiabilities: number;
-
-    @Prop({ default: 0 })
-    netWorth: number;
-
-    @Prop({ default: 0 })
-    creditScore: number;
-
-    @Prop({ default: 0 })
-    liquidAssets: number;
+    @Prop({ type: Liabilities, default: () => ({}) })
+    liabilities: Liabilities;
 
     @Prop({ default: '' })
-    guarantorSsn: string;
+    annualIncome: string;
 
     @Prop({ default: '' })
-    guarantor: string;
-
-    @Prop({ default: 0 })
-    annualIncome: number;
-
-    @Prop({ default: '' })
-    sourceOfIncome: string;
-
-    @Prop({ default: '' })
-    qualifier: string;
+    monthlyMortgageRent: string;
 }
 
 export const FinancialDetailsSchema = SchemaFactory.createForClass(FinancialDetails);

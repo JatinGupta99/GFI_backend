@@ -1,18 +1,26 @@
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+
+export class AssetsDto {
+    @IsOptional() @IsBoolean() checkingSavings?: boolean;
+    @IsOptional() @IsBoolean() stocksBonds?: boolean;
+    @IsOptional() @IsBoolean() retirementAccounts?: boolean;
+    @IsOptional() @IsString() automobiles?: string;
+    @IsOptional() @IsString() realEstateResidence?: string;
+    @IsOptional() @IsString() realEstateInvestment?: string;
+    @IsOptional() @IsString() otherAssets?: string;
+}
+
+export class LiabilitiesDto {
+    @IsOptional() @IsString() creditCardBalances?: string;
+    @IsOptional() @IsString() taxesPayable?: string;
+    @IsOptional() @IsString() mortgagesDue?: string;
+    @IsOptional() @IsString() otherLiabilities?: string;
+}
 
 export class FinancialDetailsDto {
-    @IsOptional() @IsNumber() assetsCheckingAcct?: number;
-    @IsOptional() @IsNumber() assetsSavingsAcct?: number;
-    @IsOptional() @IsNumber() assetsStocksBonds?: number;
-    @IsOptional() @IsNumber() assetsRealEstate?: number;
-    @IsOptional() @IsNumber() totalAssets?: number;
-    @IsOptional() @IsNumber() totalLiabilities?: number;
-    @IsOptional() @IsNumber() netWorth?: number;
-    @IsOptional() @IsNumber() creditScore?: number;
-    @IsOptional() @IsNumber() liquidAssets?: number;
-    @IsOptional() @IsString() guarantorSsn?: string;
-    @IsOptional() @IsString() guarantor?: string;
-    @IsOptional() @IsNumber() annualIncome?: number;
-    @IsOptional() @IsString() sourceOfIncome?: string;
-    @IsOptional() @IsString() qualifier?: string;
+    @IsOptional() @ValidateNested() @Type(() => AssetsDto) assets?: AssetsDto;
+    @IsOptional() @ValidateNested() @Type(() => LiabilitiesDto) liabilities?: LiabilitiesDto;
+    @IsOptional() @IsString() annualIncome?: string;
+    @IsOptional() @IsString() monthlyMortgageRent?: string;
 }

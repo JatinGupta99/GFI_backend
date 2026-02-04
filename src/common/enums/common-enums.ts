@@ -13,11 +13,19 @@ export enum MediaEntityType {
   USER = 'user',
   COMPANY = 'company',
   MEDIA = 'media',
+  USERS = 'users',
+  LEADS = 'leads',
+  EVENTS = 'events',
+  GENERAL = 'general',
 }
 export enum EmailType {
   PASSWORD_RESET = 'PASSWORD_RESET',
   SETUP_ACCOUNT = 'SETUP_ACCOUNT',
   LOGIN_OTP = 'LOGIN_OTP',
+  GENERAL = 'GENERAL',
+  COURTESY = 'COURTESY',
+  THREE_DAY = 'THREE_DAY',
+  ATTORNEY = 'ATTORNEY',
 }
 export enum LeadType {
   GENERAL = 'general',
@@ -81,11 +89,4 @@ export enum PropertyList {
   CROSSROADS_SHOPPING_CENTER = 'Crossroads Shopping Center',
   RICHWOOD = 'Richwood',
   GRAND_AVENUE_CENTER = 'Grand Avenue Center',
-}
-
-export enum MediaEntityType {
-  USERS = 'users',
-  LEADS = 'leads',
-  EVENTS = 'events',
-  GENERAL = 'general',
 }

@@ -1,4 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Types } from 'mongoose';
+import { Property } from '../../../properties/schema/property.entity';
 
 @Schema({ _id: false })
 export class GeneralDetails {
@@ -7,18 +9,20 @@ export class GeneralDetails {
 
     @Prop({ default: '' })
     lastName: string;
-
     @Prop({ default: '' })
     email: string;
-
     @Prop({ default: '' })
     cellPhone: string;
-
     @Prop({ default: '' })
     workPhone: string;
+    @Prop({ default: '' })
+    dob: string;
 
     @Prop({ default: '' })
     jobTitle: string;
+
+    @Prop({ default: '' })
+    ssn: string;
 
     @Prop({ default: '' })
     spouseName: string;
@@ -26,6 +30,9 @@ export class GeneralDetails {
     @Prop({ default: '' })
     businessName: string;
 
+
+    @Prop({ default: '' })
+    spouseSsn: string;
     @Prop({ default: '' })
     mailingAddress: string;
 
@@ -33,18 +40,21 @@ export class GeneralDetails {
     residentialAddress: string;
 
     @Prop({ default: '' })
-    city: string;
+    howLongAtAddress: string;
 
     @Prop({ default: '' })
-    state: string;
+    presentEmployer: string;
 
     @Prop({ default: '' })
-    zip: string;
+    businessExperienceSummary: string;
 
-    @Prop({ default: '' })
-    use: string;
+    @Prop({ default: false })
+    hasCoApplicant: boolean;
 
-    @Prop({ default: '' })
+    @Prop({ default: false })
+    driversLicenseUploaded: boolean;
+
+    @Prop({ type: String, ref: Property.name, required: true })
     property: string;
 
     @Prop({ default: '' })
@@ -52,6 +62,9 @@ export class GeneralDetails {
 
     @Prop({ default: '' })
     sf: string;
+
+    @Prop({ default: '' })
+    notes: string;
 }
 
 export const GeneralDetailsSchema = SchemaFactory.createForClass(GeneralDetails);

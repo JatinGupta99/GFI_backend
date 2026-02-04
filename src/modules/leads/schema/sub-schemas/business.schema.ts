@@ -6,37 +6,31 @@ export class BusinessDetails {
     legalName: string;
 
     @Prop({ default: '' })
-    taxId: string;
-
-    @Prop({ default: '' })
-    typeOfEntity: string;
+    fein: string; // updated from taxId
 
     @Prop({ default: '' })
     stateOfIncorporation: string;
 
     @Prop({ default: '' })
-    corporateAddress: string;
+    tradeName: string;
+
+    @Prop({ default: '' })
+    currentBusinessAddress: string;
+
+    @Prop({ default: '' })
+    proposedBusinessDescription: string;
 
     @Prop({ default: '' })
     businessTelephone: string;
 
     @Prop({ default: '' })
-    businessDescription: string;
+    isRelocating: string;
 
     @Prop({ default: '' })
-    tradeName: string;
+    howLongInBusiness: string;
 
-    @Prop({ default: 0 })
-    yearsInBusiness: number;
-
-    @Prop({ default: false })
-    areYouLicensed: boolean;
-
-    @Prop({ default: 0 })
-    numLocations: number;
-
-    @Prop({ default: false })
-    areYouRelocating: boolean;
+    @Prop({ default: '' })
+    howManyLocations: string;
 }
 
 export const BusinessDetailsSchema = SchemaFactory.createForClass(BusinessDetails);

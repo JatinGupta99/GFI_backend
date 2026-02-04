@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{subject}}</title>
+    {{> styles}}
+</head>
+
+<body>
+    <div class="container">
+        {{> header}}
+
+        <div class="content">
+            <div class="notice-header">Notice to Attorney</div>
+
+            <p class="greeting">Hi {{attorneyName}},</p>
+
+            <p>
+                <strong>{{tenantName}}</strong>'s 3-Day Notice has expired. Please see attached tenant's lease and all
+                amendments (if any), 3-Day Notice sent to tenant, and tenant's accounting statement.
+            </p>
+
+            <div
+                style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 6px; margin: 20px 0;">
+                <p
+                    style="font-weight: bold; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px; color: #1e293b;">
+                    Contacts for tenant:
+                </p>
+                <p style="margin: 0; line-height: 1.8;">
+                    <strong>{{tenantFullName}}</strong><br>
+                    {{tenantCompanyName}}<br>
+                    {{tenantAddress}}<br>
+                    <a href="mailto:{{tenantMail}}"
+                        style="color: #3b82f6; text-decoration: none;">{{tenantMail}}</a><br>
+                    {{tenantContact}}
+                </p>
+            </div>
+
+            <p>Please let me know if you need anything further to issue a demand.</p>
+
+            <div class="closing">
+                <p>Thanks,</p>
+                <p>
+                    <strong>{{userName}}</strong><br>
+                    {{userTitle}}<br>
+                    Global Fund Investments
+                </p>
+            </div>
+        </div>
+
+        {{> footer}}
+    </div>
+</body>
+
+</html>
