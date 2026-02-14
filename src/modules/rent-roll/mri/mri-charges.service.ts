@@ -13,6 +13,6 @@ export class MriChargesService {
     constructor(private readonly mri: MriCoreService) { }
 
     async fetch(leaseId: string): Promise<MriChargeRaw[]> {
-        return this.mri.get<MriChargeRaw[]>('MRI_S-PMRM_RecurringCharges', { LeaseID: leaseId });
+        return this.mri.get<MriChargeRaw[]>('MRI_S-PMRM_RecurringCharges', { LEASEID: leaseId });
     }
 }

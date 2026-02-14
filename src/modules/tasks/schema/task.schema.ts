@@ -1,7 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { PropertyList } from '../../../common/enums/common-enums';
-
 export type TaskDocument = Task & Document;
 
 export enum TaskPriority {
@@ -39,8 +37,8 @@ export class Task {
     @Prop({ type: String, required: true })
     ownerName: string;
 
-    @Prop({ type: String, enum: PropertyList, required: true })
-    property: PropertyList;
+    @Prop({ type: String, required: true })
+    property: string;
 
     @Prop({ type: String, enum: TaskPriority, default: TaskPriority.MEDIUM })
     priority: TaskPriority;

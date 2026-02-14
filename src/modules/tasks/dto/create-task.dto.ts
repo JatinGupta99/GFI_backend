@@ -10,7 +10,6 @@ import {
     IsString,
     ValidateNested,
 } from 'class-validator';
-import { PropertyList } from '../../../common/enums/common-enums';
 import { TaskPriority } from '../schema/task.schema';
 
 export class AttachmentDto {
@@ -48,9 +47,9 @@ export class CreateTaskDto {
     @Transform(({ value }) => value?.trim())
     description?: string;
 
-    @ApiProperty({ enum: PropertyList, example: PropertyList.DELTONA_COMMONS })
-    @IsEnum(PropertyList, { message: 'Invalid property name' })
-    property: PropertyList;
+    @IsString()
+    @IsNotEmpty()
+    property: string;
 
     @ApiPropertyOptional({ enum: TaskPriority, default: TaskPriority.MEDIUM })
     @IsOptional()

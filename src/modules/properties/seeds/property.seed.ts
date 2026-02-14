@@ -12,7 +12,7 @@ export class PropertySeeder {
   constructor(
     @InjectModel(Property.name)
     private readonly propertyModel: Model<PropertyDocument>,
-  ) { }
+  ) {}
 
   async seed(): Promise<void> {
     try {
@@ -49,7 +49,7 @@ export class PropertySeeder {
         { propertyId: 20, propertyName: PropertyName.RICHWOOD, region: 'TX' },
         { propertyId: 21, propertyName: PropertyName.GRAND_AVENUE_CENTER, region: 'FL' },
       ];
-
+      
       console.log("📝 Inserting properties...");
       // Retry insertMany for transient connection issues
       const maxAttempts = 5;
@@ -75,6 +75,18 @@ export class PropertySeeder {
     } catch (error) {
       console.error('❌ Error seeding properties:', error.message);
       this.logger.error(`Error seeding properties: ${error.message}`, error.stack);
+    }
+  }
+
+  private async waitForMongooseConnection(timeoutMs = 30000): Promise<void> {
+    const start = Date.now();
+    while (mongoose.connection.readyState !== 1) {
+      if (Date.now() - start > timeoutMs) {
+        const msg = `Mongoose connection not ready after ${timeoutMs}ms. readyState=${mongoose.connection.readyState}`;
+        this.logger.error(msg);
+        throw new Error(msg);
+      }
+      await new Promise((res) => setTimeout(res, 500));
     }
   }
 }

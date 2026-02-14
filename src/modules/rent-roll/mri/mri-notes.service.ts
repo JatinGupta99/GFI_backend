@@ -22,6 +22,6 @@ export class MriNotesService {
      */
     async fetch(buildingId: string, leaseId: string): Promise<MriNoteRaw[]> {
         const path = `api/applications/Integrations/CM/Leases/Notes/${buildingId}`;
-        return this.mri.getRest<MriNoteRaw[]>(path, { leaseId });
+        return this.mri.getRest<MriNoteRaw[]>(path, { LEASEID: leaseId });
     }
 }

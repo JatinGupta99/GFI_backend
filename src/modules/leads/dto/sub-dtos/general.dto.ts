@@ -1,5 +1,4 @@
 import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
-import { PropertyList } from '../../../../common/enums/common-enums';
 
 export class GeneralDetailsDto {
     @IsOptional() @IsString() name?: string;
@@ -16,7 +15,13 @@ export class GeneralDetailsDto {
     @IsOptional() @IsString() businessExperienceSummary?: string;
     @IsOptional() @IsBoolean() hasCoApplicant?: boolean;
     @IsOptional() @IsBoolean() driversLicenseUploaded?: boolean;
-    @IsOptional() @IsEnum(PropertyList) property?: PropertyList;
+    @IsOptional() @IsString() email?: string;
+    @IsOptional() @IsString() cellPhone?: string;
+    @IsOptional() @IsString() workPhone?: string;
+    @IsOptional() @IsString() businessName?: string;
+    @IsOptional() @IsString() mailingAddress?: string;
+    @IsOptional() @IsString() use?: string;
+    @IsOptional() @IsString() property?: string;
     @IsOptional() @IsString() suite?: string;
     @IsOptional() @IsString() sf?: string;
     @IsOptional() @IsString() notes?: string;

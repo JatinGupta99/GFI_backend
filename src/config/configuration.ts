@@ -84,4 +84,11 @@ export const configuration = () => ({
         developerKey: process.env.DEVELOPER_API_KEY || '',
         apiUrl: process.env.MRI_API_URL || 'https://pmx7api.cloud.mrisoftware.com/mriapiservices/api.asp',
     },
+
+    docAi: {
+        projectId: process.env.GOOGLE_DOCUMENT_AI_PROJECT_ID,
+        location: process.env.GOOGLE_DOCUMENT_AI_LOCATION || 'us',
+        processorId: process.env.GOOGLE_DOCUMENT_AI_PROCESSOR_ID,
+        credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    },
 });

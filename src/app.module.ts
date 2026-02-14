@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
 import { MongooseModule } from '@nestjs/mongoose';
 import { WinstonModule } from 'nest-winston';
 import { winstonConfig } from './common/utils/logger.config';
@@ -15,8 +16,10 @@ import { PropertiesModule } from './modules/properties/properties.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
-import { ConfigService } from '@nestjs/config';
+
 import { PropertyManagementModule } from './modules/property-management/property-management.module';
+import { LeasingModule } from './modules/leasing/leasing.module';
+import { AppCacheModule } from './common/cache/app-cache.module';
 
 
 @Module({
@@ -35,7 +38,18 @@ import { PropertyManagementModule } from './modules/property-management/property
     PropertyAssetsModule,
     PropertiesModule,
     PropertyManagementModule,
-
+    LeasingModule,
+    AppCacheModule,
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        connection: {
+          host: configService.get('redis.host'),
+          port: configService.get('redis.port'),
+        },
+      }),
+      inject: [ConfigService],
+    }),
   ],
   providers: [
     {

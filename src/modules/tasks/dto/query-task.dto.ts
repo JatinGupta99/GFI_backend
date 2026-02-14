@@ -1,15 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { PropertyList } from '../../../common/enums/common-enums';
-import { TaskPriority } from '../schema/task.schema';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { TaskPriority } from '../schema/task.schema';
 
 export class QueryTaskDto extends PaginationQueryDto {
-    @ApiPropertyOptional({ enum: PropertyList })
     @IsOptional()
-    @IsEnum(PropertyList)
-    property?: PropertyList;
+    @IsString()
+    property?: string;
 
     @ApiPropertyOptional({ enum: TaskPriority })
     @IsOptional()

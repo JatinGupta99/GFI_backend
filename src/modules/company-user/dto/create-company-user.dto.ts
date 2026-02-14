@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsArray, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { PropertyList, UserRole } from '../../../common/enums/common-enums';
+import { UserRole } from '../../../common/enums/common-enums';
 
 export class CreateCompanyUserDto {
   @ApiProperty({ example: 'John Doe' })
@@ -23,9 +23,10 @@ export class CreateCompanyUserDto {
   @IsEnum(UserRole, { message: 'Invalid user role' })
   role: UserRole = UserRole.VIEWER;
 
+  @ApiProperty({ example: ['008400'], type: [String] })
   @IsOptional()
   @IsArray()
-  @IsEnum(PropertyList, { each: true, message: 'Invalid property name' })
-  properties?: PropertyList[];
+  @IsString({ each: true })
+  properties?: string[];
 
 }

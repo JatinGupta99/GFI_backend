@@ -4,7 +4,6 @@ import * as bcrypt from 'bcrypt';
 import {
   AccountStatus,
   UserRole,
-  PropertyList,
 } from '../../../common/enums/common-enums';
 import { configuration } from '../../../config/configuration';
 
@@ -49,8 +48,8 @@ export class CompanyUser {
   @Prop({ type: String, default: null })
   deletedBy: string;
 
-  @Prop({ type: [String], enum: PropertyList, default: [] })
-  properties?: PropertyList[];
+  @Prop({ type: [String], default: [] })
+  properties?: string[];
 }
 
 export const CompanyUserSchema = SchemaFactory.createForClass(CompanyUser);

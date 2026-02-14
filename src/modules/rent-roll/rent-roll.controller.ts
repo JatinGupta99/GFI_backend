@@ -9,15 +9,22 @@ export class RentRollController {
     constructor(private readonly rentRollService: RentRollService) { }
 
     @Get(':propertyId')
-    // @CacheTTL(15 * 60 * 1000) // TTL in milliseconds for Cache Manager v5+
     async getRentRoll(
         @Param('propertyId') propertyId: string,
         @Query('page') page?: number,
-        @Query('size') size?: number
-    ): Promise<RentRollRow[]> {
-        // Note: Pagination logic is currently stubbed as the requirement focuses on the structure.
-        // In a real implementation, we would splice the results array here or pass params to the service.
+        @Query('limit') limit?: number
+    ): Promise<{ data: RentRollRow[], total: number }> {
+        return this.rentRollService.getRentRoll(propertyId, page, limit);
+    }
 
-        return this.rentRollService.getRentRoll(propertyId);
+    @Get(':propertyId/upcoming-renewals')
+    async getUpcomingRenewals(
+        @Param('propertyId') propertyId: string,
+        @Query('page') page: number = 1,
+        @Query('limit') limit: number = 20,
+        @Query('search') search?: string,
+        @Query('status') status?: string
+    ): Promise<{ data: RentRollRow[], total: number }> {
+        return this.rentRollService.getUpcomingRenewals(propertyId, page, limit, search, status);
     }
 }

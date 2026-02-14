@@ -36,6 +36,7 @@ export class CompanyUserService {
         email: user.email,
         name: user.name,
         role: user.role,
+        properties: user.properties,
       },
     };
   }

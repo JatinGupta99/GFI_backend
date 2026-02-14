@@ -1,16 +1,16 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import { LeadStatus } from '../../../common/enums/common-enums';
-import { GeneralDetailsSchema, GeneralDetails } from './sub-schemas/general.schema';
-import { BusinessDetailsSchema, BusinessDetails } from './sub-schemas/business.schema';
-import { FinancialDetailsSchema, FinancialDetails } from './sub-schemas/financial.schema';
-import { DealTermsSchema, DealTerms } from './sub-schemas/deal-terms.schema';
-import { FileInfoSchema, FileInfo } from './sub-schemas/file.schema';
-import { ActivityLogSchema, ActivityLog } from './sub-schemas/activity.schema';
-import { ReferenceInfoSchema, ReferenceInfo } from './sub-schemas/reference.schema';
-import { DraftingDetailsSchema, DraftingDetails } from './sub-schemas/drafting.schema';
-import { AccountingDetailsSchema, AccountingDetails } from './sub-schemas/accounting.schema';
-import { BrokerInfoSchema, BrokerInfo } from './sub-schemas/broker.schema';
+import { FormStatus, LeadStatus } from '../../../common/enums/common-enums';
+import { AccountingDetails, AccountingDetailsSchema } from './sub-schemas/accounting.schema';
+import { ActivityLog, ActivityLogSchema } from './sub-schemas/activity.schema';
+import { BrokerInfo, BrokerInfoSchema } from './sub-schemas/broker.schema';
+import { BusinessDetails, BusinessDetailsSchema } from './sub-schemas/business.schema';
+import { DealTerms, DealTermsSchema } from './sub-schemas/deal-terms.schema';
+import { DraftingDetails, DraftingDetailsSchema } from './sub-schemas/drafting.schema';
+import { FileInfo, FileInfoSchema } from './sub-schemas/file.schema';
+import { FinancialDetails, FinancialDetailsSchema } from './sub-schemas/financial.schema';
+import { GeneralDetails, GeneralDetailsSchema } from './sub-schemas/general.schema';
+import { ReferenceInfo, ReferenceInfoSchema } from './sub-schemas/reference.schema';
 
 @Schema({ timestamps: true })
 export class Lead {
@@ -61,6 +61,13 @@ export class Lead {
 
   @Prop({ default: '' })
   lastModifiedBy: string;
+
+  @Prop({
+    type: String,
+    enum: Object.values(FormStatus),
+    default: FormStatus.CREATED,
+  })
+  form_status?: FormStatus;
 }
 
 export type LeadDocument = Lead & Document;

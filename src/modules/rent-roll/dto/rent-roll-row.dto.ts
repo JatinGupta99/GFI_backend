@@ -3,10 +3,15 @@ export interface RentRollRow {
   tenantName: string;
   suite: string;
   sf: number;
-  options: string; // e.g., "Renewal"
-  annualRentPerSF: number; // Calculated
-  nnnPerSF: number;      // Calculated
+  expDate: string;
+  options: string; // e.g., "Yes/No"
+  optionTerm: string;    // e.g., "60 months"
+  currentRentPerSF: number; // Calculated
+  budgetRenew: string;      // Budget Status/Type
+  budgetRentPerSF: number;
+  budgetTIPerSF: number;
+  budgetRCD: string;
+  status: string;           // Occupancy Status
   arBalance: number;
   notes: string;
-  optionTerm: string;    // e.g., "Start - End"
 }

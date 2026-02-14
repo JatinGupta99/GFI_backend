@@ -1,9 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
@@ -34,6 +36,14 @@ export class SignupDto {
     enum: UserRole,
     example: UserRole.VIEWER,
   })
-  @IsEnum(UserRole, { message: 'Invalid user role' })
+  @IsEnum(UserRole, {
+    message: `Invalid user role. Allowed roles are: ${Object.values(UserRole).join(', ')}`,
+  })
   role: UserRole = UserRole.VIEWER;
+
+  @ApiProperty({ example: ['008400'], type: [String], required: false })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  properties?: string[];
 }

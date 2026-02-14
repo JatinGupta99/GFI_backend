@@ -1,4 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { LeadStatus } from '../../../../common/enums/common-enums';
 
 @Schema({ _id: false })
 export class FileInfo {
@@ -22,6 +23,15 @@ export class FileInfo {
 
     @Prop({ default: 'other' })
     category: string;
+
+    @Prop({ default: LeadStatus.PENDING })
+    processingStatus: LeadStatus; // PENDING, PROCESSED, FAILED
+
+    @Prop({ default: 0 })
+    confidence: number;
+
+    @Prop({ type: Object, default: {} })
+    extractedData: any;
 }
 
 export const FileInfoSchema = SchemaFactory.createForClass(FileInfo);

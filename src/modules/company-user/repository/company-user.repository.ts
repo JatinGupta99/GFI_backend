@@ -39,8 +39,8 @@ export class CompanyUserRepository {
       search = '',
       page = 1,
       limit = 10,
-      sortBy = 'name',
-      sortOrder = 'asc',
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
     } = query;
 
     const filter: any = {};

@@ -93,6 +93,33 @@ export class MediaService {
     return { key, url };
   }
 
+  async uploadFile(buffer: Buffer, contentType: string, folderPath: string): Promise<{ key: string; url: string }> {
+    this.validateFile(contentType);
+    const key = this.generateKey(folderPath, contentType);
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    });
+
+    try {
+      await this.s3Client.send(command);
+      // Generate a signed URL for immediate access if needed, or just return the key
+      // Returning a signed URL with default expiry for convenience
+      const url = await getSignedUrl(this.s3Client, new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      }), { expiresIn: this.downloadUrlExpire });
+
+      return { key, url };
+    } catch (error) {
+      console.error('Failed to upload file:', error);
+      throw new InternalServerErrorException('Failed to upload file to S3');
+    }
+  }
+
   async generateDownloadUrl(key: string, downloadUrlExpire = this.downloadUrlExpire) {
     const filename = key.split('/').pop();
     const command = new GetObjectCommand({
@@ -130,6 +157,25 @@ export class MediaService {
     } catch (error) {
       console.error('Failed to delete file:', error);
       throw new InternalServerErrorException('Failed to delete file in S3');
+    }
+  }
+
+  async getFileBuffer(key: string): Promise<Buffer> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+
+    try {
+      const response = await this.s3Client.send(command);
+      if (!response.Body) {
+        throw new InternalServerErrorException('File body is empty');
+      }
+      const byteArray = await response.Body.transformToByteArray();
+      return Buffer.from(byteArray);
+    } catch (error) {
+      console.error('Failed to get file buffer:', error);
+      throw new InternalServerErrorException('Failed to retrieve file from S3');
     }
   }
 

@@ -45,6 +45,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
+        properties: user.properties,
       },
     };
   }
@@ -104,6 +105,7 @@ export class AuthService {
 
     await this.companyUserRepo.update(user._id.toString(), {
       password: dto.newPassword,
+
     });
     await this.userTokenService.markTokenUsed(tokenRecord._id.toString(), type);
 
@@ -134,6 +136,7 @@ export class AuthService {
       name: user.name,
       role: user.role,
       avatar: user.avatar,
+      properties: user.properties,
     };
 
     const access_token = this.jwtService.sign(payload);

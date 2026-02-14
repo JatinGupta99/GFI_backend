@@ -1,6 +1,6 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { CreateCompanyUserDto } from './create-company-user.dto';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 import { IsStrongPassword } from '../../../common/validators/isStrongPassword';
 import { Transform } from 'class-transformer';
 
@@ -31,4 +31,12 @@ export class UpdateCompanyUserDto {
   @IsOptional({ message: 'Email is required' })
   @Transform(({ value }) => value?.trim().toLowerCase())
   email?: string;
+  @ApiProperty({ example: ['008400'], type: [String], required: false })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  properties?: string[];
+  @IsString()
+  @IsOptional()
+  role?: string;
 }

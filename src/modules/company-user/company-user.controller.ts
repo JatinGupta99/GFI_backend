@@ -18,6 +18,7 @@ import { CompanyUserService } from './company-user.service';
 import { CreateCompanyUserDto } from './dto/create-company-user.dto';
 import { QueryCompanyUserDto } from './dto/query-company-user.dto';
 import { UpdateCompanyUserDto } from './dto/update-company-user.dto';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Company User')
 @Controller('company-user')
@@ -73,6 +74,7 @@ export class CompanyUserController {
 
 
   @Post(':id/attachments/upload-url')
+  @Public()
   @ResponseMessage('Upload URL generated successfully')
   getUploadUrl(
     @Param('id', new ValidateObjectIdPipe('User ID')) id: string,
