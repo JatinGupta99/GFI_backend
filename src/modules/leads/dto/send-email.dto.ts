@@ -1,4 +1,4 @@
-import { IsString, IsArray, IsOptional } from 'class-validator';
+import { IsString, IsArray, IsOptional, IsObject } from 'class-validator';
 
 export class SendLoiEmailDto {
     @IsString()
@@ -51,8 +51,12 @@ export class SendApprovalEmailDto {
     subject: string;
 
     @IsOptional()
-    @IsString()
-    body?: string;
+    body?: string | {
+        loggedin_name?: string;
+        loggedin_role?: string;
+        loggedin_co_name?: string;
+        formBody?: any;
+    };
 
     @IsArray()
     @IsString({ each: true })
@@ -61,6 +65,11 @@ export class SendApprovalEmailDto {
 
     @IsOptional()
     payload?: any;
+
+    @IsArray()
+    @IsString({ each: true })
+    @IsOptional()
+    items?: string[];
 }
 
 export class SendRenewalLetterDto {
@@ -88,4 +97,20 @@ export class SendRenewalLetterDto {
 
     @IsOptional()
     addFollowUpTask?: boolean;
+}
+
+export class SendTenantMagicLinkDto {
+    @IsOptional()
+    @IsString()
+    email?: string;
+    @IsOptional()
+    @IsString({ each: true })
+    cc?: string[];
+
+    @IsOptional()
+    @IsString()
+    subject?: string;
+
+    @IsOptional()
+    body?: string | any;
 }

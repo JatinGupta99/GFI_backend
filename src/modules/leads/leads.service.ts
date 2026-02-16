@@ -9,7 +9,7 @@ import { Lead } from './schema/lead.schema';
 import { MailService } from '../mail/mail.service';
 import { MediaService } from '../media/media.service';
 import { CompanyUserService } from '../company-user/company-user.service';
-import { SendLoiEmailDto, SendAppEmailDto, SendApprovalEmailDto, SendRenewalLetterDto } from './dto/send-email.dto';
+import { SendLoiEmailDto, SendAppEmailDto, SendApprovalEmailDto, SendRenewalLetterDto, SendTenantMagicLinkDto } from './dto/send-email.dto';
 import { EmailType } from '../../common/enums/common-enums';
 import { TasksService } from '../tasks/tasks.service';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -22,7 +22,9 @@ import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
 import { FormStatus } from '../../common/enums/common-enums';
 import { ConfigService } from '@nestjs/config';
 
-
+export const COMPANY = {
+  NAME: 'Global Fund Investments',
+}
 
 @Injectable()
 export class LeadsService {
@@ -328,23 +330,95 @@ export class LeadsService {
       body: dto.body,
       firstName: lead.general?.firstName?.split(' ')[0] || '',
       applicationLink: dto.applicationLink,
-      userName: user?.name || 'Global Fund Investments',
-      userTitle: user?.role === Role.LEASING ? 'Leasing Agent' : 'Team Member',
-      companyName: 'Global Fund Investments',
+      userName: user?.name || '',
+      userTitle: user.role,
+      companyName: COMPANY.NAME,
     });
     return { success: true };
   }
 
-  async sendApprovalEmail(id: string, dto: SendApprovalEmailDto) {
-    const lead = await this.findOne(id);
-    await this.mailService.send(EmailType.GENERAL as any, {
-      email: dto.to,
-      cc: dto.cc,
-      subject: dto.subject,
-      body: dto.body,
-      firstName: lead.general?.firstName?.split(' ')[0] || '',
+  async sendApprovalEmail(
+    id: string,
+    dto: SendApprovalEmailDto,
+    user: {
+      userId: string;
+      name: string;
+      role: string;
+      email: string;
+    },
+  ) {
+    const lead = await this.repo.findById(id);
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    // Best-effort user lookup (do not block email)
+    if (user?.userId) {
+      try {
+        await this.companyUserService.findOne(user.userId);
+      } catch (err: any) {
+        console.warn(
+          `Could not fetch user ${user.userId} for email signature:`,
+          err?.message,
+        );
+      }
+    }
+
+    /* ------------------ Subject ------------------ */
+
+    let subject = dto.subject?.trim();
+
+    if (!subject || subject.includes('undefined')) {
+      const prospect =
+        lead.general?.businessName ||
+        lead.general?.firstName ||
+        'Lead';
+
+      const property =
+        lead.general?.property ||
+        'Property';
+
+      subject = `Approval Request for ${prospect} Deal Terms at ${property}`;
+    }
+
+    /* ------------------ Body extraction ------------------ */
+
+    const bodyMetadata =
+      typeof dto.body === 'object' && dto.body !== null ? dto.body : {};
+
+    let bodyContent =
+      typeof dto.body === 'string' ? dto.body : '';
+
+    if (
+      !bodyContent &&
+      typeof dto.body === 'object' &&
+      (dto.body as any)?.formBody
+    ) {
+      const fb = (dto.body as any).formBody;
+      bodyContent =
+        typeof fb === 'string'
+          ? fb.trim()
+          : fb?.body?.trim() || '';
+    }
+
+    /* ------------------ Send ------------------ */
+
+    await this.mailService.send(EmailType.GENERAL, {
       ...dto.payload,
+      email: dto.to,
+      cc: dto.cc ?? [],
+      subject,
+      body: bodyContent,
+      firstName: lead.general?.firstName?.split(' ')[0] ?? '',
+      lastName: lead.general?.lastName ?? '',
+      userName: bodyMetadata?.loggedin_name ?? user?.name,
+      userTitle:
+        bodyMetadata?.loggedin_role ??
+        (user?.role === Role.LEASING ? 'Leasing Agent' : 'Team Member'),
+      companyName:
+        bodyMetadata?.loggedin_co_name ?? 'Global Fund Investments',
     });
+
     return { success: true };
   }
 
@@ -423,12 +497,6 @@ export class LeadsService {
   }
 
   async updateFileStatus(leadId: string, fileId: string, status: LeadStatus) {
-    // We need to use array filters to update specific element
-    // MongoDB usage: 'files.$.processingStatus': status
-    // But since repository pattern might be generic, let's fetch and update for now if direct set isn't easy
-    // Actually standard Mongoose allows 'files.$.processingStatus' if we query by leadId AND fileId
-
-    // For safety and simplicity with current repository wrapper:
     const lead = await this.repo.findById(leadId);
     if (!lead) return;
 
@@ -438,8 +506,6 @@ export class LeadsService {
       await this.repo.update(leadId, { files: lead.files });
     }
   }
-
-
 
   async addFile(leadId: string, file: any, category: string = 'other', userId: string = 'System') {
     const lead = await this.repo.findById(leadId);
@@ -451,7 +517,7 @@ export class LeadsService {
 
     // Create FileInfo
     const fileInfo = {
-      id: key, // Using S3 key as ID for simplicity
+      id: key,
       fileName: file.originalname,
       fileSize: file.size,
       fileType: file.mimetype,
@@ -540,7 +606,7 @@ export class LeadsService {
       // Add Activity Log
       if (!lead.activities) lead.activities = [];
       lead.activities.push({
-        id: uuidv4(), // standard uuid import if available, or just string
+        id: uuidv4(),
         type: ActivityType.DOC_AI_PROCESSED,
         description: `Document processed: ${lead.files[fileIndex].fileName}. Confidence: ${result.overallConfidence}`,
         createdBy: 'System',
@@ -552,11 +618,11 @@ export class LeadsService {
     }
   }
 
-  async sendTenantMagicLink(leadId: string, email?: string) {
+  async sendTenantMagicLink(leadId: string, dto: SendTenantMagicLinkDto) {
     const lead = await this.repo.findById(leadId);
     if (!lead) throw new NotFoundException('Lead not found');
 
-    const recipientEmail = email || lead.general?.email;
+    const recipientEmail = dto.email || lead.general?.email;
     if (!recipientEmail) {
       throw new BadRequestException('No email provided for tenant form');
     }
@@ -590,24 +656,40 @@ export class LeadsService {
     const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
     const formLink = `${frontendUrl}/apply/tenant/${leadId}?token=${token}`;
 
-    await this.mailService.send(EmailType.GENERAL as any, {
-      // email: dto.to,
-      // cc: dto.cc,
-      // subject: dto.subject,
-      // body: dto.body,
-      // firstName: lead.general?.firstName?.split(' ')[0] || '',
-      // applicationLink: dto.applicationLink,
-      // userName: user?.name || 'Global Fund Investments',
-      // userTitle: user?.role === Role.LEASING ? 'Leasing Agent' : 'Team Member',
-      // companyName: 'Global Fund Investments',
-      email: recipientEmail,
-      subject: 'Complete Your Lease Application',
-      body: `
+    /* ------------------ Body extraction ------------------ */
+
+    let body = typeof dto.body === 'string' ? dto.body : '';
+
+    if (
+      !body &&
+      typeof dto.body === 'object' &&
+      (dto.body as any)?.formBody
+    ) {
+      const fb = (dto.body as any).formBody;
+      body =
+        typeof fb === 'string'
+          ? fb.trim()
+          : fb?.body?.trim() || '';
+    }
+
+    if (body) {
+      body = body.replace(/{{magic_link}}/g, formLink);
+      body = body.replace(/{{expiry_days}}/g, expiryDays.toString());
+      body = body.replace(/{{tenant_name}}/g, lead.general?.firstName || 'Tenant');
+    } else {
+      body = `
         <p>Dear ${lead.general?.firstName || 'Tenant'},</p>
         <p>Your lease application magic link is ready. Use the link below to start or resume your application. This link will expire in ${expiryDays} days.</p>
         <p><a href="${formLink}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Resume Application</a></p>
         <p>Best regards,<br>Global Fund Investments</p>
-      `,
+      `;
+    }
+
+    await this.mailService.send(EmailType.GENERAL as any, {
+      email: recipientEmail,
+      cc: dto.cc,
+      subject: dto.subject || 'Complete Your Lease Application',
+      body,
     });
 
     return { success: true, message: 'Magic link sent', token };
@@ -638,7 +720,6 @@ export class LeadsService {
   async saveTenantForm(token: string, dto: SaveTenantFormDto) {
     const progress = await this.validateTenantToken(token);
 
-    // Merge logic: Overwrite sections or full payload
     progress.form_data = { ...progress.form_data, ...dto.form_data };
     progress.status = FormStatus.IN_PROGRESS;
     progress.last_saved = new Date();
@@ -653,7 +734,6 @@ export class LeadsService {
     const formData = { ...progress.form_data, ...dto.form_data };
     const leadId = progress.tenant_id.toString();
 
-    // 1. Update Lead record (Final Table)
     const updatePayload: any = {
       business: formData.business,
       financial: formData.financial,
@@ -664,13 +744,11 @@ export class LeadsService {
 
     await this.repo.update(leadId, updatePayload);
 
-    // 2. Mark progress as SUBMITTED
     progress.status = FormStatus.SUBMITTED;
     progress.form_data = formData;
     progress.last_saved = new Date();
     await progress.save();
 
-    // 3. Add Activity Log to Lead
     const lead = await this.repo.findById(leadId);
     if (!lead) {
       throw new NotFoundException('Lead not found');

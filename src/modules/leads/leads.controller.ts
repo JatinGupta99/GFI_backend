@@ -18,13 +18,14 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
-import { SendLoiEmailDto, SendAppEmailDto, SendApprovalEmailDto, SendRenewalLetterDto } from './dto/send-email.dto';
+import { SendLoiEmailDto, SendAppEmailDto, SendApprovalEmailDto, SendRenewalLetterDto, SendTenantMagicLinkDto } from './dto/send-email.dto';
 import { LeadStatus } from '../../common/enums/common-enums';
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { UserId } from '../../common/decorators/user-id.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
+import { User } from '../../common/decorators/user.decorator';
 
 @Controller('leasing/active-leads')
 export class LeadsController {
@@ -83,8 +84,13 @@ export class LeadsController {
   }
 
   @Post(':id/approval/send')
-  sendApprovalEmail(@Param('id') id: string, @Body() dto: SendApprovalEmailDto) {
-    return this.service.sendApprovalEmail(id, dto);
+  sendApprovalEmail(@Param('id') id: string, @Body() dto: SendApprovalEmailDto, @User() user: {
+    userId: string;
+    name: string;
+    role: string;
+    email: string;
+  }) {
+    return this.service.sendApprovalEmail(id, dto, user);
   }
 
   @Post(':id/renewal/letter/send')
@@ -108,9 +114,10 @@ export class LeadsController {
     return this.service.addFile(id, file, category, userId);
   }
 
+
   @Post(':id/tenant-form/send')
-  sendTenantMagicLink(@Param('id') id: string, @Body('email') email?: string) {
-    return this.service.sendTenantMagicLink(id, email);
+  sendTenantMagicLink(@Param('id') id: string, @Body() dto: SendTenantMagicLinkDto) {
+    return this.service.sendTenantMagicLink(id, dto);
   }
 
   @Public()
