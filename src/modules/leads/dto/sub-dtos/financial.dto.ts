@@ -23,4 +23,11 @@ export class FinancialDetailsDto {
     @IsOptional() @ValidateNested() @Type(() => LiabilitiesDto) liabilities?: LiabilitiesDto;
     @IsOptional() @IsString() annualIncome?: string;
     @IsOptional() @IsString() monthlyMortgageRent?: string;
+    @IsOptional() @IsString() guarantor?: string;
+    @IsOptional() @IsString() guarantorSsn?: string;
+    @IsOptional() @IsString() totalLiabilities?: string;
+    @IsOptional() @IsString() netWorth?: string;
+    @IsOptional() @IsString() creditScore?: string;
+    @IsOptional() @IsString() liquidAssets?: string;
+    @IsOptional() @IsString() totalAssets?: string;
 }

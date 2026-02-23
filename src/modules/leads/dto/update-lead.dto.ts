@@ -10,7 +10,10 @@ import {
 } from 'class-validator';
 import { LeadStatus } from '../../../common/enums/common-enums';
 
-export class UpdateLeadDto extends PartialType(CreateLeadDto) {}
+export class UpdateLeadDto extends PartialType(CreateLeadDto) {
+
+  
+}
 
 export class FindLeadsDto {
   @IsOptional()

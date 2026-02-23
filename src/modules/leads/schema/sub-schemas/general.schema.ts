@@ -64,7 +64,7 @@ export class GeneralDetails {
     sf: string;
 
     @Prop({ default: '' })
-    notes: string;
+    notes?: string;
 }
 
 export const GeneralDetailsSchema = SchemaFactory.createForClass(GeneralDetails);

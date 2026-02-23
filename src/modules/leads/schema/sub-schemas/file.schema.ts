@@ -8,12 +8,21 @@ export class FileInfo {
 
     @Prop({ default: '' })
     fileName: string;
+    
+    @Prop({ default: '' })
+    key: string;
 
     @Prop({ default: '' })
     uploadedBy: string;
 
     @Prop({ default: null })
     uploadedDate: Date;
+
+    @Prop({ default: '' })
+    updatedBy: string;
+
+    @Prop({ default: null })
+    updatedAt: Date;
 
     @Prop({ default: 0 })
     fileSize: number;

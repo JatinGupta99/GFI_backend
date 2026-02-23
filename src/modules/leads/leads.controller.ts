@@ -9,11 +9,8 @@ import {
   Delete,
   UsePipes,
   ValidationPipe,
-  UseInterceptors,
-  UploadedFile,
   Headers,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 
 import { LeadsService } from './leads.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
@@ -32,6 +29,7 @@ export class LeadsController {
   constructor(private readonly service: LeadsService) { }
 
   @Get()
+  @UsePipes(new ValidationPipe({ transform: true }))
   findAll(@Query() query: PaginationQueryDto) {
     return this.service.findAll(query);
   }
@@ -43,8 +41,13 @@ export class LeadsController {
 
   @Post()
   @UsePipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true }))
-  create(@Body() dto: CreateLeadDto, @UserId('userId') userId: string) {
-    return this.service.create(dto, userId);
+  create(@Body() dto: CreateLeadDto, @UserId() user:{
+            userId: string;
+            email: string;
+            name: string;
+            role: string;
+        }) {
+    return this.service.create(dto, user.userId);
   }
 
   @Patch(':id')
@@ -79,8 +82,13 @@ export class LeadsController {
   }
 
   @Post(':id/app/send')
-  sendAppEmail(@Param('id') id: string, @Body() dto: SendAppEmailDto, @UserId('userId') userId: string) {
-    return this.service.sendAppEmail(id, dto, userId);
+  sendAppEmail(@Param('id') id: string, @Body() dto: SendAppEmailDto, @UserId() user: {
+            userId: string;
+            email: string;
+            name: string;
+            role: string;
+        }) {
+    return this.service.sendAppEmail(id, dto, user.userId);
   }
 
   @Post(':id/approval/send')
@@ -103,15 +111,44 @@ export class LeadsController {
     return this.service.processFile(id, fileId);
   }
 
-  @Post(':id/files')
-  @UseInterceptors(FileInterceptor('file'))
-  uploadFile(
+  @Post(':id/files/upload-url')
+  getFileUploadUrl(
     @Param('id') id: string,
-    @UploadedFile() file: any,
+    @Body('contentType') contentType: string,
     @Body('category') category: string,
-    @UserId('userId') userId: string,
   ) {
-    return this.service.addFile(id, file, category, userId);
+    return this.service.getFileUploadUrl(id, contentType, category);
+  }
+
+  @Post(':id/files/confirm')
+  confirmFileUpload(
+    @Param('id') id: string,
+    @Body('key') key: string,
+    @Body('fileName') fileName: string,
+    @Body('fileSize') fileSize: number,
+    @Body('fileType') fileType: string,
+    @Body('category') category: string,
+    @UserId() user: {
+      userId: string;
+      email: string;
+      name: string;
+      role: string;
+    },
+  ) {
+    return this.service.confirmFileUpload(id, key, fileName, fileSize, fileType, category, user.name);
+  }
+
+  @Delete(':id/files')
+  deleteFile(
+    @Param('id') id: string,
+    @Query('fileKey') fileKey: string,
+  ) {
+    return this.service.deleteFile(id, fileKey);
+  }
+
+  @Get('files/download-url')
+  getFileDownloadUrl(@Query('key') key: string) {
+    return this.service.getFileDownloadUrl(key);
   }
 
 

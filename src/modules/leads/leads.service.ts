@@ -21,6 +21,7 @@ import { TenantFormProgress, TenantFormProgressDocument } from './schema/tenant-
 import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
 import { FormStatus } from '../../common/enums/common-enums';
 import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 
 export const COMPANY = {
   NAME: 'Global Fund Investments',
@@ -40,51 +41,71 @@ export class LeadsService {
   ) { }
 
   async findAll(query: PaginationQueryDto) {
-    const { page = 1, limit = 20, search, sortOrder = SortOrder.DESC, sortBy = 'createdAt' } = query;
-    const skip = (page - 1) * limit;
+      const { page = 1, limit = 20, search, sortOrder = SortOrder.DESC, sortBy = 'createdAt', isLease, property } = query;
+      const skip = (page - 1) * limit;
 
-    const filter: FilterQuery<Lead> = {};
+      const filter: FilterQuery<Lead> = {};
 
-    if (search) {
-      const q = search.trim();
-      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      // Filter by isLease field - handle both boolean and string values
+      console.log('isLease value:', isLease, 'type:', typeof isLease);
+      
+      if (isLease === true) {
+        filter.isLease = true;
+      } else if (isLease === false ) {
+        filter.isLease = false;
+      } else {
+        // Default: when isLease is undefined, show non-lease records
+        filter.isLease = false;
+      }
+      
+      console.log('Filter applied:', filter.isLease);
 
-      filter.$or = [
-        { 'general.prospect': regex },
-        { 'general.property': regex },
-        { 'general.firstName': regex },
-        { 'general.name': regex },
-        { 'general.lastName': regex },
-        { 'general.email': regex },
-        { 'general.businessName': regex },
-        { 'business.legalName': regex },
-      ];
+      // Filter by property name
+      if (property) {
+        filter['general.property'] = new RegExp(property.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      }
+
+      if (search) {
+        const q = search.trim();
+        const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+        filter.$or = [
+          { 'general.prospect': regex },
+          { 'general.property': regex },
+          { 'general.firstName': regex },
+          { 'general.name': regex },
+          { 'general.lastName': regex },
+          { 'general.email': regex },
+          { 'general.businessName': regex },
+          { 'business.legalName': regex },
+        ];
+      }
+
+      const sort: FilterQuery<Lead> = { [sortBy]: sortOrder === SortOrder.ASC ? 1 : -1 };
+
+      const [data, total] = await Promise.all([
+        this.repo.find(filter, skip, limit, sort),
+        this.repo.count(filter),
+      ]);
+      const mapper = data.map((item) => {
+        const it = item as any;
+        return {
+          ...it,
+          id: it._id?.toString(),
+          fullName: `${it.general?.firstName || ''} ${it.general?.lastName || ''}`.trim(),
+        }
+      })
+      return {
+        data: mapper,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
     }
 
-    const sort: FilterQuery<Lead> = { [sortBy]: sortOrder === SortOrder.ASC ? 1 : -1 };
-
-    const [data, total] = await Promise.all([
-      this.repo.find(filter, skip, limit, sort),
-      this.repo.count(filter),
-    ]);
-    const mapper = data.map((item) => {
-      const it = item as any;
-      return {
-        ...it,
-        id: it._id?.toString(),
-        fullName: `${it.general?.firstName || ''} ${it.general?.lastName || ''}`.trim(),
-      }
-    })
-    return {
-      data: mapper,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
 
   async findOne(id: string) {
     if (!Types.ObjectId.isValid(id)) {
@@ -532,24 +553,121 @@ export class LeadsService {
     if (!lead.files) lead.files = [];
     lead.files.push(fileInfo as any);
 
-    // Add Activity Log
-    if (!lead.activities) lead.activities = [];
-    lead.activities.push({
-      id: uuidv4(),
-      type: ActivityType.FILE_UPLOAD,
-      description: `Uploaded file: ${file.originalname} (${category})`,
-      createdBy: userId,
-      createdDate: new Date(),
-    } as any);
-
-    await this.repo.update(leadId, { files: lead.files, activities: lead.activities });
+    await this.repo.update(leadId, { files: lead.files });
 
     // Auto-trigger processing if it's a PDF
     if (file.mimetype === 'application/pdf') {
       await this.processFile(leadId, key);
+
     }
 
     return { success: true, file: fileInfo, url, key };
+  }
+
+  async getFileUploadUrl(leadId: string, contentType: string, category: string = 'other') {
+    const lead = await this.repo.findById(leadId);
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    // Pass only the folder path, media service will generate the key with UUID
+    const folderPath = `leads/${leadId}/files`;
+
+    const { key, url } = await this.mediaService.generateUploadUrl(folderPath, contentType);
+
+    return {
+      statusCode: 200,
+      message: 'Upload URL generated successfully',
+      data: {
+        key,
+        url,
+        category,
+      },
+    };
+  }
+
+  async confirmFileUpload(
+    leadId: string,
+    key: string,
+    fileName: string,
+    fileSize: number,
+    fileType: string,
+    category: string = 'other',
+    userName: string = 'System',
+  ) {
+    const lead = await this.repo.findById(leadId);
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    // Create FileInfo
+    const fileInfo = {
+      id: key,
+      fileName,
+      fileSize,
+      fileType,
+      category,
+      uploadedBy: userName,
+      uploadedDate: new Date(),
+      updatedBy: userName,
+      updatedAt: new Date(),
+      processingStatus: LeadStatus.PENDING,
+      confidence: 0,
+      extractedData: {},
+    };
+
+    // Update Lead
+    if (!lead.files) lead.files = [];
+    lead.files.push(fileInfo as any);
+
+    await this.repo.update(leadId, { files: lead.files });
+
+    // Auto-trigger processing if it's a PDF
+    if (fileType === 'application/pdf') {
+      await this.processFile(leadId, key);
+    }
+
+    return {
+      statusCode: 200,
+      message: 'File uploaded successfully',
+      data: fileInfo,
+    };
+  }
+
+  async getFileDownloadUrl(key: string) {
+    const url = await this.mediaService.generateDownloadUrl(key);
+    return {
+      statusCode: 200,
+      message: 'Download URL generated successfully',
+      data: { url },
+    };
+  }
+
+  async deleteFile(leadId: string, fileKey: string) {
+    const lead = await this.repo.findById(leadId);
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    // Find and remove file from lead's files array
+    const fileIndex = lead.files?.findIndex(f => f.key === fileKey || f.id === fileKey);
+    if (fileIndex === -1 || fileIndex === undefined) {
+      throw new NotFoundException('File not found in lead');
+    }
+
+    const file = lead.files[fileIndex];
+    const s3Key = file.key || file.id;
+
+    // Remove from array
+    lead.files.splice(fileIndex, 1);
+    await this.repo.update(leadId, { files: lead.files });
+
+    // Delete from S3
+    try {
+      await this.mediaService.deleteFile(s3Key);
+    } catch (error) {
+      console.log(error);
+    }
+
+    return {
+      statusCode: 200,
+      message: 'File deleted successfully',
+      data: { fileKey: s3Key },
+    };
   }
 
   async updateWithExtraction(leadId: string, fileId: string, result: any) {
@@ -600,19 +718,7 @@ export class LeadsService {
       const updatePayload: any = {
         files: lead.files,
         general: lead.general,
-        activities: lead.activities,
       };
-
-      // Add Activity Log
-      if (!lead.activities) lead.activities = [];
-      lead.activities.push({
-        id: uuidv4(),
-        type: ActivityType.DOC_AI_PROCESSED,
-        description: `Document processed: ${lead.files[fileIndex].fileName}. Confidence: ${result.overallConfidence}`,
-        createdBy: 'System',
-        createdDate: new Date(),
-      } as any);
-      updatePayload.activities = lead.activities;
 
       await this.repo.update(leadId, updatePayload);
     }
@@ -753,16 +859,6 @@ export class LeadsService {
     if (!lead) {
       throw new NotFoundException('Lead not found');
     }
-    if (!lead.activities) lead.activities = [];
-    lead.activities.push({
-      id: uuidv4(),
-      type: ActivityType.NOTE,
-      description: 'Tenant Application Submitted via Magic Link',
-      createdBy: 'Tenant',
-      createdDate: new Date(),
-    } as any);
-    await this.repo.update(leadId, { activities: lead.activities });
-
     return { success: true, message: 'Application submitted successfully' };
   }
 }

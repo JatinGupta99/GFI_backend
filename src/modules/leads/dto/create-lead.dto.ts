@@ -38,4 +38,7 @@ export class CreateLeadDto {
 
   @IsOptional() @IsString() createdBy?: string;
   @IsOptional() @IsString() lastModifiedBy?: string;
+
+  @IsOptional() @IsString() lead_notes?: string;
+  @IsOptional() @IsString() lease_notes?: string;
 }

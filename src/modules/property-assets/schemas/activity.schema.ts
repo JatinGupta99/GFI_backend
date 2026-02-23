@@ -7,19 +7,19 @@ export class Activity extends Document {
     activityName: string;
 
     @Prop({ type: String })
-    department?: string;
+    department: string;
 
     @Prop({ type: String, required: true })
-    createdBy: string; // User Name
+    createdBy?: string=''; // User Name
 
     @Prop({ type: String })
-    updatedBy?: string; // User Name
+    updatedBy?: string=''; // User Name
 
     @Prop({ type: String, required: true })
-    propertyId: string;
+    leadId: string;
 
     @Prop({ type: String })
-    fileKey: string;
+    fileKey: string='';
 }
 
 export const ActivitySchema = SchemaFactory.createForClass(Activity);

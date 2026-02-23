@@ -31,6 +31,9 @@ export class BusinessDetails {
 
     @Prop({ default: '' })
     howManyLocations: string;
+    
+    @Prop({ default: '' })
+    typeOfEntity: string;
 }
 
 export const BusinessDetailsSchema = SchemaFactory.createForClass(BusinessDetails);

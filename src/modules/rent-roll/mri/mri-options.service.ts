@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { MriCoreService } from './mri-core.service';
 
 export interface MriOptionRaw {
@@ -20,9 +20,12 @@ export interface MriOptionRaw {
 
 @Injectable()
 export class MriOptionsService {
+    private readonly logger = new Logger(MriOptionsService.name);
+
     constructor(private readonly mri: MriCoreService) { }
 
     async fetch(buildingId: string, leaseId?: string): Promise<MriOptionRaw[]> {
+        this.logger.debug(`Fetching options | buildingId=${buildingId} leaseId=${leaseId}`);
         const params: any = { BLDGID: buildingId };
         if (leaseId) params.LEASEID = leaseId;
         return this.mri.get<MriOptionRaw[]>('MRI_S-PMCM_CommercialLeasesLeasOptsByBuildingID', params);

@@ -53,6 +53,22 @@ export class FinancialDetails {
 
     @Prop({ default: '' })
     monthlyMortgageRent: string;
+    
+    @Prop({ default: '' })
+    guarantor: string;
+    
+    @Prop({ default: '' })
+    guarantorSSN: string;
+    @Prop({ default: '' })
+    totalAssets: string;
+    @Prop({ default: '' })
+    liquidAssets: string;
+    @Prop({ default: '' })
+    creditScore: string;
+    @Prop({ default: '' })
+    netWorth: string;
+    @Prop({ default: '' })
+    totalLiabilities: string;
 }
 
 export const FinancialDetailsSchema = SchemaFactory.createForClass(FinancialDetails);

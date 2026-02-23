@@ -51,6 +51,10 @@ export class CreateTaskDto {
     @IsNotEmpty()
     property: string;
 
+    @IsOptional()
+    @IsBoolean()
+    isCompleted?: boolean=false;
+
     @ApiPropertyOptional({ enum: TaskPriority, default: TaskPriority.MEDIUM })
     @IsOptional()
     @IsEnum(TaskPriority)

@@ -15,50 +15,71 @@ import { CreateActivityDto, UpdateActivityDto } from './dtos/activity.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { User } from '../../common/decorators/user.decorator';
 import { GetUploadUrlDto } from './dtos/attachment.dto';
+import { UserId } from '../../common/decorators/user-id.decorator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
-@Controller('activities')
+@Controller('leasing/active-leads/:id/activities')
 @UseGuards(JwtAuthGuard)
 export class ActivitiesController {
     constructor(private readonly activitiesService: ActivitiesService) { }
 
     @Post()
-    create(@Body() createActivityDto: CreateActivityDto) {
-        return this.activitiesService.create(createActivityDto);
+    create(
+        @Param('id') leadId: string,
+        @Body() createActivityDto: CreateActivityDto,
+        @UserId() user: {
+            userId: string;
+            email: string;
+            name: string;
+            role: string;
+        }
+    ) {
+        console.log(user, 'clnascknsca')
+        return this.activitiesService.create(leadId, createActivityDto, user);
     }
 
-    @Get('property/:id')
-    findAllByProperty(@Param('id') propertyId: string) {
+    @Get()
+    async findAllByLead(
+        @Param('id') leadId: string,
+        @Query() query: PaginationQueryDto
+    ) {
+        const { page = 1, limit = 10 } = query;
+        return this.activitiesService.findAllByLead(leadId, page, limit);
+    }
+
+    @Get('property/:propertyId')
+    findAllByProperty(@Param('propertyId') propertyId: string) {
         return this.activitiesService.findAllByProperty(propertyId);
     }
 
-    @Get(':id')
-    findOne(@Param('id') id: string) {
-        return this.activitiesService.findOne(id);
+    @Get(':activityId')
+    findOne(@Param('activityId') activityId: string) {
+        return this.activitiesService.findOne(activityId);
     }
 
-    @Patch(':id')
+    @Patch(':activityId')
     update(
-        @Param('id') id: string,
+        @Param('activityId') activityId: string,
         @Body() updateActivityDto: UpdateActivityDto,
-        @User('name') userName: string,
+        @User() user: { userId: string; email: string; name: string; role: string; },
     ) {
-        return this.activitiesService.update(id, updateActivityDto, userName);
+        return this.activitiesService.update(activityId, updateActivityDto, user.name);
     }
 
-    @Delete(':id')
-    remove(@Param('id') id: string) {
-        return this.activitiesService.remove(id);
+    @Delete(':activityId')
+    remove(@Param('activityId') activityId: string) {
+        return this.activitiesService.remove(activityId);
     }
 
-
-    @Post('upload-url')
-    getUploadUrl(@Body() dto: GetUploadUrlDto) {
-        return this.activitiesService.getUploadUrl(dto);
+    @Post(':activityId/upload-url')
+    getUploadUrl(@Param(':id')leadId:string,@Param('activityId')activityId:string,@Body() contentType:string) {
+        return this.activitiesService.getUploadUrl(leadId,activityId,contentType);
     }
 
-    @Get('download-url')
-    getDownloadUrl(@Query('key') key: string) {
+    @Get(':activityId/download-url')
+    getDownloadUrl(@Param('activityId') activityId:string,@Query('key') key: string) {
         if (!key) throw new BadRequestException('Key is required');
-        return this.activitiesService.getDownloadUrl(key);
+        if (!activityId) throw new BadRequestException('activityId is required');
+        return this.activitiesService.getDownloadUrl(activityId,key);
     }
 }

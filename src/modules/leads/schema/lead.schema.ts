@@ -11,6 +11,7 @@ import { FileInfo, FileInfoSchema } from './sub-schemas/file.schema';
 import { FinancialDetails, FinancialDetailsSchema } from './sub-schemas/financial.schema';
 import { GeneralDetails, GeneralDetailsSchema } from './sub-schemas/general.schema';
 import { ReferenceInfo, ReferenceInfoSchema } from './sub-schemas/reference.schema';
+import { Activity, ActivitySchema } from '../../property-assets/schemas/activity.schema';
 
 @Schema({ timestamps: true })
 export class Lead {
@@ -53,9 +54,6 @@ export class Lead {
   @Prop({ type: [FileInfoSchema], default: [] })
   files: FileInfo[];
 
-  @Prop({ type: [ActivityLogSchema], default: [] })
-  activities: ActivityLog[];
-
   @Prop({ default: '' })
   createdBy: string;
 
@@ -68,6 +66,15 @@ export class Lead {
     default: FormStatus.CREATED,
   })
   form_status?: FormStatus;
+
+  @Prop({type:Boolean})
+  isLease?:boolean=false;
+
+  @Prop({type:String})
+  lead_notes?:string='Note';
+  
+  @Prop({type:String})
+  lease_notes?:string='Note';
 }
 
 export type LeadDocument = Lead & Document;

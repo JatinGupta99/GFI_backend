@@ -13,11 +13,37 @@ export class ActivitiesService {
         private readonly mediaService: MediaService,
     ) { }
 
-    async create(createActivityDto: CreateActivityDto): Promise<Activity> {
+    async create(leadId:string,createActivityDto: CreateActivityDto,user:any): Promise<Activity> {
         const activity = new this.activityModel({
+            createdBy:user.userId,
+            leadId:leadId,
             ...createActivityDto,
         });
         return activity.save();
+    }
+
+    async findAllByLead(leadId: string, page: number = 1, limit: number = 10) {
+        const skip = (page - 1) * limit;
+        
+        const [data, total] = await Promise.all([
+            this.activityModel
+                .find({ leadId })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .exec(),
+            this.activityModel.countDocuments({ leadId }).exec(),
+        ]);
+
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 
     async findAllByProperty(propertyId: string): Promise<Activity[]> {
@@ -36,25 +62,22 @@ export class ActivitiesService {
     }
 
 
-    async getUploadUrl(dto: GetUploadUrlDto) {
-        if (!isValidObjectId(dto.propertyId)) throw new NotFoundException('Invalid property ID');
-
-        const ext = dto.fileName.split('.').pop() || 'bin';
-        const fileId = dto.attachmentId || crypto.randomUUID();
-        const fileKey = `properties/${dto.propertyId}/activities/${fileId}.${ext}`;
+    async getUploadUrl(leadId:string,activityId:string,contentType:string) {
+        if (!isValidObjectId(leadId)) throw new NotFoundException('Invalid lead ID');
+        const fileKey = `leads/${leadId}/activities/${activityId}`;
 
         const { key, url } = await this.mediaService.generateUploadUrl(
             fileKey,
-            dto.contentType || `file/${ext}`,
+            contentType ,
         );
         return { key, url };
     }
-    async getDownloadUrl(key: string) {
+    async getDownloadUrl(activityId:string,key: string) {
         const url = await this.mediaService.generateDownloadUrl(key);
         return {
             statusCode: 200,
             message: 'Download URL generated',
-            data: { url },
+            data: { url ,activityId},
         };
     }
     async update(id: string, updateActivityDto: UpdateActivityDto, userName: string): Promise<Activity> {

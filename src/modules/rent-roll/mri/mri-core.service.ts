@@ -46,7 +46,8 @@ export class MriCoreService {
      * Generic GET wrapper for MRI RESTful path-based APIs
      */
     async getRest<T>(path: string, params: any = {}, retries = 3): Promise<T> {
-        this.logger.log(`MRI GET REST -> ${path}`);
+        const startTime = Date.now();
+        this.logger.log(`🔵 MRI REST API Call -> ${path} | Params: ${JSON.stringify(params)}`);
 
         let lastError: any;
         for (let i = 0; i < retries; i++) {
@@ -66,23 +67,34 @@ export class MriCoreService {
                     })
                 );
 
-                this.logger.log(`MRI GET REST success -> ${path}`);
+                const duration = Date.now() - startTime;
+                const recordCount = Array.isArray(data) ? data.length : 'N/A';
+                
+                // Log response data (first record only for brevity)
+                if (Array.isArray(data) && data.length > 0) {
+                    this.logger.log(`✅ MRI REST Success -> ${path} | Records: ${recordCount} | Duration: ${duration}ms | Sample: ${JSON.stringify(data[0])}`);
+                } else {
+                    this.logger.log(`✅ MRI REST Success -> ${path} | Records: ${recordCount} | Duration: ${duration}ms | Response: ${JSON.stringify(data)}`);
+                }
+                
                 return data;
 
             } catch (error) {
                 lastError = error;
+                const duration = Date.now() - startTime;
                 const errorBody = error.response?.data?.toString() || '';
                 const isDeadlock = errorBody.includes('deadlocked');
                 const is500 = error.response?.status === 500;
+                const statusCode = error.response?.status || 'N/A';
 
                 if ((is500 || isDeadlock) && i < retries - 1) {
                     const delay = (i + 1) * 1000;
-                    this.logger.warn(`MRI API Deadlock/500 detected for REST [${path}]. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+                    this.logger.warn(`⚠️  MRI REST Retry -> ${path} | Status: ${statusCode} | Attempt: ${i + 1}/${retries} | Retrying in ${delay}ms`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                     continue;
                 }
 
-                this.logger.error(`MRI REST API Error [${path}]: ${error.message}`);
+                this.logger.error(`❌ MRI REST Failed -> ${path} | Status: ${statusCode} | Params: ${JSON.stringify(params)} | Duration: ${duration}ms | Error: ${error.message}`);
                 if (error.response) {
                     throw new HttpException(
                         `MRI API Failed: ${error.response.statusText}`,
@@ -99,7 +111,12 @@ export class MriCoreService {
      * Generic GET wrapper for MRI endpoints with retry logic for deadlocks/500s (OData style)
      */
     async get<T>(apiName: string, params: any = {}, retries = 3): Promise<T> {
-        this.logger.log(`MRI GET -> ${apiName}`);
+        const startTime = Date.now();
+        const sanitizedParams = { ...params };
+        delete sanitizedParams.$api;
+        delete sanitizedParams.$format;
+        
+        this.logger.log(`🔵 MRI API Call -> ${apiName} | Params: ${JSON.stringify(sanitizedParams)}`);
 
         let lastError: any;
         for (let i = 0; i < retries; i++) {
@@ -128,21 +145,34 @@ export class MriCoreService {
                     ? (data as any).value
                     : data;
 
+                const duration = Date.now() - startTime;
+                const recordCount = Array.isArray(result) ? result.length : 'N/A';
+                
+                // Log response data (first record only for brevity)
+                if (Array.isArray(result) && result.length > 0) {
+                    this.logger.log(`✅ MRI Success -> ${apiName} | Records: ${recordCount} | Duration: ${duration}ms | Sample: ${JSON.stringify(result[0])}`);
+                } else {
+                    this.logger.log(`✅ MRI Success -> ${apiName} | Records: ${recordCount} | Duration: ${duration}ms | Response: ${JSON.stringify(result)}`);
+                }
+
                 return result as T;
 
             } catch (error) {
                 lastError = error;
+                const duration = Date.now() - startTime;
                 const errorBody = error.response?.data?.toString() || '';
                 const isDeadlock = errorBody.includes('deadlocked');
                 const is500 = error.response?.status === 500;
+                const statusCode = error.response?.status || 'N/A';
 
                 if ((is500 || isDeadlock) && i < retries - 1) {
                     const delay = (i + 1) * 1000;
-                    this.logger.warn(`MRI API Deadlock/500 detected for [${apiName}]. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+                    this.logger.warn(`⚠️  MRI Retry -> ${apiName} | Status: ${statusCode} | Attempt: ${i + 1}/${retries} | Retrying in ${delay}ms`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                     continue;
                 }
 
+                this.logger.error(`❌ MRI Failed -> ${apiName} | Status: ${statusCode} | Params: ${JSON.stringify(sanitizedParams)} | Duration: ${duration}ms | Error: ${error.message}`);
                 if (error.response) {
                     throw new HttpException(
                         `MRI API Failed: ${error.response.statusText}`,

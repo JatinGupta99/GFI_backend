@@ -6,9 +6,6 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 import { TaskPriority } from '../schema/task.schema';
 
 export class QueryTaskDto extends PaginationQueryDto {
-    @IsOptional()
-    @IsString()
-    property?: string;
 
     @ApiPropertyOptional({ enum: TaskPriority })
     @IsOptional()

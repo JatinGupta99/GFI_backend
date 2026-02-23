@@ -25,4 +25,5 @@ export class GeneralDetailsDto {
     @IsOptional() @IsString() suite?: string;
     @IsOptional() @IsString() sf?: string;
     @IsOptional() @IsString() notes?: string;
+    @IsOptional() @IsString() jobTitle?: string;
 }

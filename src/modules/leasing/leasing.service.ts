@@ -4,6 +4,8 @@ import {
     Inject,
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import * as cacheManager from 'cache-manager';
 import pLimit from 'p-limit';
 
@@ -17,6 +19,7 @@ import { MriChargesService } from '../rent-roll/mri/mri-charges.service';
 import { UpcomingRenewal } from './dto/upcoming-renewal.dto';
 import { PropertiesService } from '../properties/properties.service';
 import { Property } from '../properties/schema/property.entity';
+import { RenewalsSyncJob, RenewalsSyncResult } from './renewals.processor';
 
 @Injectable()
 export class LeasingService {
@@ -24,24 +27,30 @@ export class LeasingService {
 
     /**
      * Limits concurrent MRI calls across properties
+     * Set to 1 to process completely sequentially
      */
-    private readonly globalLimit = pLimit(3);
+    private readonly globalLimit = pLimit(1);
 
     /**
      * Limits per-lease MRI fan-out (notes/options/charges)
+     * Reduced to 2 to avoid hitting rate limits
      */
-    private readonly leaseLimit = pLimit(5);
+    private readonly leaseLimit = pLimit(2);
 
     /**
      * Cache TTLs (seconds)
+     * Increased to reduce API calls
      */
-    private static readonly OFFERS_TTL = 300; // 5 min
-    private static readonly EMEA_TTL = 300;
-    private static readonly LEASES_TTL = 60;
+    private static readonly OFFERS_TTL = 600; // 10 min
+    private static readonly EMEA_TTL = 600; // 10 min
+    private static readonly LEASES_TTL = 300; // 5 min
 
     constructor(
         @Inject(CACHE_MANAGER)
         private readonly cache: cacheManager.Cache,
+
+        @InjectQueue('renewals-sync')
+        private readonly renewalsQueue: Queue<RenewalsSyncJob, RenewalsSyncResult>,
 
         private readonly leasesService: MriLeasesService,
         private readonly renewalOffersService: MriRenewalOffersService,
@@ -56,41 +65,199 @@ export class LeasingService {
     /*                               PUBLIC API                                   */
     /* -------------------------------------------------------------------------- */
 
-    async getAllUpcomingRenewals(): Promise<UpcomingRenewal[]> {
-        this.logger.log('Starting aggregation of upcoming renewals');
-
+    /**
+     * Clear all renewal-related cache entries
+     */
+    async clearRenewalsCache(): Promise<void> {
+        this.logger.log('🗑️  Clearing renewals cache...');
+        
         const properties: Property[] = await this.propertiesService.findAll();
+        
+        // Clear all-renewals cache
+        await this.cache.del('all-renewals');
+        
+        // Clear property-specific caches
+        for (const property of properties) {
+            const propertyId = property.propertyId;
+            
+            // Clear leases cache (all pages)
+            const keys = [
+                `leases:${propertyId}:1:50`,
+                `leases:${propertyId}:1:100`,
+                `leases:${propertyId}:1:1000`,
+                `offers:${propertyId}`,
+                `emea:${propertyId}`,
+            ];
+            
+            for (const key of keys) {
+                await this.cache.del(key);
+            }
+        }
+        
+        this.logger.log(`✅ Cleared cache for ${properties.length} properties`);
+    }
+
+    async clearSyncQueue(): Promise<{ 
+        waiting: number; 
+        active: number; 
+        delayed: number; 
+        failed: number;
+    }> {
+        this.logger.log('🗑️  Clearing sync queue...');
+        
+        // Get counts before clearing
+        const [waiting, active, delayed, failed] = await Promise.all([
+            this.renewalsQueue.getWaitingCount(),
+            this.renewalsQueue.getActiveCount(),
+            this.renewalsQueue.getDelayedCount(),
+            this.renewalsQueue.getFailedCount(),
+        ]);
+
+        // Clear all jobs
+        await Promise.all([
+            this.renewalsQueue.clean(0, 1000, 'wait'),      // Remove waiting jobs
+            this.renewalsQueue.clean(0, 1000, 'active'),    // Remove active jobs
+            this.renewalsQueue.clean(0, 1000, 'delayed'),   // Remove delayed jobs
+            this.renewalsQueue.clean(0, 1000, 'completed'), // Remove completed jobs
+            this.renewalsQueue.clean(0, 1000, 'failed'),    // Remove failed jobs
+        ]);
+
+        // Drain queue (remove all jobs)
+        await this.renewalsQueue.drain();
+
+        this.logger.log(`✅ Cleared sync queue - Removed: ${waiting} waiting, ${active} active, ${delayed} delayed, ${failed} failed`);
+
+        return { waiting, active, delayed, failed };
+    }
+
+    /**
+     * Queue a background job to sync all renewals
+     * Returns job ID for tracking progress
+     */
+    async queueRenewalsSync(options?: {
+        batchSize?: number;
+        delayBetweenBatches?: number;
+        clearCache?: boolean;
+    }): Promise<{ jobId: string }> {
+        const properties: Property[] = await this.propertiesService.findAll();
+        
+        if (!properties?.length) {
+            throw new Error('No properties found');
+        }
+
+        // Clear cache before starting sync (default: true)
+        if (options?.clearCache !== false) {
+            await this.clearRenewalsCache();
+        }
+
+        const job = await this.renewalsQueue.add(
+            'sync-all-renewals',
+            {
+                propertyIds: properties.map(p => p.propertyId),
+                batchSize: options?.batchSize || 1, // Process 1 property at a time
+                delayBetweenBatches: options?.delayBetweenBatches || 300000, // 5 minutes (300 seconds)
+            },
+            {
+                attempts: 3,
+                backoff: {
+                    type: 'exponential',
+                    delay: 5000,
+                },
+                removeOnComplete: {
+                    age: 3600, // Keep completed jobs for 1 hour
+                    count: 100,
+                },
+                removeOnFail: {
+                    age: 86400, // Keep failed jobs for 24 hours
+                },
+            },
+        );
+
+        this.logger.log(`Queued renewals sync job: ${job.id}`);
+
+        return { jobId: job.id! };
+    }
+
+    /**
+     * Get job status and progress
+     */
+    async getJobStatus(jobId: string) {
+        const job = await this.renewalsQueue.getJob(jobId);
+
+        if (!job) {
+            return { status: 'not_found' };
+        }
+
+        const state = await job.getState();
+        const progress = job.progress;
+
+        return {
+            id: job.id,
+            status: state,
+            progress,
+            result: job.returnvalue,
+            failedReason: job.failedReason,
+            processedOn: job.processedOn,
+            finishedOn: job.finishedOn,
+        };
+    }
+
+    /**
+     * Get cached renewals (from last successful sync)
+     */
+    async getCachedRenewals(): Promise<UpcomingRenewal[]> {
+        const cached = await this.cache.get<UpcomingRenewal[]>('all-renewals');
+        return cached || [];
+    }
+
+    /**
+     * Legacy method - now triggers background job
+     * @deprecated Use queueRenewalsSync() instead
+     */
+    /**
+     * @deprecated Use queueRenewalsSync() for background processing
+     * Fetches renewals for all properties directly (synchronous, may be slow)
+     */
+    async getAllUpcomingRenewals(): Promise<UpcomingRenewal[]> {
+        this.logger.warn('getAllUpcomingRenewals() is deprecated. Consider using queueRenewalsSync() for better performance.');
+        
+        // Fetch all properties
+        const properties: Property[] = await this.propertiesService.findAll();
+        
         if (!properties?.length) {
             this.logger.warn('No properties found');
             return [];
         }
 
-        const results = await Promise.all(
-            properties.map(property =>
-                this.globalLimit(() =>
-                    this.getUpcomingRenewals(property.propertyId),
-                ),
-            ),
-        );
+        this.logger.log(`Fetching renewals for ${properties.length} properties directly from MRI...`);
 
-        const flattened = results.flat();
+        // Fetch renewals for each property (with default pagination)
+        const allRenewals: UpcomingRenewal[] = [];
+        
+        for (const property of properties) {
+            try {
+                const renewals = await this.getUpcomingRenewals(property.propertyId, 1, 50);
+                allRenewals.push(...renewals);
+                this.logger.log(`✓ Fetched ${renewals.length} renewals for property ${property.propertyId}`);
+            } catch (error) {
+                this.logger.error(`✗ Failed to fetch renewals for property ${property.propertyId}: ${error.message}`);
+            }
+        }
 
-        this.logger.log(
-            `Aggregation complete: ${flattened.length} renewals from ${properties.length} properties`,
-        );
-
-        return flattened;
+        this.logger.log(`Total renewals fetched: ${allRenewals.length}`);
+        return allRenewals;
     }
 
     async getUpcomingRenewals(
         propertyId: string,
         page = 1,
         limit = 50,
+        minimal = false, // New flag to skip optional data
     ): Promise<UpcomingRenewal[]> {
         const skip = (page - 1) * limit;
 
         this.logger.debug(
-            `Fetching leases | property=${propertyId} page=${page} limit=${limit}`,
+            `Fetching leases | property=${propertyId} page=${page} limit=${limit} minimal=${minimal}`,
         );
 
         const leases = await this.getCached(
@@ -102,6 +269,7 @@ export class LeasingService {
 
         if (!leases.length) return [];
 
+        // Always fetch offers and emea (needed for expiration dates)
         const [offers, emea] = await Promise.all([
             this.getCached(
                 `offers:${propertyId}`,
@@ -128,9 +296,62 @@ export class LeasingService {
                         lease,
                         offersMap,
                         emeaMap,
+                        minimal, // Pass minimal flag
                     ),
                 ),
             ),
+        );
+    }
+
+    /* -------------------------------------------------------------------------- */
+    /*                      HELPER METHODS FOR INCREMENTAL PROCESSOR              */
+    /* -------------------------------------------------------------------------- */
+
+    /**
+     * Fetch all leases for a property (used by incremental processor)
+     */
+    async getPropertyLeases(propertyId: string): Promise<any[]> {
+        this.logger.debug(`Fetching leases for property ${propertyId}`);
+        return this.safeFetch(
+            () => this.leasesService.fetch(propertyId, 1000, 0),
+            [],
+        );
+    }
+
+    /**
+     * Fetch property metadata (offers and EMEA) (used by incremental processor)
+     */
+    async getPropertyMetadata(propertyId: string): Promise<[any[], any[]]> {
+        this.logger.debug(`Fetching metadata for property ${propertyId}`);
+        
+        const [offers, emea] = await Promise.all([
+            this.safeFetch(
+                () => this.renewalOffersService.fetch(propertyId),
+                [],
+            ),
+            this.safeFetch(
+                () => this.emeaService.fetch(propertyId),
+                [],
+            ),
+        ]);
+
+        return [offers, emea];
+    }
+
+    /**
+     * Process a single lease with its metadata (used by incremental processor)
+     */
+    async processLease(
+        propertyId: string,
+        lease: any,
+        offersMap: Map<string, any>,
+        emeaMap: Map<string, any>,
+    ): Promise<UpcomingRenewal> {
+        return this.mapLeaseToUpcomingRenewal(
+            propertyId,
+            lease,
+            offersMap,
+            emeaMap,
         );
     }
 
@@ -139,70 +360,97 @@ export class LeasingService {
     /* -------------------------------------------------------------------------- */
 
     private async mapLeaseToUpcomingRenewal(
-        propertyId: string,
-        lease: any,
-        offersMap: Map<string, any>,
-        emeaMap: Map<string, any>,
-    ): Promise<UpcomingRenewal> {
-        const [notes, options, charges] = await Promise.all([
-            this.safeFetch(
-                () => this.notesService.fetch(propertyId, lease.LeaseID),
-                [],
-            ),
-            this.safeFetch(
-                () => this.optionsService.fetch(propertyId, lease.LeaseID),
-                [],
-            ),
-            this.safeFetch(
-                () => this.chargesService.fetch(lease.LeaseID),
-                [],
-            ),
-        ]);
+            propertyId: string,
+            lease: any,
+            offersMap: Map<string, any>,
+            emeaMap: Map<string, any>,
+            minimal = false,
+        ): Promise<UpcomingRenewal> {
+            // Add small delay to avoid rate limiting (stagger requests)
+            await new Promise(resolve => setTimeout(resolve, 100));
+            console.log(lease,'csalsaclscanlasc')
+            if (minimal) {
+                return {
+                    id: lease.LeaseID,
+                    tenant: lease.OccupantName,
+                    property: lease.BuildingName,
+                    suite: lease.SuiteID,
+                    sf: lease.OrigSqFt || 0,
+                    expDate:
+                        emeaMap.get(lease.LeaseID)?.Expiration ||
+                        offersMap.get(lease.LeaseID)?.ExpirationDate ||
+                        'N/A',
+                    option: 'N/A', // Skip options API call
+                    optionTerm: 'N/A',
+                    rentPerSf: 0, // Skip charges API call
+                    ti: 'N/A',
+                    lcd: 'N/A',
+                    budgetSf: lease.OrigSqFt || 0,
+                    budgetRent: 0,
+                    budgetLcd: 'N/A',
+                    status: 'Renewal Negotiation',
+                    note: '',
+                };
+            }
 
-        const annualBaseRent =
-            charges
-                .filter(c =>
-                    ['RNT', 'RENT', 'BASE'].includes(
-                        c.ChargeCode?.toUpperCase(),
-                    ),
-                )
-                .reduce((sum, c) => sum + (c.Amount || 0), 0) * 12;
+            // Full mode: Fetch options and charges
+            const [options, charges] = await Promise.all([
+                this.safeFetch(
+                    () => this.optionsService.fetch(propertyId, lease.LeaseID),
+                    [],
+                ),
+                this.safeFetch(
+                    () => this.chargesService.fetch(lease.LeaseID),
+                    [],
+                ),
+            ]);
 
-        const sf = options[0]?.SquareFeet || lease.OrigSqFt || 0;
-        const rentPerSf = sf > 0 ? +(annualBaseRent / sf).toFixed(2) : 0;
+            // BRR = Base Rent from CurrentDelinquencies API
+            const annualBaseRent =
+                charges
+                    .filter(c =>
+                        ['BRR', 'RNT', 'RENT', 'BASE'].includes(
+                            c.ChargeCode?.toUpperCase(),
+                        ),
+                    )
+                    .reduce((sum, c) => sum + (c.Amount || 0), 0) * 12;
 
-        const optionTerm = options.length
-            ? options
-                .map(
-                    o =>
-                        `Option ${o.OptionNumber ?? 'N/A'}: ${o.TermInMonths ?? 0
-                        } months`,
-                )
-                .join(', ')
-            : 'N/A';
+            const sf = options[0]?.SquareFeet || lease.OrigSqFt || 0;
+            const rentPerSf = sf > 0 ? +(annualBaseRent / sf).toFixed(2) : 0;
 
-        return {
-            id: lease.LeaseID,
-            tenant: lease.OccupantName,
-            property: lease.BuildingName,
-            suite: lease.SuiteID,
-            sf,
-            expDate:
-                emeaMap.get(lease.LeaseID)?.Expiration ||
-                offersMap.get(lease.LeaseID)?.ExpirationDate ||
-                'N/A',
-            option: options.length ? 'Yes' : 'No',
-            optionTerm,
-            rentPerSf,
-            ti: 'N/A',
-            lcd: 'N/A',
-            budgetSf: sf,
-            budgetRent: 0,
-            budgetLcd: 'N/A',
-            status: 'Renewal Negotiation',
-            note: notes.map(n => n.text).join('; '),
-        };
-    }
+            const optionTerm = options.length
+                ? options
+                    .map(
+                        o =>
+                            `Option ${o.OptionNumber ?? 'N/A'}: ${o.TermInMonths ?? 0
+                            } months`,
+                    )
+                    .join(', ')
+                : 'N/A';
+
+            return {
+                id: lease.LeaseID,
+                tenant: lease.OccupantName,
+                property: lease.BuildingName,
+                suite: lease.SuiteID,
+                sf,
+                expDate:
+                    emeaMap.get(lease.LeaseID)?.Expiration ||
+                    offersMap.get(lease.LeaseID)?.ExpirationDate ||
+                    'N/A',
+                option: options.length ? 'Yes' : 'No',
+                optionTerm,
+                rentPerSf,
+                ti: 'N/A',
+                lcd: 'N/A',
+                budgetSf: sf,
+                budgetRent: 0,
+                budgetLcd: 'N/A',
+                status: 'Renewal Negotiation',
+                note: '',
+            };
+        }
+
 
     /* -------------------------------------------------------------------------- */
     /*                              CACHE UTILS                                    */

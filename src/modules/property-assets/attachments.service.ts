@@ -15,19 +15,19 @@ export class AttachmentsService {
         private readonly companyUserService: CompanyUserService,
     ) { }
 
-    async getUploadUrl(dto: GetUploadUrlDto) {
-        if (!isValidObjectId(dto.propertyId)) throw new NotFoundException('Invalid property ID');
+    // async getUploadUrl(leadId:string,activityId:string) {
+    //     if (!isValidObjectId(leadId)) throw new NotFoundException('Invalid leadId ID');
 
-        const ext = dto.fileName.split('.').pop() || 'bin';
-        const fileId = dto.attachmentId || crypto.randomUUID();
-        const fileKey = `properties/${dto.propertyId}/attachments/${fileId}.${ext}`;
+    //     const ext = dto.fileName.split('.').pop() || 'bin';
+    //     const fileId = dto.attachmentId || crypto.randomUUID();
+    //     const fileKey = `properties/${dto.propertyId}/attachments/${fileId}.${ext}`;
 
-        const { key, url } = await this.mediaService.generateUploadUrl(
-            fileKey,
-            dto.contentType || `file/${ext}`,
-        );
-        return { key, url };
-    }
+    //     const { key, url } = await this.mediaService.generateUploadUrl(
+    //         fileKey,
+    //         dto.contentType || `file/${ext}`,
+    //     );
+    //     return { key, url };
+    // }
 
     async create(createAttachmentDto: CreateAttachmentDto, user: any): Promise<Attachment> {
         this.logger.log(user, 'cnsalkncsla');

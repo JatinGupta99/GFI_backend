@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { MriCoreService } from './mri-core.service';
 
 export interface MriNoteRaw {
@@ -14,6 +14,8 @@ export interface MriNoteRaw {
 
 @Injectable()
 export class MriNotesService {
+    private readonly logger = new Logger(MriNotesService.name);
+
     constructor(private readonly mri: MriCoreService) { }
 
     /**
@@ -21,6 +23,7 @@ export class MriNotesService {
      * Routes: GET /api/applications/Integrations/CM/Leases/Notes/{buildingId}?leaseId=
      */
     async fetch(buildingId: string, leaseId: string): Promise<MriNoteRaw[]> {
+        this.logger.debug(`Fetching notes | buildingId=${buildingId} leaseId=${leaseId}`);
         const path = `api/applications/Integrations/CM/Leases/Notes/${buildingId}`;
         return this.mri.getRest<MriNoteRaw[]>(path, { LEASEID: leaseId });
     }

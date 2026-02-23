@@ -7,7 +7,7 @@ export class GetUploadUrlDto {
 
     @IsString()
     @IsNotEmpty()
-    propertyId: string;
+    leadId: string;
 
     @IsString()
     @IsOptional()

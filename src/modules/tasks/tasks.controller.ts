@@ -35,11 +35,16 @@ export class TasksController {
 
     @Patch('bulk-status-update')
     @ResponseMessage('Tasks updated successfully')
-    bulkUpdateStatus(@Body() bulkUpdateStatusDto: BulkUpdateStatusDto, @UserId('userId') userId: string) {
+    bulkUpdateStatus(@Body() bulkUpdateStatusDto: BulkUpdateStatusDto, @UserId() user: {
+        userId:string,
+        email:string,
+        name:string,
+        role:string
+    }) {
         return this.tasksService.bulkUpdateStatus(
             bulkUpdateStatusDto.ids,
             bulkUpdateStatusDto.isCompleted,
-            userId,
+            user.userId,
         );
     }
     @Get()
@@ -74,8 +79,13 @@ export class TasksController {
 
     @Post(':id/toggle-status')
     @ResponseMessage('Task status toggled successfully')
-    toggleStatus(@Param('id', new ValidateObjectIdPipe('Task ID')) id: string, @UserId('userId') userId: string) {
-        return this.tasksService.toggleStatus(id, userId);
+    toggleStatus(@Param('id', new ValidateObjectIdPipe('Task ID')) id: string, @UserId() user:{
+            userId: string;
+            email: string;
+            name: string;
+            role: string;
+        }) {
+        return this.tasksService.toggleStatus(id, user.userId);
     }
 
     @Post(':id/attachments/upload-url')

@@ -20,10 +20,10 @@ import { UserId } from '../../common/decorators/user-id.decorator';
 export class AttachmentsController {
     constructor(private readonly attachmentsService: AttachmentsService) { }
 
-    @Post('upload-url')
-    getUploadUrl(@Body() dto: GetUploadUrlDto) {
-        return this.attachmentsService.getUploadUrl(dto);
-    }
+    // @Post('upload-url')
+    // getUploadUrl(@Body() dto: GetUploadUrlDto) {
+    //     return this.attachmentsService.getUploadUrl(dto);
+    // }
 
     @Post()
     create(@Body() createAttachmentDto: CreateAttachmentDto, @User() user: any) {
