@@ -31,6 +31,6 @@ import { JOBNAME } from '../../common/enums/common-enums';
   ],
   controllers: [LeadsController],
   providers: [LeadsService, LeadsRepository, LeadsProcessor],
-  exports: [LeadsService],
+  exports: [LeadsService, LeadsRepository],
 })
 export class LeadsModule { }

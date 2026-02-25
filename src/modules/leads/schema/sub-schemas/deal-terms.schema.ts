@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
 @Schema({ _id: false })
 export class NegotiationValues {
-    @Prop({ default: '' })
+       @Prop({ default: '' })
     term: string;
 
     @Prop({ default: 0 })
@@ -28,6 +28,54 @@ export class NegotiationValues {
 
     @Prop({ default: '' })
     insReimbursementDetails: string;
+
+    @Prop({ default: '' })
+    retReimbursement: string;
+
+    @Prop({ default: '' })
+    retReimbursementDetails: string;
+
+    @Prop({ default: '' })
+    securityDeposit: string;
+
+    @Prop({ default: '' })
+    securityDepositDetails: string;
+
+    @Prop({ default: '' })
+    prepaidRent: string;
+
+    @Prop({ default: '' })
+    use: string;
+
+    @Prop({ default: '' })
+    exclusiveUse: string;
+
+    @Prop({ default: '' })
+    option: string;
+
+    @Prop({ default: '' })
+    optionDetails: string;
+
+    @Prop({ default: '' })
+    guaranty: string;
+
+    @Prop({ default: '' })
+    guarantyDetails: string;
+
+    @Prop({ default: '' })
+    tiAllowance: string;
+
+    @Prop({ default: '' })
+    tiAllowanceDetails: string;
+
+    @Prop({ default: '' })
+    percentageRent: string;
+
+    @Prop({ default: '' })
+    percentageRentDetails: string;
+
+    @Prop({ default: '' })
+    deliveryOfSpace: string;
 }
 
 const NegotiationValuesSchema = SchemaFactory.createForClass(NegotiationValues);
@@ -72,7 +120,6 @@ export class NegotiationProposal {
     @Prop({ type: NegotiationValuesSchema, default: () => ({}) })
     values: NegotiationValues;
 }
-
 const NegotiationProposalSchema = SchemaFactory.createForClass(NegotiationProposal);
 
 @Schema({ _id: false })

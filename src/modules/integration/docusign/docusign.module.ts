@@ -5,9 +5,10 @@ import { DocuSignService } from './docusign.service';
 import { DocuSignController, DocuSignWebhookController } from './docusign.controller';
 import { LeasingModule } from '../../leasing/leasing.module';
 import { MediaModule } from '../../media/media.module';
+import { LeadsModule } from '../../leads/leads.module';
 
 @Module({
-  imports: [ConfigModule, HttpModule, LeasingModule, MediaModule],
+  imports: [ConfigModule, HttpModule,LeadsModule, LeasingModule, MediaModule],
   controllers: [DocuSignController, DocuSignWebhookController],
   providers: [DocuSignService],
   exports: [DocuSignService],

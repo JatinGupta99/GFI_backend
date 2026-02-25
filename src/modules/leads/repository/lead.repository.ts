@@ -51,4 +51,67 @@ export class LeadsRepository {
       .updateMany({ _id: { $in: ids } }, { $set: { status } })
       .exec();
   }
+
+  // ========================================
+  // DocuSign Integration Methods
+  // ========================================
+
+  /**
+   * Find lead by DocuSign envelope ID
+   */
+  async findByEnvelopeId(envelopeId: string): Promise<LeadDocument | null> {
+    return this.leadModel.findOne({ docusignEnvelopeId: envelopeId }).lean().exec();
+  }
+
+  /**
+   * Update lead with DocuSign envelope ID and set status to PENDING_SIGNATURE
+   */
+  async updateEnvelopeId(leadId: string, envelopeId: string): Promise<LeadDocument | null> {
+    return this.leadModel
+      .findByIdAndUpdate(
+        leadId,
+        {
+          docusignEnvelopeId: envelopeId,
+          signatureStatus: 'PENDING_SIGNATURE',
+          sentForSignatureAt: new Date(),
+        },
+        { new: true },
+      )
+      .lean()
+      .exec();
+  }
+
+  /**
+   * Update lead with signed document URL and set status to SIGNED
+   */
+  async updateSignedDocument(leadId: string, signedDocumentUrl: string): Promise<LeadDocument | null> {
+    return this.leadModel
+      .findByIdAndUpdate(
+        leadId,
+        {
+          signedDocumentUrl,
+          signatureStatus: 'SIGNED',
+          signedAt: new Date(),
+        },
+        { new: true },
+      )
+      .lean()
+      .exec();
+  }
+
+  /**
+   * Update lead signature status (for declined, voided, etc.)
+   */
+  async updateSignatureStatus(leadId: string, status: string): Promise<LeadDocument | null> {
+    return this.leadModel
+      .findByIdAndUpdate(
+        leadId,
+        {
+          signatureStatus: status,
+        },
+        { new: true },
+      )
+      .lean()
+      .exec();
+  }
 }

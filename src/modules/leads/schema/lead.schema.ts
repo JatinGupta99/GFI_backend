@@ -75,6 +75,28 @@ export class Lead {
   
   @Prop({type:String})
   lease_notes?:string='Note';
+
+  @Prop({ type: String, required: false })
+  docusignEnvelopeId?: string;
+
+  @Prop({
+    type: String,
+    enum: ['DRAFT', 'PENDING_SIGNATURE', 'SIGNED', 'VOIDED'],
+    default: 'DRAFT',
+  })
+  signatureStatus?: string;
+
+  @Prop({ type: String, required: false })
+  signedDocumentUrl?: string;
+
+  @Prop({ type: Date, required: false })
+  sentForSignatureAt?: Date;
+
+  @Prop({ type: Date, required: false })
+  signedAt?: Date;
+
+  @Prop({ type: String, required: false })
+  pdfDocumentUrl?: string;
 }
 
 export type LeadDocument = Lead & Document;

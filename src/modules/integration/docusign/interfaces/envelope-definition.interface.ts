@@ -10,6 +10,7 @@ export interface Signer {
   name: string;
   recipientId: string;
   routingOrder: string;
+  clientUserId?: string; // Optional: Required for embedded signing
   tabs: {
     signHereTabs: SignHereTab[];
   };
@@ -22,6 +23,24 @@ export interface Document {
   documentId: string;
 }
 
+export interface Reminders {
+  reminderEnabled: string;
+  reminderDelay: string;
+  reminderFrequency: string;
+}
+
+export interface Expirations {
+  expireEnabled: string;
+  expireAfter: string;
+  expireWarn: string;
+}
+
+export interface Notification {
+  useAccountDefaults: string;
+  reminders: Reminders;
+  expirations: Expirations;
+}
+
 export interface EnvelopeDefinition {
   emailSubject: string;
   documents: Document[];
@@ -29,4 +48,5 @@ export interface EnvelopeDefinition {
     signers: Signer[];
   };
   status: string;
+  notification?: Notification; // Optional: for expiration and reminder settings
 }

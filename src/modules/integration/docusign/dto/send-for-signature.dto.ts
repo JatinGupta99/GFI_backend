@@ -6,6 +6,7 @@ import {
   IsObject,
   ValidateNested,
   IsNumber,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -34,4 +35,8 @@ export class SendForSignatureDto {
   @ValidateNested()
   @Type(() => SignaturePositionDto)
   signaturePosition?: SignaturePositionDto;
+
+  @IsBoolean()
+  @IsOptional()
+  isTesting?: boolean = true;
 }

@@ -81,6 +81,32 @@ export class LeaseRepository {
     return updated;
   }
 
+  /**
+   * Update lease signature status
+   * Used for declined and voided envelopes
+   */
+  async updateLeaseStatus(
+    leaseId: string,
+    status: SignatureStatus | string,
+  ): Promise<LeaseDocument> {
+    if (!isValidObjectId(leaseId)) {
+      throw new BadRequestException('Invalid lease ID');
+    }
+    const updated = await this.model
+      .findByIdAndUpdate(
+        leaseId,
+        {
+          signatureStatus: status,
+        },
+        { new: true },
+      )
+      .exec();
+    if (!updated) {
+      throw new NotFoundException('Lease not found');
+    }
+    return updated;
+  }
+
   async findAll(): Promise<LeaseDocument[]> {
     return this.model.find().exec();
   }

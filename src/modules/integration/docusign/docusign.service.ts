@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -7,7 +7,7 @@ import { EnvelopeDefinition } from './interfaces/envelope-definition.interface';
 import { EnvelopeResponseDto } from './dto/envelope-response.dto';
 import { SendForSignatureDto } from './dto/send-for-signature.dto';
 import { DocuSignWebhookDto } from './dto/docusign-webhook.dto';
-import { LeaseRepository } from '../../leasing/repository/lease.repository';
+import { LeadsRepository } from '../../leads/repository/lead.repository';
 import { MediaService } from '../../media/media.service';
 
 interface TokenCache {
@@ -23,7 +23,7 @@ export class DocuSignService {
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
-    private readonly leaseRepository: LeaseRepository,
+    private readonly leadsRepository: LeadsRepository,
     private readonly mediaService: MediaService,
   ) {}
 
@@ -98,10 +98,14 @@ export class DocuSignService {
     const jwtAssertion = this.generateJwtAssertion();
     const basePath = this.configService.get<string>('DOCUSIGN_BASE_PATH')!;
 
+    // Determine OAuth host based on environment
+    const isDemo = basePath.includes('demo');
+    const oauthHost = isDemo ? 'https://account-d.docusign.com' : 'https://account.docusign.com';
+
     try {
       const response = await firstValueFrom(
         this.httpService.post(
-          `${basePath}/oauth/token`,
+          `${oauthHost}/oauth/token`,
           new URLSearchParams({
             grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
             assertion: jwtAssertion,
@@ -276,6 +280,9 @@ export class DocuSignService {
   /**
    * Build envelope definition from lease data
    * Configures document, recipients, and signature tabs
+   * 
+   * Enhancement 4: Optional envelope expiration
+   * Configure via DOCUSIGN_ENVELOPE_EXPIRE_DAYS environment variable
    */
   private buildEnvelopeDefinition(
     leaseId: string,
@@ -291,7 +298,12 @@ export class DocuSignService {
       yPosition: 200,
     };
 
-    return {
+    // Enhancement 4: Optional envelope expiration
+    // Get expiration days from environment (default: 30 days)
+    const expireDays = this.configService.get<string>('DOCUSIGN_ENVELOPE_EXPIRE_DAYS') || '30';
+    const expireEnabled = this.configService.get<string>('DOCUSIGN_ENVELOPE_EXPIRE_ENABLED') === 'true';
+
+    const envelopeDefinition: EnvelopeDefinition = {
       emailSubject: `Please sign your lease agreement - ${leaseId}`,
       documents: [
         {
@@ -323,6 +335,29 @@ export class DocuSignService {
       },
       status: 'sent',
     };
+
+    // Add expiration settings if enabled
+    if (expireEnabled) {
+      envelopeDefinition.notification = {
+        useAccountDefaults: 'false',
+        reminders: {
+          reminderEnabled: 'true',
+          reminderDelay: '2', // Send reminder after 2 days
+          reminderFrequency: '3', // Then every 3 days
+        },
+        expirations: {
+          expireEnabled: 'true',
+          expireAfter: expireDays, // Expire after X days
+          expireWarn: '3', // Warn 3 days before expiration
+        },
+      };
+
+      this.logger.log(
+        `Envelope expiration enabled: ${expireDays} days for lease ${leaseId}`,
+      );
+    }
+
+    return envelopeDefinition;
   }
 
   /**
@@ -330,26 +365,35 @@ export class DocuSignService {
    * Processes envelope status changes and updates lease records
    * 
    * Requirements: 3.4, 3.5, 3.6, 3.7, 3.8, 3.9
+   * 
+   * Enhancements:
+   * - Idempotency protection: Prevents double processing on webhook retries
+   * - Status history logging: Maintains audit trail for compliance
+   * - Support for multiple event types: completed, declined, voided
    */
   async handleWebhookEvent(payload: DocuSignWebhookDto): Promise<void> {
     // Parse envelope status from webhook payload (Requirement 3.4)
     const envelopeStatus = payload.data.envelopeSummary.status;
     const envelopeId = payload.data.envelopeId;
+    const eventType = payload.event;
 
     this.logger.log(
-      `Processing webhook for envelope ${envelopeId} with status: ${envelopeStatus}`,
+      `Processing webhook for envelope ${envelopeId} with status: ${envelopeStatus}, event: ${eventType}`,
     );
 
-    // Filter for "completed" status events (Requirement 3.5)
-    if (envelopeStatus !== 'completed') {
+    // Enhancement 1: Filter for relevant status events only
+    // Recommended to configure in DocuSign Connect: envelope-completed, envelope-declined, envelope-voided
+    const relevantStatuses = ['completed', 'declined', 'voided'];
+    if (!relevantStatuses.includes(envelopeStatus)) {
       this.logger.log(
-        `Ignoring webhook for envelope ${envelopeId} with status ${envelopeStatus}`,
+        `Ignoring webhook for envelope ${envelopeId} with status ${envelopeStatus}. ` +
+        `Only processing: ${relevantStatuses.join(', ')}`,
       );
       return;
     }
 
-    // Find lease by envelope ID (Requirement 3.6)
-    const lease = await this.leaseRepository.findByEnvelopeId(envelopeId);
+    // Find lead by envelope ID (Requirement 3.6)
+    const lease = await this.leadsRepository.findByEnvelopeId(envelopeId);
 
     // Handle missing lease gracefully (Requirement 3.7)
     if (!lease) {
@@ -360,8 +404,56 @@ export class DocuSignService {
     }
 
     this.logger.log(
-      `Found lease ${lease._id} for envelope ${envelopeId}. Processing completion...`,
+      `Found lease ${lease._id} for envelope ${envelopeId}. Current status: ${lease.signatureStatus}`,
     );
+
+    // Enhancement 2: Idempotency Protection
+    // Prevents double processing if DocuSign retries webhook delivery
+    if (envelopeStatus === 'completed' && lease.signatureStatus === 'SIGNED') {
+      this.logger.warn(
+        `Lease ${lease._id} is already SIGNED. Skipping duplicate processing for envelope ${envelopeId}. ` +
+        `This is likely a webhook retry from DocuSign.`,
+      );
+      return;
+    }
+
+    if (envelopeStatus === 'voided' && lease.signatureStatus === 'VOIDED') {
+      this.logger.warn(
+        `Lease ${lease._id} is already VOIDED. Skipping duplicate processing for envelope ${envelopeId}.`,
+      );
+      return;
+    }
+
+    // Enhancement 3: Store Envelope Status History (Audit Trail)
+    // Log status change for compliance and debugging
+    await this.logEnvelopeStatusHistory(
+      (lease._id as any).toString(),
+      envelopeId,
+      envelopeStatus,
+      payload,
+    );
+
+    // Process based on envelope status
+    if (envelopeStatus === 'completed') {
+      await this.processCompletedEnvelope(lease, envelopeId);
+    } else if (envelopeStatus === 'declined') {
+      await this.processDeclinedEnvelope(lease, envelopeId);
+    } else if (envelopeStatus === 'voided') {
+      await this.processVoidedEnvelope(lease, envelopeId);
+    }
+
+    this.logger.log(
+      `Successfully processed webhook for envelope ${envelopeId}. ` +
+      `Lease ${lease._id} status updated to ${envelopeStatus.toUpperCase()}`,
+    );
+  }
+
+  /**
+   * Process completed envelope
+   * Downloads signed document and updates lease status to SIGNED
+   */
+  private async processCompletedEnvelope(lease: any, envelopeId: string): Promise<void> {
+    this.logger.log(`Processing completed envelope ${envelopeId} for lease ${lease._id}`);
 
     // Retrieve signed document from DocuSign (Requirement 3.9)
     const signedPdfBuffer = await this.getSignedDocument(envelopeId);
@@ -374,17 +466,102 @@ export class DocuSignService {
       signedPdfBuffer,
     );
 
-    // Update lease status to SIGNED with document reference (Requirement 3.8)
-    // This ensures consistency between status and document reference (Requirement 9.6)
-    await this.leaseRepository.updateSignedDocument(
+    // Update lead status to SIGNED with document reference (Requirement 3.8)
+    const updatedLead = await this.leadsRepository.updateSignedDocument(
       leaseIdString,
       storageReference,
     );
 
+    if (!updatedLead) {
+      this.logger.error(`Failed to update lead ${leaseIdString} with signed document`);
+      throw new Error(`Failed to update lead ${leaseIdString} with signed document`);
+    }
+
     this.logger.log(
-      `Successfully processed webhook for envelope ${envelopeId}. ` +
-      `Lease ${lease._id} status updated to SIGNED with document reference: ${storageReference}`,
+      `Lease ${lease._id} marked as SIGNED with document reference: ${storageReference}`,
     );
+  }
+
+  /**
+   * Process declined envelope
+   * Updates lease status when tenant declines to sign
+   */
+  private async processDeclinedEnvelope(lease: any, envelopeId: string): Promise<void> {
+    this.logger.log(`Processing declined envelope ${envelopeId} for lease ${lease._id}`);
+
+    const leaseIdString = (lease._id as any).toString();
+
+    // Update lead status to DRAFT (tenant declined, needs to be resent)
+    // Note: You may want to create a specific "DECLINED" status in your schema
+    const updatedLead = await this.leadsRepository.updateSignatureStatus(leaseIdString, 'DRAFT');
+
+    if (!updatedLead) {
+      this.logger.error(`Failed to update lead ${leaseIdString} status to DRAFT`);
+    }
+
+    this.logger.log(
+      `Lease ${lease._id} status reset to DRAFT after tenant declined envelope ${envelopeId}`,
+    );
+  }
+
+  /**
+   * Process voided envelope
+   * Updates lease status when envelope is voided/cancelled
+   */
+  private async processVoidedEnvelope(lease: any, envelopeId: string): Promise<void> {
+    this.logger.log(`Processing voided envelope ${envelopeId} for lease ${lease._id}`);
+
+    const leaseIdString = (lease._id as any).toString();
+
+    // Update lead status to VOIDED
+    const updatedLead = await this.leadsRepository.updateSignatureStatus(leaseIdString, 'VOIDED');
+
+    if (!updatedLead) {
+      this.logger.error(`Failed to update lead ${leaseIdString} status to VOIDED`);
+    }
+
+    this.logger.log(
+      `Lease ${lease._id} marked as VOIDED for envelope ${envelopeId}`,
+    );
+  }
+
+  /**
+   * Enhancement 3: Log envelope status history for audit trail
+   * Stores status changes for compliance and debugging
+   * 
+   * Note: This requires a StatusHistory collection/entity to be implemented
+   * For now, it logs to application logs. In production, store in database.
+   */
+  private async logEnvelopeStatusHistory(
+    leaseId: string,
+    envelopeId: string,
+    status: string,
+    payload: DocuSignWebhookDto,
+  ): Promise<void> {
+    const historyEntry = {
+      leaseId,
+      envelopeId,
+      status,
+      event: payload.event,
+      timestamp: new Date(payload.generatedDateTime),
+      retryCount: payload.retryCount,
+      recipients: payload.data.envelopeSummary.recipients,
+    };
+
+    // Log to application logs (for now)
+    this.logger.log(
+      `Envelope status history: ${JSON.stringify(historyEntry)}`,
+    );
+
+    // TODO: Store in database for audit trail
+    // Example implementation:
+    // await this.envelopeStatusHistoryRepository.create(historyEntry);
+    
+    // This provides:
+    // - Compliance audit trail
+    // - Debugging capability
+    // - Status change timeline
+    // - Retry tracking
   }
 
   /**
@@ -563,5 +740,284 @@ export class DocuSignService {
    */
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Get signed document download URL
+   * Retrieves the lease, validates it's signed, and generates a presigned S3 URL
+   * 
+   * @param leaseId - The lease ID
+   * @returns Presigned S3 URL for downloading the signed document
+   * @throws NotFoundException if lease not found or not signed
+   * @throws Error if S3 key is invalid or URL generation fails
+   */
+  async getSignedDocumentUrl(leaseId: string): Promise<string> {
+    try {
+      this.logger.log(`Generating download URL for signed document of lease ${leaseId}`);
+
+      // Retrieve lead by ID (lead = lease)
+      const lease = await this.leadsRepository.findById(leaseId);
+
+      if (!lease) {
+        throw new NotFoundException(`Lease not found with ID ${leaseId}`);
+      }
+
+      // Validate lease is signed
+      if (lease.signatureStatus !== 'SIGNED') {
+        throw new Error(
+          `Lease ${leaseId} is not signed yet. Current status: ${lease.signatureStatus}`,
+        );
+      }
+
+      // Validate signed document URL exists
+      if (!lease.signedDocumentUrl) {
+        throw new Error(
+          `Lease ${leaseId} is marked as SIGNED but has no signed document reference`,
+        );
+      }
+
+      // Extract S3 key from signedDocumentUrl
+      // The signedDocumentUrl contains the S3 key (e.g., "signed-leases/{leaseId}/{envelopeId}_{timestamp}.pdf")
+      const s3Key = lease.signedDocumentUrl;
+
+      this.logger.log(`Generating presigned URL for S3 key: ${s3Key}`);
+
+      // Generate presigned download URL (expires in 15 minutes by default)
+      const downloadUrl = await this.mediaService.generateDownloadUrl(s3Key, 900);
+
+      this.logger.log(
+        `Successfully generated download URL for lease ${leaseId}`,
+      );
+
+      return downloadUrl;
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate download URL for lease ${leaseId}`,
+        error.message,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Generate DocuSign Recipient View URL (Embedded Signing)
+   * This creates a URL that allows the recipient to sign the document directly
+   * without receiving an email. The URL is valid for 5 minutes.
+   * 
+   * @param envelopeId - The DocuSign envelope ID
+   * @param recipientEmail - Email of the recipient who will sign
+   * @param recipientName - Name of the recipient
+   * @param returnUrl - URL to redirect after signing (optional)
+   * @returns Signing URL that the recipient can use
+   * 
+   * Example URL: https://na4.docusign.net/Signing/EmailStart.aspx?a=...
+   */
+  async generateRecipientViewUrl(
+    envelopeId: string,
+    recipientEmail: string,
+    recipientName: string,
+    returnUrl?: string,
+  ): Promise<string> {
+    try {
+      this.logger.log(
+        `Generating recipient view URL for envelope ${envelopeId}, recipient: ${recipientEmail}`,
+      );
+
+      // Get access token
+      const accessToken = await this.getAccessToken();
+
+      // Get account ID and base path
+      const accountId = this.configService.get<string>('DOCUSIGN_ACCOUNT_ID')!;
+      const basePath = this.configService.get<string>('DOCUSIGN_BASE_PATH')!;
+
+      // Default return URL if not provided
+      const finalReturnUrl = returnUrl || this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+
+      // Create recipient view request
+      const recipientViewRequest = {
+        returnUrl: finalReturnUrl,
+        authenticationMethod: 'none', // No authentication required
+        email: recipientEmail,
+        userName: recipientName,
+        clientUserId: recipientEmail, // Must match the clientUserId set when creating envelope
+      };
+
+      this.logger.log(
+        `Recipient view request: ${JSON.stringify(recipientViewRequest)}`,
+      );
+
+      // Call DocuSign API to create recipient view
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${basePath}/v2.1/accounts/${accountId}/envelopes/${envelopeId}/views/recipient`,
+          recipientViewRequest,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        ),
+      );
+
+      const signingUrl = response.data.url;
+
+      this.logger.log(
+        `Successfully generated signing URL for envelope ${envelopeId}`,
+      );
+
+      return signingUrl;
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate recipient view URL for envelope ${envelopeId}`,
+        error.response?.data || error.message,
+      );
+      throw new Error(
+        `Failed to generate signing URL: ${error.response?.data?.message || error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Send lease for signature with embedded signing (generates signing URL)
+   * This creates an envelope in "created" status and returns a signing URL
+   * instead of sending an email.
+   * 
+   * @param leaseId - The lease ID
+   * @param leasePdfBuffer - PDF buffer of the lease document
+   * @param recipientEmail - Recipient email
+   * @param recipientName - Recipient name
+   * @param returnUrl - URL to redirect after signing
+   * @param signaturePosition - Optional signature position
+   * @returns Object with envelope ID and signing URL
+   */
+  async sendLeaseForEmbeddedSigning(
+    leaseId: string,
+    leasePdfBuffer: Buffer,
+    recipientEmail: string,
+    recipientName: string,
+    returnUrl: string,
+    signaturePosition?: { pageNumber: number; xPosition: number; yPosition: number },
+  ): Promise<{ envelopeId: string; signingUrl: string }> {
+    try {
+      this.logger.log(
+        `Creating envelope for embedded signing - lease ${leaseId}, recipient: ${recipientEmail}`,
+      );
+
+      // Encode PDF to base64
+      const pdfBase64 = leasePdfBuffer.toString('base64');
+
+      // Build envelope definition for embedded signing
+      const envelopeDefinition = this.buildEmbeddedEnvelopeDefinition(
+        leaseId,
+        pdfBase64,
+        recipientEmail,
+        recipientName,
+        signaturePosition,
+      );
+
+      // Get access token
+      const accessToken = await this.getAccessToken();
+
+      // Get account ID and base path
+      const accountId = this.configService.get<string>('DOCUSIGN_ACCOUNT_ID')!;
+      const basePath = this.configService.get<string>('DOCUSIGN_BASE_PATH')!;
+
+      // Create envelope (status = "created", not "sent")
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${basePath}/v2.1/accounts/${accountId}/envelopes`,
+          envelopeDefinition,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        ),
+      );
+
+      const envelopeId = response.data.envelopeId;
+
+      this.logger.log(
+        `Successfully created envelope ${envelopeId} for embedded signing`,
+      );
+
+      // Generate recipient view URL
+      const signingUrl = await this.generateRecipientViewUrl(
+        envelopeId,
+        recipientEmail,
+        recipientName,
+        returnUrl,
+      );
+
+      return {
+        envelopeId,
+        signingUrl,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to create envelope for embedded signing - lease ${leaseId}`,
+        error.response?.data || error.message,
+      );
+      throw new Error(
+        `Failed to create embedded signing envelope: ${error.response?.data?.message || error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Build envelope definition for embedded signing
+   * Sets clientUserId to enable embedded signing and status to "created"
+   */
+  private buildEmbeddedEnvelopeDefinition(
+    leaseId: string,
+    pdfBase64: string,
+    recipientEmail: string,
+    recipientName: string,
+    signaturePosition?: { pageNumber: number; xPosition: number; yPosition: number },
+  ): EnvelopeDefinition {
+    // Default signature position if not provided
+    const sigPosition = signaturePosition || {
+      pageNumber: 1,
+      xPosition: 100,
+      yPosition: 200,
+    };
+
+    const envelopeDefinition: EnvelopeDefinition = {
+      emailSubject: `Please sign your lease agreement - ${leaseId}`,
+      documents: [
+        {
+          documentBase64: pdfBase64,
+          name: `Lease_${leaseId}.pdf`,
+          fileExtension: 'pdf',
+          documentId: '1',
+        },
+      ],
+      recipients: {
+        signers: [
+          {
+            email: recipientEmail,
+            name: recipientName,
+            recipientId: '1',
+            routingOrder: '1',
+            clientUserId: recipientEmail, // CRITICAL: This enables embedded signing
+            tabs: {
+              signHereTabs: [
+                {
+                  documentId: '1',
+                  pageNumber: sigPosition.pageNumber.toString(),
+                  xPosition: sigPosition.xPosition.toString(),
+                  yPosition: sigPosition.yPosition.toString(),
+                },
+              ],
+            },
+          },
+        ],
+      },
+      status: 'sent', // Must be "sent" to generate recipient view
+    };
+
+    return envelopeDefinition;
   }
 }
