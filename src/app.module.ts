@@ -20,6 +20,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PropertyManagementModule } from './modules/property-management/property-management.module';
 import { LeasingModule } from './modules/leasing/leasing.module';
 import { AppCacheModule } from './common/cache/app-cache.module';
+import { DocuSignModule } from './modules/integration/docusign/docusign.module';
 
 
 @Module({
@@ -40,6 +41,7 @@ import { AppCacheModule } from './common/cache/app-cache.module';
     PropertyManagementModule,
     LeasingModule,
     AppCacheModule,
+    DocuSignModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

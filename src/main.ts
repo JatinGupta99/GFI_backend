@@ -4,6 +4,7 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
+import * as bodyParser from 'body-parser';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exception.filter';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -15,6 +16,17 @@ import { PropertySeeder } from './modules/properties/seeds/property.seed';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+
+  // Configure body-parser to preserve raw body for HMAC validation
+  // This is required for webhook signature verification
+  app.use(
+    bodyParser.json({
+      verify: (req: any, res, buf) => {
+        // Store raw body buffer for HMAC validation in webhook endpoints
+        req.rawBody = buf;
+      },
+    }),
+  );
 
   // Run seeding in background, don't block app startup
   const propertySeeder = app.get(PropertySeeder);
