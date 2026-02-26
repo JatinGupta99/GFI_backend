@@ -62,9 +62,6 @@ export class AccountingDetails {
     balanceDue: number;
 
     @Prop({ default: '' })
-    status: string;
-
-    @Prop({ default: '' })
     rentDueDate: string;
 
     @Prop({ default: '' })
@@ -72,6 +69,12 @@ export class AccountingDetails {
 
     @Prop({ default: 0 })
     lateFee: number;
+
+    @Prop({ default: 0 })
+    balance_forward_0131: number;
+
+    @Prop({ default: 0 })
+    feb_cash_received: number;
 
     @Prop({ type: AnnualPMTSchema, default: () => ({}) })
     annualPMT: AnnualPMT;

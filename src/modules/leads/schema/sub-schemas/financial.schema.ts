@@ -1,7 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
 @Schema({ _id: false })
-@Schema({ _id: false })
 export class Assets {
     @Prop({ default: false })
     checkingSavings: boolean;
@@ -58,17 +57,34 @@ export class FinancialDetails {
     guarantor: string;
     
     @Prop({ default: '' })
-    guarantorSSN: string;
+    guarantorSsn: string;
+
     @Prop({ default: '' })
     totalAssets: string;
+
     @Prop({ default: '' })
     liquidAssets: string;
+
     @Prop({ default: '' })
     creditScore: string;
+
     @Prop({ default: '' })
     netWorth: string;
+
     @Prop({ default: '' })
     totalLiabilities: string;
+
+    @Prop({ default: '' })
+    assetsCheckingAcct: string;
+
+    @Prop({ default: '' })
+    assetsSavingsAcct: string;
+
+    @Prop({ default: '' })
+    assetsRealEstate: string;
+
+    @Prop({ default: '' })
+    assetsStocksBonds: string;
 }
 
 export const FinancialDetailsSchema = SchemaFactory.createForClass(FinancialDetails);

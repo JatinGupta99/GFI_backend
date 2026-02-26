@@ -7,6 +7,10 @@
       {
         "include": "modules/mail/templates/**/*",
         "watchAssets": true
+      },
+      {
+        "include": "modules/leasing/templates/**/*",
+        "watchAssets": true
       }
     ],
     "deleteOutDir": true

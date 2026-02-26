@@ -19,6 +19,7 @@ import { SendLoiEmailDto, SendAppEmailDto, SendApprovalEmailDto, SendRenewalLett
 import { LeadStatus } from '../../common/enums/common-enums';
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { LeaseQueryDto } from './dto/lease-query.dto';
 import { UserId } from '../../common/decorators/user-id.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
@@ -32,6 +33,12 @@ export class LeadsController {
   @UsePipes(new ValidationPipe({ transform: true }))
   findAll(@Query() query: PaginationQueryDto) {
     return this.service.findAll(query);
+  }
+
+  @Get('leases')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  findAllLeases(@Query() query: LeaseQueryDto) {
+    return this.service.findAllLeases(query);
   }
 
   @Get(':id')

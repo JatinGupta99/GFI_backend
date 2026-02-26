@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PropertiesService } from '../properties/properties.service';
@@ -8,7 +8,8 @@ import { MriChargesService } from '../rent-roll/mri/mri-charges.service';
 import { ARBalance, ARStatus, NoticeType, SendNoticeDto } from './dto/ar-balance.dto';
 import { ARNoticeStatus, ARNoticeStatusDocument } from './schema/ar-notice-status.schema';
 import { MailService } from '../mail/mail.service';
-import { EmailType } from '../../common/enums/common-enums';
+import { EmailType, LeadStatus } from '../../common/enums/common-enums';
+import { LeadsRepository } from '../leads/repository/lead.repository';
 
 @Injectable()
 export class PropertyManagementService {
@@ -21,6 +22,7 @@ export class PropertyManagementService {
         private readonly chargesService: MriChargesService,
         private readonly mailService: MailService,
         @InjectModel(ARNoticeStatus.name) private noticeStatusModel: Model<ARNoticeStatusDocument>,
+        private readonly leadsRepository: LeadsRepository,
     ) { }
 
     async getAllARBalances(): Promise<ARBalance[]> {
@@ -96,8 +98,15 @@ export class PropertyManagementService {
             [NoticeType.ATTORNEY]: EmailType.ATTORNEY,
         };
 
+        const leadStatusMapping: Record<string, LeadStatus> = {
+            [NoticeType.COURTESY]: LeadStatus.SEND_COURTESY_NOTICE,
+            [NoticeType.THREE_DAY]: LeadStatus.SEND_THREE_DAY_NOTICE,
+            [NoticeType.ATTORNEY]: LeadStatus.SEND_TO_ATTORNEY,
+        };
+
         const newStatus = statusMapping[type];
         const targetEmailType = emailMapping[type];
+        const newLeadStatus = leadStatusMapping[type];
         const { emailData, note } = dto;
 
         // Logic to trigger notice workflow
@@ -137,6 +146,7 @@ export class PropertyManagementService {
             }
         }
 
+        // Update AR notice status
         await this.noticeStatusModel.findOneAndUpdate(
             { leaseId: id },
             {
@@ -147,7 +157,15 @@ export class PropertyManagementService {
             { upsert: true, new: true }
         );
 
-        return { success: true, status: newStatus };
+        // Update Lead status
+        try {
+            await this.leadsRepository.update(id, { status: newLeadStatus });
+            this.logger.log(`Updated lead ${id} status to ${newLeadStatus}`);
+        } catch (error) {
+            this.logger.warn(`Failed to update lead status: ${error.message}`);
+        }
+
+        return { success: true, status: newLeadStatus };
     }
 
     private async getARBalancesByProperty(propertyId: string): Promise<ARBalance[]> {
@@ -193,8 +211,7 @@ export class PropertyManagementService {
                     status: (localStatus?.status as ARStatus) || ARStatus.SENT_COURTESY_NOTICE,
                     monthlyRent: Number(monthlyRent.toFixed(2)),
                     totalMonthly: Number(totalMonthly.toFixed(2)),
-                    lastActivity: localStatus?.lastActivity,
-                    note: localStatus?.note
+                    lastActivity: localStatus?.lastActivity
                 };
 
                 return arBalance;

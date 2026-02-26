@@ -31,13 +31,21 @@ export class PaginationQueryDto {
   @IsEnum(SortOrder)
   sortOrder: SortOrder = SortOrder.DESC;
 
-@IsOptional()
-@Transform(({ value }) => {
-  if (value === 'true' || value === true) return true;
-  if (value === 'false' || value === false) return false;
-  return undefined;
-})
-isLease?: boolean | string;
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
+  isLease?: boolean | string;
+
+  @IsOptional()
+  @IsString()
+  lease_status?: string;
+
+  @IsOptional()
+  @IsString()
+  lead_status?: string;
 
   @IsOptional()
   @IsString()

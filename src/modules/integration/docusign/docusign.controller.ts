@@ -25,6 +25,9 @@ import { readFile } from 'fs/promises';
 import { MediaService } from '../../media/media.service';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { MailService } from '../../mail/mail.service';
+import { EmailType } from '../../../common/enums/common-enums';
+import { UserId } from '../../../common/decorators/user-id.decorator';
 
 @Controller('leases')
 export class DocuSignController {
@@ -35,6 +38,7 @@ export class DocuSignController {
     private readonly leadRepository: LeadsRepository,
     private readonly mediaService: MediaService,
     private readonly httpService: HttpService,
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -121,6 +125,12 @@ export class DocuSignController {
   async sendForSignature(
     @Param('id') leaseId: string,
     @Body() dto: SendForSignatureDto,
+    @UserId() user:{
+      userId:string;
+      name:string;
+      email:string;
+      role:string;
+    }
   ): Promise<EnvelopeResponseDto> {
     this.logger.log(`Received request to send lease ${leaseId} for signature`);
 
@@ -184,6 +194,55 @@ export class DocuSignController {
       this.logger.log(
         `Successfully sent lease ${leaseId} for signature. Envelope ID: ${envelopeResponse.envelopeId}`,
       );
+
+      // Send custom email with signing URL if available
+      if (envelopeResponse.signingUrl) {
+        try {
+          const propertyInfo = lease.general?.property || 'Property';
+          const suiteInfo = lease.general?.suite || '';
+          const propertyDisplay = suiteInfo ? `${propertyInfo}, Suite ${suiteInfo}` : propertyInfo;
+
+          // Read email template from file
+          const templatePath = 'src/modules/leasing/templates/execution-email.html';
+          let emailHtml = await readFile(templatePath, 'utf-8');
+
+          // Replace template variables with actual values
+          emailHtml = emailHtml
+            .replace(/\$\{lease\.general\?\.firstName \|\| 'there'\}/g, lease.general?.firstName || 'there')
+            .replace(/\$\{propertyDisplay\}/g, propertyDisplay)
+            .replace(/\$\{envelopeResponse\.signingUrl\}/g, envelopeResponse.signingUrl)
+            .replace(/\$\{lease\.general\?\.businessName \|\| ''\}/g, lease.general?.businessName || '')
+            .replace(/\$\{lease\.general\?\.suite \|\| ''\}/g, lease.general?.suite || '')
+            .replace(/\$\{user\.name\}/g, user.name)
+            .replace(/\$\{user\.role\}/g, user.role);
+
+          // Prepare attachments if PDF is available
+          const attachments = pdfBuffer ? [{
+            filename: `${tenantName} - Lease Agreement.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+          }] : [];
+
+          // Send email
+          await this.mailService.send(EmailType.GENERAL, {
+            email: tenantEmail,
+            cc: dto.cc, // Support CC from request
+            subject: `Lease Agreement - ${propertyDisplay}`,
+            body: emailHtml,
+            attachments,
+          });
+
+          this.logger.log(
+            `Custom signing email sent to ${tenantEmail} for lease ${leaseId}`,
+          );
+        } catch (emailError) {
+          // Log error but don't fail the request - envelope was created successfully
+          this.logger.error(
+            `Failed to send custom signing email for lease ${leaseId}`,
+            emailError.message,
+          );
+        }
+      }
 
       // Return envelope response with proper status code (Requirement 6.4)
       return envelopeResponse;

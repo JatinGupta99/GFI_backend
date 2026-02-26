@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { HttpModule } from '@nestjs/axios';
 import { LeasingController } from './leasing.controller';
+import { LeaseController } from './lease.controller';
 import { LeasingService } from './leasing.service';
 import { RenewalsProcessor } from './renewals.processor';
 // import { RenewalsCronService } from './renewals-cron.service'; // Uncomment if @nestjs/schedule is installed
@@ -27,6 +28,7 @@ import { LeadsModule } from '../leads/leads.module';
     ],
     controllers: [
         LeasingController,
+        LeaseController,
     ],
     providers: [
         LeasingService,

@@ -6,13 +6,15 @@ import { ARNoticeStatus, ARNoticeStatusSchema } from './schema/ar-notice-status.
 import { PropertiesModule } from '../properties/properties.module';
 import { RentRollModule } from '../rent-roll/rent-roll.module';
 import { MailModule } from '../mail/mail.module';
+import { LeadsModule } from '../leads/leads.module';
 
 @Module({
     imports: [
         MongooseModule.forFeature([{ name: ARNoticeStatus.name, schema: ARNoticeStatusSchema }]),
         PropertiesModule,
         RentRollModule,
-        MailModule
+        MailModule,
+        LeadsModule
     ],
     controllers: [PropertyManagementController],
     providers: [PropertyManagementService],

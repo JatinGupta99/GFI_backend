@@ -32,6 +32,8 @@ export class AccountingDetailsDto {
   @IsOptional() @IsString() rentDueDate?: string;
   @IsOptional() @IsString() lateAfter?: string;
   @IsOptional() @IsNumber() lateFee?: number;
+  @IsOptional() @IsNumber() balance_forward_0131?: number;
+  @IsOptional() @IsNumber() feb_cash_received?: number;
 
   @IsOptional()
   @ValidateNested()

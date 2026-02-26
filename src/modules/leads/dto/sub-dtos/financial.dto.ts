@@ -27,6 +27,10 @@ export class FinancialDetailsDto {
     @IsOptional() @IsString() guarantorSsn?: string;
     @IsOptional() @IsString() totalLiabilities?: string;
     @IsOptional() @IsString() netWorth?: string;
+    @IsOptional() @IsString() assetsCheckingAcct?: string;
+    @IsOptional() @IsString() assetsSavingsAcct?: string;
+    @IsOptional() @IsString() assetsRealEstate?: string;
+    @IsOptional() @IsString() assetsStocksBonds?: string;
     @IsOptional() @IsString() creditScore?: string;
     @IsOptional() @IsString() liquidAssets?: string;
     @IsOptional() @IsString() totalAssets?: string;

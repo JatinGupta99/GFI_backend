@@ -145,9 +145,6 @@ export class ARBalance {
 
     @ApiProperty({ example: '2024-02-01', description: 'Date of last notice or action', required: false })
     lastActivity?: string | Date;
-
-    @ApiProperty({ example: 'Tenant promised to pay by Friday', description: 'Internal tracking notes', required: false })
-    note?: string;
 }
 
 export class ARBalanceResponse {

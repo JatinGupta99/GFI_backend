@@ -53,9 +53,7 @@ export enum LeadStatus {
   PENDING = 'PENDING',
   FAILED = 'FAILED',
   LOI_NEGOTIATION = 'LOI Negotiation',
-  LEASE_NEGOTIATION = 'Lease Negotiation',
   QUALIFYING = 'Qualifying',
-  OUT_FOR_EXECUTION = 'Out for Execution',
   NO_CONTACT = 'No Contact',
   RENEWAL_NEGOTIATION = 'Renewal Negotiation',
   DRAFTING_AMENDMENT = 'Drafting Amendment',
@@ -69,6 +67,10 @@ export enum LeadStatus {
   NEGOTIATION = 'negotiation',
   CONTRACT_SENT = 'contract_sent',
   WON = 'won',
+  SEND_TO_ATTORNEY='SEND_TO_ATTORNEY',
+  SEND_COURTESY_NOTICE='SEND_COURTESY_NOTICE',
+  SEND_THREE_DAY_NOTICE='SEND_THREE_DAY_NOTICE',
+  TENANT_AR_ALL='TENANT_AR_ALL',
 }
 
 export enum JOBNAME {

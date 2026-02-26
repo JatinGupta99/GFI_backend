@@ -6,9 +6,11 @@ import { DocuSignController, DocuSignWebhookController } from './docusign.contro
 import { LeasingModule } from '../../leasing/leasing.module';
 import { MediaModule } from '../../media/media.module';
 import { LeadsModule } from '../../leads/leads.module';
+import { MailModule } from '../../mail/mail.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
-  imports: [ConfigModule, HttpModule,LeadsModule, LeasingModule, MediaModule],
+  imports: [ConfigModule,MailModule,JwtModule, HttpModule,LeadsModule, LeasingModule, MediaModule],
   controllers: [DocuSignController, DocuSignWebhookController],
   providers: [DocuSignService],
   exports: [DocuSignService],

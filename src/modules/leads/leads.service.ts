@@ -22,10 +22,22 @@ import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
 import { FormStatus } from '../../common/enums/common-enums';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
+import { LeaseStatus } from './schema/sub-schemas/lease-info.schema';
 
 export const COMPANY = {
   NAME: 'Global Fund Investments',
 }
+
+// Status group mapping for filtering
+const LEASE_STATUS_GROUPS: Record<string, string[]> = {
+  APPROVAL_ALL: ['PENDING', 'IN_REVIEW'],
+  LEASE_ALL: ['LEASE_NEGOTIATION', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE'],
+};
+
+// Lead status group mapping for filtering
+const LEAD_STATUS_GROUPS: Record<string, string[]> = {
+  TENANT_AR_ALL: ['SEND_TO_ATTORNEY', 'SEND_COURTESY_NOTICE', 'SEND_THREE_DAY_NOTICE'],
+};
 
 @Injectable()
 export class LeadsService {
@@ -41,24 +53,56 @@ export class LeadsService {
   ) { }
 
   async findAll(query: PaginationQueryDto) {
-      const { page = 1, limit = 20, search, sortOrder = SortOrder.DESC, sortBy = 'createdAt', isLease, property } = query;
+      const { page = 1, limit = 20, search, sortOrder = SortOrder.DESC, sortBy = 'createdAt', isLease, lease_status, lead_status, property } = query;
       const skip = (page - 1) * limit;
 
       const filter: FilterQuery<Lead> = {};
 
-      // Filter by isLease field - handle both boolean and string values
+      // Filter by isLease - check if lease object exists
       console.log('isLease value:', isLease, 'type:', typeof isLease);
       
       if (isLease === true) {
-        filter.isLease = true;
-      } else if (isLease === false ) {
-        filter.isLease = false;
+        // Filter for records where lease object exists and is not empty
+        filter.lease = { $exists: true, $ne: null };
+      } else if (isLease === false) {
+        // Filter for records where lease object doesn't exist or is null
+        filter.$or = [
+          { lease: { $exists: false } },
+          { lease: null }
+        ];
       } else {
         // Default: when isLease is undefined, show non-lease records
-        filter.isLease = false;
+        filter.$or = [
+          { lease: { $exists: false } },
+          { lease: null }
+        ];
       }
       
-      console.log('Filter applied:', filter.isLease);
+      console.log('Filter applied for lease:', filter.lease || filter.$or);
+
+      // Filter by lease.status - only filter if not NOTHING
+      if (lease_status && lease_status !== 'NOTHING') {
+        // Check if it's a group filter
+        if (LEASE_STATUS_GROUPS[lease_status]) {
+          // Use $in for group filters
+          filter['lease.status'] = { $in: LEASE_STATUS_GROUPS[lease_status] };
+        } else {
+          // For individual status, also use $in for consistency
+          filter['lease.status'] = { $in: [lease_status] };
+        }
+      }
+
+      // Filter by lead status
+      if (lead_status) {
+        // Check if it's a group filter
+        if (LEAD_STATUS_GROUPS[lead_status]) {
+          // Use $in for group filters
+          filter.status = { $in: LEAD_STATUS_GROUPS[lead_status] };
+        } else {
+          // For individual status, also use $in for consistency
+          filter.status = { $in: [lead_status] };
+        }
+      }
 
       // Filter by property name
       if (property) {
@@ -105,6 +149,58 @@ export class LeadsService {
         },
       };
     }
+
+  async findAllLeases(query: any) {
+    const { page = 1, limit = 20, property, status, sortOrder = SortOrder.DESC, sortBy = 'createdAt' } = query;
+    const skip = (page - 1) * limit;
+
+    const filter: FilterQuery<Lead> = {};
+
+    filter.lease = { $exists: true, $ne: null };
+
+    // Filter by property name
+    if (property) {
+      filter['general.property'] = new RegExp(property.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    }
+
+    // Filter by lease.status
+    if (status && status !== 'NOTHING') {
+      // Check if it's a group filter
+      if (LEASE_STATUS_GROUPS[status]) {
+        // Use $in for group filters
+        filter['lease.status'] = { $in: LEASE_STATUS_GROUPS[status] };
+      } else {
+        // For individual status, also use $in for consistency
+        filter['lease.status'] = { $in: [status] };
+      }
+    }
+
+    const sort: FilterQuery<Lead> = { [sortBy]: sortOrder === SortOrder.ASC ? 1 : -1 };
+
+    const [data, total] = await Promise.all([
+      this.repo.find(filter, skip, limit, sort),
+      this.repo.count(filter),
+    ]);
+
+    const mapper = data.map((item) => {
+      const it = item as any;
+      return {
+        ...it,
+        id: it._id?.toString(),
+        fullName: `${it.general?.firstName || ''} ${it.general?.lastName || ''}`.trim(),
+      }
+    });
+
+    return {
+      data: mapper,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
 
 
   async findOne(id: string) {

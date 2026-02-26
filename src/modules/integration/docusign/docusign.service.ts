@@ -15,6 +15,18 @@ interface TokenCache {
   expiresAt: number;
 }
 
+interface RecipientViewRequest {
+  returnUrl: string;
+  authenticationMethod: string;
+  email: string;
+  userName: string;
+  clientUserId?: string;
+}
+
+interface RecipientViewResponse {
+  url: string;
+}
+
 @Injectable()
 export class DocuSignService {
   private readonly logger = new Logger(DocuSignService.name);
@@ -208,6 +220,80 @@ export class DocuSignService {
   }
 
   /**
+   * Generate recipient view URL for signing (private helper with error handling)
+   * Returns null on failure instead of throwing to ensure envelope creation succeeds
+   * 
+   * @param envelopeId - The DocuSign envelope ID
+   * @param recipientEmail - Email of the recipient who will sign
+   * @param recipientName - Name of the recipient
+   * @returns Signing URL or null if generation fails
+   */
+  private async generateRecipientViewUrlSafe(
+    envelopeId: string,
+    recipientEmail: string,
+    recipientName: string,
+  ): Promise<string | null> {
+    try {
+      this.logger.log(
+        `Generating recipient view URL for envelope ${envelopeId}, recipient: ${recipientEmail}`,
+      );
+
+      // Get access token
+      const accessToken = await this.getAccessToken();
+
+      // Get account ID and base path
+      const accountId = this.configService.get<string>('DOCUSIGN_ACCOUNT_ID')!;
+      const basePath = this.configService.get<string>('DOCUSIGN_BASE_PATH')!;
+
+      // Get return URL from config or use default
+      const returnUrl = this.configService.get<string>('DOCUSIGN_RETURN_URL') 
+        || 'https://www.docusign.com/deeplinkRedirect';
+
+      // Create recipient view request
+      const recipientViewRequest: RecipientViewRequest = {
+        returnUrl,
+        authenticationMethod: 'email',
+        email: recipientEmail,
+        userName: recipientName,
+      };
+
+      this.logger.log(
+        `Recipient view request for envelope ${envelopeId}: returnUrl=${returnUrl}, email=${recipientEmail}`,
+      );
+
+      // Call DocuSign API to create recipient view
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${basePath}/v2.1/accounts/${accountId}/envelopes/${envelopeId}/views/recipient`,
+          recipientViewRequest,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        ),
+      );
+
+      const signingUrl = response.data.url;
+
+      this.logger.log(
+        `Successfully generated signing URL for envelope ${envelopeId}: ${signingUrl.substring(0, 50)}...`,
+      );
+
+      return signingUrl;
+    } catch (error) {
+      // Log error but don't throw - envelope creation should succeed even if URL generation fails
+      this.logger.error(
+        `Failed to generate signing URL for envelope ${envelopeId}, recipient: ${recipientEmail}`,
+        error.response?.data || error.message,
+      );
+      return null;
+    }
+  }
+
+
+  /**
    * Send lease for signature via DocuSign
    * Creates an envelope with the lease PDF and sends it to the tenant
    */
@@ -264,6 +350,28 @@ export class DocuSignService {
       this.logger.log(
         `Successfully created envelope ${envelopeResponse.envelopeId} for lease ${leaseId}`,
       );
+
+      // Generate signing URL (non-critical - envelope creation succeeds even if this fails)
+      try {
+        const signingUrl = await this.generateRecipientViewUrlSafe(
+          envelopeResponse.envelopeId,
+          tenantEmail,
+          tenantName,
+        );
+
+        if (signingUrl) {
+          envelopeResponse.signingUrl = signingUrl;
+          this.logger.log(
+            `Signing URL included in response for envelope ${envelopeResponse.envelopeId}`,
+          );
+        }
+      } catch (urlError) {
+        // Log error but don't fail the request
+        this.logger.error(
+          `Failed to generate signing URL for envelope ${envelopeResponse.envelopeId}`,
+          urlError.message,
+        );
+      }
 
       return envelopeResponse;
     } catch (error) {

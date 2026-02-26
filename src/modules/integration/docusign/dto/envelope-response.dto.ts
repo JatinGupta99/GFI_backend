@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 
 export class EnvelopeResponseDto {
   @IsString()
@@ -12,4 +12,8 @@ export class EnvelopeResponseDto {
 
   @IsString()
   uri: string;
+
+  @IsString()
+  @IsOptional()
+  signingUrl?: string;
 }

@@ -7,6 +7,7 @@ import {
   ValidateNested,
   IsNumber,
   IsBoolean,
+  IsArray,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -29,6 +30,11 @@ export class SendForSignatureDto {
   @IsEmail()
   @IsOptional()
   recipientEmail?: string;
+
+  @IsArray()
+  @IsEmail({}, { each: true })
+  @IsOptional()
+  cc?: string[];
 
   @IsObject()
   @IsOptional()

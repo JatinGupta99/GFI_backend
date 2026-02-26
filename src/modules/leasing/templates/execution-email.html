@@ -1,167 +1,45 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lease Execution Copy</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #1E293B;
-      margin: 0;
-      padding: 0;
-      background-color: #F8FAFC;
-    }
-    .email-container {
-      max-width: 600px;
-      margin: 40px auto;
-      background: #FFFFFF;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .email-header {
-      background: #001D3D;
-      color: #FFFFFF;
-      padding: 30px;
-      text-align: center;
-    }
-    .email-header h1 {
-      margin: 0;
-      font-size: 24px;
-      font-weight: 700;
-    }
-    .email-body {
-      padding: 40px 30px;
-    }
-    .email-body p {
-      margin: 0 0 16px 0;
-      font-size: 15px;
-      color: #1E293B;
-    }
-    .docusign-button {
-      display: inline-block;
-      margin: 24px 0;
-      padding: 14px 32px;
-      background: #001D3D;
-      color: #FFFFFF;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 15px;
-      transition: background 0.3s;
-    }
-    .docusign-button:hover {
-      background: #002855;
-    }
-    .docusign-link {
-      color: #001D3D;
-      text-decoration: underline;
-      font-weight: 700;
-    }
-    .lease-details {
-      background: #F8FAFC;
-      border-left: 4px solid #001D3D;
-      padding: 20px;
-      margin: 24px 0;
-      border-radius: 4px;
-    }
-    .lease-details h3 {
-      margin: 0 0 12px 0;
-      font-size: 16px;
-      color: #001D3D;
-    }
-    .lease-details ul {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-    .lease-details li {
-      padding: 6px 0;
-      font-size: 14px;
-      color: #475569;
-    }
-    .lease-details li strong {
-      color: #1E293B;
-      display: inline-block;
-      min-width: 100px;
-    }
-    .signature {
-      margin-top: 32px;
-      padding-top: 24px;
-      border-top: 1px solid #E2E8F0;
-    }
-    .signature p {
-      margin: 4px 0;
-    }
-    .signature .name {
-      font-weight: 700;
-      color: #001D3D;
-    }
-    .signature .role,
-    .signature .company {
-      font-style: italic;
-      color: #64748B;
-      font-size: 14px;
-    }
-    .email-footer {
-      background: #F8FAFC;
-      padding: 24px 30px;
-      text-align: center;
-      border-top: 1px solid #E2E8F0;
-    }
-    .email-footer p {
-      margin: 0;
-      font-size: 12px;
-      color: #64748B;
-    }
-  </style>
-</head>
-<body>
-  <div class="email-container">
-    <!-- Header -->
-    <div class="email-header">
-      <h1>Lease Execution Copy</h1>
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+
+  <!-- Body -->
+  <div>
+    <p>Hi ${lease.general?.firstName || 'there'},</p>
+
+    <p style="color:#555; line-height:1.6;">
+      Here is the execution copy of the lease for <strong>${propertyDisplay}</strong>.
+    </p>
+
+    <p style="color:#555; line-height:1.6;">
+      You will receive a separate email from DocuSign with a secure link to review and sign the lease.
+      Please follow the instructions in the DocuSign email to complete the signing process.
+    </p>
+
+    <p style="color:#555; line-height:1.6;">
+      If you do not receive the DocuSign email within a few minutes, please check your spam or junk folder.
+    </p>
+
+    <!-- Lease Details -->
+    <div style="margin-top:30px;">
+      <h3>Lease Details</h3>
+      <ul>
+        <li><strong>Tenant:</strong> ${lease.general?.businessName || ''}</li>
+        <li><strong>Property:</strong> ${propertyDisplay}</li>
+        <li><strong>Suite:</strong> ${lease.general?.suite || ''}</li>
+      </ul>
     </div>
 
-    <!-- Body -->
-    <div class="email-body">
-      <p>Hi, {{firstName}},</p>
-      
-      <p>Here is the execution copy of the lease for the space at {{property}}. Please let me know if you have any questions.</p>
-
-      <!-- DocuSign Button -->
-      <div style="text-align: center; margin: 32px 0;">
-        <a href="{{docusignUri}}" class="docusign-button">Sign Lease via DocuSign</a>
-      </div>
-
-      <p>Or copy this link: <a href="{{docusignUri}}" class="docusign-link">{{docusignUri}}</a></p>
-
-      <!-- Lease Details -->
-      <div class="lease-details">
-        <h3>Lease Details</h3>
-        <ul>
-          <li><strong>Tenant:</strong> {{businessName}}</li>
-          <li><strong>Property:</strong> {{property}}</li>
-          <li><strong>Suite:</strong> {{suite}}</li>
-        </ul>
-      </div>
-
-      <!-- Signature -->
-      <div class="signature">
-        <p>Thanks,</p>
-        <p class="name">{{userName}}</p>
-        <p class="role">{{userRole}}</p>
-        <p class="company">Global Fund Investments</p>
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div class="email-footer">
-      <p>This is an automated email from Global Fund Investments.</p>
-      <p>Please do not reply to this email.</p>
+    <!-- Signature -->
+    <div style="margin-top:30px;">
+      <p>Thanks,</p>
+      <p>${user.name}</p>
+      <p>${user.role}</p>
+      <p>Global Fund Investments</p>
     </div>
   </div>
-</body>
-</html>
+
+  <!-- Footer -->
+  <div style="margin-top:40px; font-size:12px; color:#999;">
+    <p>This is an automated email from Global Fund Investments.</p>
+    <p>Please do not reply to this email.</p>
+  </div>
+
+</div>
