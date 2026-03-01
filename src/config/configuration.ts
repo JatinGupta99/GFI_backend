@@ -25,6 +25,10 @@ export const configuration = () => ({
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
     },
 
+    cache: {
+        ttl: parseInt(process.env.CACHE_TTL || '900', 10), // 15 minutes in seconds
+    },
+
     mail: {
         host: process.env.MAIL_HOST!,
         port: parseInt(process.env.MAIL_PORT || '587', 10),

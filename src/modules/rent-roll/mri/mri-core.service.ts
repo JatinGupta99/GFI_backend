@@ -184,4 +184,76 @@ export class MriCoreService {
         }
         throw lastError;
     }
+
+    /**
+     * Generic PUT wrapper for MRI endpoints (for create/update operations)
+     */
+    async put<T>(apiName: string, params: any = {}, body: any, retries = 3): Promise<T> {
+        const startTime = Date.now();
+        const sanitizedParams = { ...params };
+        delete sanitizedParams.$api;
+        delete sanitizedParams.$format;
+        
+        this.logger.log(`🔵 MRI PUT Call -> ${apiName} | Params: ${JSON.stringify(sanitizedParams)} | Body: ${JSON.stringify(body)}`);
+
+        let lastError: any;
+        for (let i = 0; i < retries; i++) {
+            try {
+                const url = this.baseUrl;
+                const authHeader = this.authHeader;
+
+                const queryParams = {
+                    '$api': apiName,
+                    '$format': 'json',
+                    ...params
+                };
+
+                const { data } = await firstValueFrom(
+                    this.httpService.put<T>(url, body, {
+                        params: queryParams,
+                        headers: {
+                            'Authorization': authHeader,
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        timeout: 15000
+                    })
+                );
+
+                const result = (data && typeof data === 'object' && 'value' in data)
+                    ? (data as any).value
+                    : data;
+
+                const duration = Date.now() - startTime;
+                this.logger.log(`✅ MRI PUT Success -> ${apiName} | Duration: ${duration}ms | Response: ${JSON.stringify(result)}`);
+
+                return result as T;
+
+            } catch (error) {
+                lastError = error;
+                const duration = Date.now() - startTime;
+                const errorBody = error.response?.data?.toString() || '';
+                const isDeadlock = errorBody.includes('deadlocked');
+                const is500 = error.response?.status === 500;
+                const statusCode = error.response?.status || 'N/A';
+
+                if ((is500 || isDeadlock) && i < retries - 1) {
+                    const delay = (i + 1) * 1000;
+                    this.logger.warn(`⚠️  MRI PUT Retry -> ${apiName} | Status: ${statusCode} | Attempt: ${i + 1}/${retries} | Retrying in ${delay}ms`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                }
+
+                this.logger.error(`❌ MRI PUT Failed -> ${apiName} | Status: ${statusCode} | Params: ${JSON.stringify(sanitizedParams)} | Duration: ${duration}ms | Error: ${error.message}`);
+                if (error.response) {
+                    throw new HttpException(
+                        `MRI API Failed: ${error.response.statusText}`,
+                        error.response.status
+                    );
+                }
+                throw new HttpException('MRI API Unreachable', 503);
+            }
+        }
+        throw lastError;
+    }
 }

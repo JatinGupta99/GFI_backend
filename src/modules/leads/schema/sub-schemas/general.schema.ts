@@ -28,6 +28,9 @@ export class GeneralDetails {
     spouseName: string;
 
     @Prop({ default: '' })
+    spouseDob: string;
+
+    @Prop({ default: '' })
     businessName: string;
 
 
@@ -59,6 +62,9 @@ export class GeneralDetails {
 
     @Prop({ default: '' })
     suite: string;
+
+    @Prop({ default: '' })
+    use: string;
 
     @Prop({ default: '' })
     sf: string;

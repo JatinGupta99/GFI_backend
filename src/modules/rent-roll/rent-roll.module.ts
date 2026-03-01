@@ -6,6 +6,7 @@ import { MriOptionsService } from './mri/mri-options.service';
 import { MriChargesService } from './mri/mri-charges.service';
 import { MriArService } from './mri/mri-ar.service';
 import { MriNotesService } from './mri/mri-notes.service';
+import { MriCommercialLeaseNotesService } from './mri/mri-commercial-lease-notes.service';
 import { MriVacantSuitesService } from './mri/mri-vacant-suites.service';
 import { MriRenewalOffersService } from './mri/mri-renewal-offers.service';
 import { MriLeaseEmeaService } from './mri/mri-lease-emea.service';
@@ -25,6 +26,7 @@ import { RentRollController } from './rent-roll.controller';
         MriChargesService,
         MriArService,
         MriNotesService,
+        MriCommercialLeaseNotesService,
         RentRollService,
         MriVacantSuitesService,
         MriRenewalOffersService,
@@ -42,6 +44,7 @@ import { RentRollController } from './rent-roll.controller';
         MriChargesService,
         MriArService,
         MriNotesService,
+        MriCommercialLeaseNotesService,
         RentRollService,
         MriRenewalOffersService,
         MriLeaseEmeaService,

@@ -21,7 +21,6 @@ import { FileInfoDto } from './sub-dtos/file.dto';
 import { ActivityLogDto } from './sub-dtos/activity.dto';
 
 export class CreateLeadDto {
-  @IsOptional() @IsEnum(LeadStatus) status?: LeadStatus;
 
   @IsOptional() @ValidateNested() @Type(() => GeneralDetailsDto) general?: GeneralDetailsDto;
   @IsOptional() @ValidateNested() @Type(() => BusinessDetailsDto) business?: BusinessDetailsDto;
@@ -39,6 +38,8 @@ export class CreateLeadDto {
   @IsOptional() @IsString() createdBy?: string;
   @IsOptional() @IsString() lastModifiedBy?: string;
 
+  @IsOptional() @IsEnum(LeadStatus) lead_status?: LeadStatus;
+  @IsOptional() @IsString() lease_status?: string;
   @IsOptional() @IsString() lead_notes?: string;
   @IsOptional() @IsString() lease_notes?: string;
 }

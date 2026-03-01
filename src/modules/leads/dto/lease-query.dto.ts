@@ -8,7 +8,6 @@ import {
   Min,
 } from 'class-validator';
 import { SortOrder } from '../../../common/enums/common-enums';
-import { LeaseStatus } from '../schema/sub-schemas/lease-info.schema';
 
 export class LeaseQueryDto {
   @IsOptional()
@@ -29,8 +28,8 @@ export class LeaseQueryDto {
   property?: string;
 
   @IsOptional()
-  @IsEnum(LeaseStatus)
-  status?: LeaseStatus;
+  @IsString()
+  status?: string;
 
   @IsOptional()
   @IsEnum(SortOrder)

@@ -8,7 +8,12 @@ import {
   Min,
 } from 'class-validator';
 import { SortOrder } from '../enums/common-enums';
-
+export enum LeaseStatusFilter {
+  LEASE_NEGOTIATION = 'LEASE_NEGOTIATION',
+  OUT_FOR_EXECUTION = 'OUT_FOR_EXECUTION',
+  DRAFTING_LEASE = 'DRAFTING_LEASE',
+  LEASE_ALL = 'LEASE_ALL',
+}
 export class PaginationQueryDto {
   @IsOptional()
   @Type(() => Number)
@@ -32,20 +37,16 @@ export class PaginationQueryDto {
   sortOrder: SortOrder = SortOrder.DESC;
 
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true' || value === true) return true;
-    if (value === 'false' || value === false) return false;
-    return undefined;
-  })
-  isLease?: boolean | string;
+  @IsString()
+  lead_status?: string='';
 
   @IsOptional()
   @IsString()
-  lease_status?: string;
+  approval_status?: string='';
 
   @IsOptional()
-  @IsString()
-  lead_status?: string;
+  @IsEnum(LeaseStatusFilter)
+  lease_status?: LeaseStatusFilter;
 
   @IsOptional()
   @IsString()

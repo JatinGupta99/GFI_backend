@@ -11,7 +11,25 @@ import { FinancialDetails, FinancialDetailsSchema } from './sub-schemas/financia
 import { GeneralDetails, GeneralDetailsSchema } from './sub-schemas/general.schema';
 import { ReferenceInfo, ReferenceInfoSchema } from './sub-schemas/reference.schema';
 import { LeaseInfo, LeaseInfoSchema } from './sub-schemas/lease-info.schema';
+export enum LeaseStatus {
+  LEASE_NEGOTIATION = 'LEASE_NEGOTIATION',
+  OUT_FOR_EXECUTION = 'OUT_FOR_EXECUTION',
+  DRAFTING_LEASE = 'DRAFTING_LEASE',
+}
 
+export enum ApprovalStatus {
+  IN_REVIEW = 'IN_REVIEW',
+  APPROVED = 'APPROVED',
+  PENDING = 'PENDING',
+}
+
+export enum SignatureStatus {
+  DRAFT = 'DRAFT',
+  PENDING_SIGNATURE = 'PENDING_SIGNATURE',
+  SIGNED = 'SIGNED',
+  VOIDED = 'VOIDED',
+}
+@Schema({ timestamps: true })
 @Schema({ timestamps: true })
 export class Lead {
 
@@ -21,7 +39,7 @@ export class Lead {
     default: LeadStatus.PROSPECT,
     index: true,
   })
-  status: LeadStatus;
+  lead_status: LeadStatus;
 
   @Prop({ type: GeneralDetailsSchema, default: () => ({}) })
   general: GeneralDetails;
@@ -41,8 +59,8 @@ export class Lead {
   @Prop({ type: DraftingDetailsSchema, default: () => ({}) })
   budget_negotiation: DraftingDetails;
 
-  @Prop({ type: ReferenceInfoSchema, default: () => ({}) })
-  references: ReferenceInfo;
+  @Prop({ type: [ReferenceInfoSchema], default: [] })
+  references: ReferenceInfo[];
 
   @Prop({ type: AccountingDetailsSchema, default: () => ({}) })
   accounting: AccountingDetails;
@@ -53,11 +71,11 @@ export class Lead {
   @Prop({ type: [FileInfoSchema], default: [] })
   files: FileInfo[];
 
-  @Prop({ default: '' })
+  @Prop({ type: String, trim: true })
   createdBy: string;
 
-  @Prop({ default: '' })
-  lastModifiedBy: string;
+  @Prop({ type: String, trim: true })
+  lastModifiedBy?: string;
 
   @Prop({
     type: String,
@@ -66,37 +84,57 @@ export class Lead {
   })
   form_status?: FormStatus;
 
-  @Prop({type:String})
-  lead_notes?:string='Note';
-  
-  @Prop({type:String})
-  lease_notes?:string='Note';
+  @Prop({ type: String, trim: true })
+  lead_notes?: string;
 
-  @Prop({ type: String, required: false })
+  @Prop({ type: String, trim: true })
+  lease_notes?: string;
+
+  @Prop({ type: String })
   docusignEnvelopeId?: string;
 
   @Prop({
     type: String,
-    enum: ['DRAFT', 'PENDING_SIGNATURE', 'SIGNED', 'VOIDED'],
-    default: 'DRAFT',
+    enum: Object.values(SignatureStatus),
+    default: SignatureStatus.DRAFT,
+    index: true,
   })
-  signatureStatus?: string;
+  signatureStatus?: SignatureStatus;
 
-  @Prop({ type: String, required: false })
+  @Prop({ type: String })
   signedDocumentUrl?: string;
 
-  @Prop({ type: Date, required: false })
+  @Prop({ type: Date })
   sentForSignatureAt?: Date;
 
-  @Prop({ type: Date, required: false })
+  @Prop({ type: Date })
   signedAt?: Date;
 
-  @Prop({ type: String, required: false })
+  @Prop({ type: String })
   pdfDocumentUrl?: string;
 
-  @Prop({ type: LeaseInfoSchema, default: () => ({}) })
+  @Prop({ type: LeaseInfoSchema })
   lease?: LeaseInfo;
+
+    @Prop({
+      type: String,
+      index: true,
+    })
+    lease_status?: string;
+    
+    @Prop({
+      type: String,
+      index: true,
+    })
+    approval_status?: string;
 }
+
 
 export type LeadDocument = Lead & Document;
 export const LeadSchema = SchemaFactory.createForClass(Lead);
+LeadSchema.index({ status: 1 });
+LeadSchema.index({ 'lease.lease_status': 1 });
+LeadSchema.index({ 'lease.approval_status': 1 });
+LeadSchema.index({ signatureStatus: 1 });
+LeadSchema.index({ createdAt: -1 });
+LeadSchema.index({ 'general.property': 1 });

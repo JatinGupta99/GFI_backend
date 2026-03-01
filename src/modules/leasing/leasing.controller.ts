@@ -1,12 +1,14 @@
 import { Controller, Get, Post, Query, Param, UseInterceptors, Body, HttpCode, HttpStatus, Req, NotFoundException, InternalServerErrorException, BadRequestException, Logger } from '@nestjs/common';
-import { CacheInterceptor } from '@nestjs/cache-manager';
+import { CacheTTL } from '@nestjs/cache-manager';
+import { HttpCacheInterceptor } from '../../common/cache/app-cache.module';
 import { LeasingService } from './leasing.service';
 import { GetRenewalsQueryDto } from './dto/get-renewals-query.dto';
 import { SendExecutionEmailDto } from './dto/send-execution-email.dto';
+import { AddRenewalNoteDto } from './dto/add-renewal-note.dto';
 import { LeaseEmailService } from './services/lease-email.service';
 
 @Controller('leasing')
-@UseInterceptors(CacheInterceptor)
+@UseInterceptors(HttpCacheInterceptor)
 export class LeasingController {
     private readonly logger = new Logger(LeasingController.name);
 
@@ -19,6 +21,7 @@ export class LeasingController {
      * Get renewals for a specific property (paginated)
      */
     @Get('renewals')
+    @CacheTTL(1800) // Cache for 30 minutes
     async getUpcomingRenewals(
         @Query() query: GetRenewalsQueryDto
     ) {
@@ -84,6 +87,7 @@ export class LeasingController {
      * Fast endpoint that returns immediately
      */
     @Get('renewals/cached')
+    @CacheTTL(600) // Cache for 10 minutes
     async getCachedRenewals() {
         const data = await this.service.getCachedRenewals();
         return {
@@ -96,12 +100,61 @@ export class LeasingController {
     }
 
     /**
+     * Add a note to a commercial lease for upcoming renewal
+     * POST /leasing/renewals/:buildingId/:leaseId/notes
+     */
+    @Post('renewals/:buildingId/:leaseId/notes')
+    @HttpCode(HttpStatus.CREATED)
+    async addRenewalNote(
+        @Param('buildingId') buildingId: string,
+        @Param('leaseId') leaseId: string,
+        @Body() dto: AddRenewalNoteDto
+    ) {
+        const note = await this.service.addRenewalNote(
+            buildingId,
+            leaseId,
+            dto.noteText,
+            dto.noteReference1,
+            dto.noteReference2
+        );
+
+        return {
+            success: true,
+            message: 'Renewal note added successfully',
+            data: note,
+        };
+    }
+
+    /**
+     * Get all notes for a commercial lease
+     * GET /leasing/renewals/:buildingId/:leaseId/notes
+     */
+    @Get('renewals/:buildingId/:leaseId/notes')
+    @CacheTTL(180) // Cache for 3 minutes
+    async getRenewalNotes(
+        @Param('buildingId') buildingId: string,
+        @Param('leaseId') leaseId: string
+    ) {
+        const notes = await this.service.getRenewalNotes(buildingId, leaseId);
+
+        return {
+            data: notes,
+            meta: {
+                total: notes.length,
+                buildingId,
+                leaseId,
+            },
+        };
+    }
+
+    /**
      * @deprecated Use POST /sync and GET /cached instead
      * Legacy endpoint - fetches renewals directly from MRI
      * If propertyId is provided, fetches only that property
      * Otherwise fetches all properties
      */
     @Get('renewals/all')
+    @CacheTTL(300) // Cache for 5 minutes
     async getAllUpcomingRenewals(@Query('propertyId') propertyId?: string) {
         const data = propertyId 
             ? await this.service.getUpcomingRenewals(propertyId, 1, 50)

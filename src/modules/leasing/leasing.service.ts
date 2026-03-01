@@ -13,6 +13,7 @@ import { MriLeasesService } from '../rent-roll/mri/mri-leases.service';
 import { MriRenewalOffersService } from '../rent-roll/mri/mri-renewal-offers.service';
 import { MriLeaseEmeaService } from '../rent-roll/mri/mri-lease-emea.service';
 import { MriNotesService } from '../rent-roll/mri/mri-notes.service';
+import { MriCommercialLeaseNotesService } from '../rent-roll/mri/mri-commercial-lease-notes.service';
 import { MriOptionsService } from '../rent-roll/mri/mri-options.service';
 import { MriChargesService } from '../rent-roll/mri/mri-charges.service';
 
@@ -56,6 +57,7 @@ export class LeasingService {
         private readonly renewalOffersService: MriRenewalOffersService,
         private readonly emeaService: MriLeaseEmeaService,
         private readonly notesService: MriNotesService,
+        private readonly commercialLeaseNotesService: MriCommercialLeaseNotesService,
         private readonly optionsService: MriOptionsService,
         private readonly chargesService: MriChargesService,
         private readonly propertiesService: PropertiesService,
@@ -208,6 +210,46 @@ export class LeasingService {
     async getCachedRenewals(): Promise<UpcomingRenewal[]> {
         const cached = await this.cache.get<UpcomingRenewal[]>('all-renewals');
         return cached || [];
+    }
+
+    /**
+     * Add a note to a commercial lease for upcoming renewal
+     * @param buildingId - Building ID
+     * @param leaseId - Lease ID
+     * @param noteText - The note text
+     * @param noteReference1 - Note reference type 1 (default: 'RENEWAL')
+     * @param noteReference2 - Note reference type 2 (default: '*')
+     */
+    async addRenewalNote(
+        buildingId: string,
+        leaseId: string,
+        noteText: string,
+        noteReference1: string = 'RENEWAL',
+        noteReference2: string = '*'
+    ) {
+        this.logger.log(`Adding renewal note for lease ${leaseId} in building ${buildingId}`);
+        
+        const note = await this.commercialLeaseNotesService.create({
+            BuildingID: buildingId,
+            LeaseID: leaseId,
+            NoteDate: new Date().toISOString(),
+            NoteText: noteText,
+            NoteReference1: noteReference1,
+            NoteReference2: noteReference2
+        });
+
+        this.logger.log(`✅ Renewal note added successfully for lease ${leaseId}`);
+        return note;
+    }
+
+    /**
+     * Get all notes for a commercial lease
+     * @param buildingId - Building ID
+     * @param leaseId - Lease ID
+     */
+    async getRenewalNotes(buildingId: string, leaseId: string) {
+        this.logger.log(`Fetching renewal notes for lease ${leaseId} in building ${buildingId}`);
+        return this.commercialLeaseNotesService.fetchByLease(buildingId, leaseId);
     }
 
     /**
@@ -370,6 +412,7 @@ export class LeasingService {
             await new Promise(resolve => setTimeout(resolve, 100));
             console.log(lease,'csalsaclscanlasc')
             if (minimal) {
+                console.log(minimal,'111111111111')
                 return {
                     id: lease.LeaseID,
                     tenant: lease.OccupantName,
@@ -392,15 +435,19 @@ export class LeasingService {
                     note: '',
                 };
             }
-
-            // Full mode: Fetch options and charges
-            const [options, charges] = await Promise.all([
+console.log(minimal,'2222222222')
+            // Full mode: Fetch options, charges, and commercial lease notes
+            const [options, charges, commercialNotes] = await Promise.all([
                 this.safeFetch(
                     () => this.optionsService.fetch(propertyId, lease.LeaseID),
                     [],
                 ),
                 this.safeFetch(
-                    () => this.chargesService.fetch(lease.LeaseID),
+                    () => this.chargesService.fetch(lease.LeaseID, propertyId),
+                    [],
+                ),
+                this.safeFetch(
+                    () => this.commercialLeaseNotesService.fetchByLease(propertyId, lease.LeaseID),
                     [],
                 ),
             ]);
@@ -428,6 +475,13 @@ export class LeasingService {
                     .join(', ')
                 : 'N/A';
 
+            // Get the most recent note text
+            const latestNote = commercialNotes.length > 0
+                ? commercialNotes.sort((a, b) => 
+                    new Date(b.LastUpdate).getTime() - new Date(a.LastUpdate).getTime()
+                  )[0].NoteText
+                : '';
+
             return {
                 id: lease.LeaseID,
                 tenant: lease.OccupantName,
@@ -447,7 +501,7 @@ export class LeasingService {
                 budgetRent: 0,
                 budgetLcd: 'N/A',
                 status: 'Renewal Negotiation',
-                note: '',
+                note: latestNote,
             };
         }
 

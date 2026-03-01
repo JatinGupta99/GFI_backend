@@ -159,7 +159,7 @@ export class PropertyManagementService {
 
         // Update Lead status
         try {
-            await this.leadsRepository.update(id, { status: newLeadStatus });
+            await this.leadsRepository.update(id, { lead_status: newLeadStatus });
             this.logger.log(`Updated lead ${id} status to ${newLeadStatus}`);
         } catch (error) {
             this.logger.warn(`Failed to update lead status: ${error.message}`);
@@ -180,7 +180,7 @@ export class PropertyManagementService {
             const chunkResults = await Promise.all(chunk.map(async (lease) => {
                 const [arRaw, charges, localStatus] = await Promise.all([
                     this.safeFetch(() => this.arService.fetch(lease.MasterOccupantID), []),
-                    this.safeFetch(() => this.chargesService.fetch(lease.LeaseID), []),
+                    this.safeFetch(() => this.chargesService.fetch(lease.LeaseID, propertyId), []),
                     this.noticeStatusModel.findOne({ leaseId: lease.LeaseID }).lean().exec()
                 ]);
 

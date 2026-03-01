@@ -127,17 +127,11 @@ export class NegotiationRound {
     @Prop({ default: '' })
     id: string;
 
-    @Prop({ default: '' })
-    label: string;
+    @Prop({ type: NegotiationValuesSchema, default: () => ({}) })
+    initial: NegotiationValues;
 
-    @Prop({ type: NegotiationProposalSchema, default: () => ({}) })
-    initial: NegotiationProposal;
-
-    @Prop({ type: NegotiationProposalSchema, default: () => ({}) })
-    counter: NegotiationProposal;
-
-    @Prop({ type: AgreementSchema, default: () => ({}) })
-    agreement: Agreement;
+    @Prop({ type: NegotiationValuesSchema, default: () => ({}) })
+    counter: NegotiationValues;
 }
 
 const NegotiationRoundSchema = SchemaFactory.createForClass(NegotiationRound);

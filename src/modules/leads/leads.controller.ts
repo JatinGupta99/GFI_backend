@@ -1,29 +1,29 @@
 import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  Post,
   Body,
-  Patch,
+  Controller,
   Delete,
+  Get,
+  Headers,
+  Param,
+  Patch,
+  Post,
+  Query,
   UsePipes,
   ValidationPipe,
-  Headers,
 } from '@nestjs/common';
 
-import { LeadsService } from './leads.service';
-import { CreateLeadDto } from './dto/create-lead.dto';
-import { UpdateLeadDto } from './dto/update-lead.dto';
-import { SendLoiEmailDto, SendAppEmailDto, SendApprovalEmailDto, SendRenewalLetterDto, SendTenantMagicLinkDto } from './dto/send-email.dto';
 import { LeadStatus } from '../../common/enums/common-enums';
+import { CreateLeadDto } from './dto/create-lead.dto';
+import { SendAppEmailDto, SendApprovalEmailDto, SendLoiEmailDto, SendRenewalLetterDto, SendTenantMagicLinkDto } from './dto/send-email.dto';
+import { UpdateLeadPublicDto } from './dto/update-lead-public.dto';
+import { UpdateLeadDto } from './dto/update-lead.dto';
+import { LeadsService } from './leads.service';
 
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
-import { LeaseQueryDto } from './dto/lease-query.dto';
-import { UserId } from '../../common/decorators/user-id.decorator';
 import { Public } from '../../common/decorators/public.decorator';
-import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
+import { UserId } from '../../common/decorators/user-id.decorator';
 import { User } from '../../common/decorators/user.decorator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
 
 @Controller('leasing/active-leads')
 export class LeadsController {
@@ -33,12 +33,6 @@ export class LeadsController {
   @UsePipes(new ValidationPipe({ transform: true }))
   findAll(@Query() query: PaginationQueryDto) {
     return this.service.findAll(query);
-  }
-
-  @Get('leases')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  findAllLeases(@Query() query: LeaseQueryDto) {
-    return this.service.findAllLeases(query);
   }
 
   @Get(':id')
@@ -176,6 +170,44 @@ export class LeadsController {
   saveTenantForm(@Headers('authorization') auth: string, @Body() dto: SaveTenantFormDto) {
     const token = auth?.replace('Bearer ', '');
     return this.service.saveTenantForm(token, dto);
+  }
+
+  @Public()
+  @Patch('public/tenant-form/update')
+  updateTenantForm(@Headers('authorization') auth: string, @Body() body: any) {
+    const token = auth?.replace('Bearer ', '');
+    return this.service.updateTenantForm(token, body);
+  }
+
+  @Public()
+  @Patch('public/:id/update')
+  updateLeadPublic(@Param('id') id: string, @Body() dto: UpdateLeadPublicDto) {
+    return this.service.updateLeadPublic(id, dto);
+  }
+
+  @Post(':id/documents/upload-url')
+  getDocumentUploadUrl(
+    @Param('id') id: string,
+    @Body('documentType') documentType: string,
+    @Body('contentType') contentType: string,
+  ) {
+    return this.service.getDocumentUploadUrl(id, documentType, contentType);
+  }
+
+  @Post(':id/documents/confirm')
+  confirmDocumentUpload(
+    @Param('id') id: string,
+    @Body('key') key: string,
+    @Body('fileName') fileName: string,
+    @Body('documentType') documentType: string,
+    @UserId() user: {
+      userId: string;
+      email: string;
+      name: string;
+      role: string;
+    },
+  ) {
+    return this.service.confirmDocumentUpload(id, key, fileName, documentType, user.name);
   }
 
   @Public()

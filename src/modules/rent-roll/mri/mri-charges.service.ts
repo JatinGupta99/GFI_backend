@@ -27,13 +27,19 @@ export class MriChargesService {
 
     constructor(private readonly mri: MriCoreService) { }
 
-    async fetch(leaseId: string): Promise<MriChargeRaw[]> {
-        this.logger.debug(`Fetching charges | leaseId=${leaseId}`);
+    async fetch(leaseId: string, buildingId?: string): Promise<MriChargeRaw[]> {
+        this.logger.debug(`Fetching charges | leaseId=${leaseId} | buildingId=${buildingId || 'not provided'}`);
+        
+        // Build params object
+        const params: Record<string, string> = { LEASEID: leaseId };
+        if (buildingId) {
+            params.BuildingID = buildingId;
+        }
         
         // Use CurrentDelinquencies API instead of RecurringCharges (which returns 400/429)
         const delinquencies = await this.mri.get<MriDelinquencyRaw[]>(
             'MRI_S-PMCM_CurrentDelinquencies',
-            { LEASEID: leaseId }
+            params
         );
 
         // Map delinquencies to charge format

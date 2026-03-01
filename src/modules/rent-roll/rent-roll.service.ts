@@ -76,7 +76,7 @@ export class RentRollService {
                 // Parallel sub-fetches for THIS lease
                 const [options, charges, ar, notes, analysis] = await Promise.all([
                     this.safeFetch(() => this.optionsService.fetch(propertyId, lease.LeaseID), []),
-                    this.safeFetch(() => this.chargesService.fetch(lease.LeaseID), []),
+                    this.safeFetch(() => this.chargesService.fetch(lease.LeaseID, propertyId), []),
                     this.safeFetch(() => this.arService.fetch(lease.MasterOccupantID), []),
                     this.safeFetch(() => this.notesService.fetch(propertyId, lease.LeaseID), []),
                     this.safeFetch(() => this.analysisService.fetch(propertyId, lease.LeaseID), []),

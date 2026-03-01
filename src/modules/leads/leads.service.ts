@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
 import { FilterQuery, Types } from 'mongoose';
 import { ActivityType, JOBNAME, LeadStatus, Role, SortOrder } from '../../common/enums/common-enums';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
+import { UpdateLeadPublicDto } from './dto/update-lead-public.dto';
 import { LeadsRepository } from './repository/lead.repository';
 import { Lead } from './schema/lead.schema';
 import { MailService } from '../mail/mail.service';
@@ -22,7 +23,6 @@ import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
 import { FormStatus } from '../../common/enums/common-enums';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import { LeaseStatus } from './schema/sub-schemas/lease-info.schema';
 
 export const COMPANY = {
   NAME: 'Global Fund Investments',
@@ -37,10 +37,13 @@ const LEASE_STATUS_GROUPS: Record<string, string[]> = {
 // Lead status group mapping for filtering
 const LEAD_STATUS_GROUPS: Record<string, string[]> = {
   TENANT_AR_ALL: ['SEND_TO_ATTORNEY', 'SEND_COURTESY_NOTICE', 'SEND_THREE_DAY_NOTICE'],
+  LEAD_FOR_ALL: ['LOI_NEGOTIATION', 'LEASE_NEGOTIATION', 'QUALIFYING', 'OUT_FOR_EXECUTION'],
 };
 
 @Injectable()
 export class LeadsService {
+  private readonly logger = new Logger(LeadsService.name);
+
   constructor(
     private readonly repo: LeadsRepository,
     private readonly mailService: MailService,
@@ -53,146 +56,112 @@ export class LeadsService {
   ) { }
 
   async findAll(query: PaginationQueryDto) {
-      const { page = 1, limit = 20, search, sortOrder = SortOrder.DESC, sortBy = 'createdAt', isLease, lease_status, lead_status, property } = query;
-      const skip = (page - 1) * limit;
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      sortOrder = SortOrder.DESC,
+      sortBy = 'createdAt',
+      lead_status,
+      approval_status,
+      lease_status,
+      property,
+    } = query;
 
-      const filter: FilterQuery<Lead> = {};
-
-      // Filter by isLease - check if lease object exists
-      console.log('isLease value:', isLease, 'type:', typeof isLease);
-      
-      if (isLease === true) {
-        // Filter for records where lease object exists and is not empty
-        filter.lease = { $exists: true, $ne: null };
-      } else if (isLease === false) {
-        // Filter for records where lease object doesn't exist or is null
-        filter.$or = [
-          { lease: { $exists: false } },
-          { lease: null }
-        ];
-      } else {
-        // Default: when isLease is undefined, show non-lease records
-        filter.$or = [
-          { lease: { $exists: false } },
-          { lease: null }
-        ];
-      }
-      
-      console.log('Filter applied for lease:', filter.lease || filter.$or);
-
-      // Filter by lease.status - only filter if not NOTHING
-      if (lease_status && lease_status !== 'NOTHING') {
-        // Check if it's a group filter
-        if (LEASE_STATUS_GROUPS[lease_status]) {
-          // Use $in for group filters
-          filter['lease.status'] = { $in: LEASE_STATUS_GROUPS[lease_status] };
-        } else {
-          // For individual status, also use $in for consistency
-          filter['lease.status'] = { $in: [lease_status] };
-        }
-      }
-
-      // Filter by lead status
-      if (lead_status) {
-        // Check if it's a group filter
-        if (LEAD_STATUS_GROUPS[lead_status]) {
-          // Use $in for group filters
-          filter.status = { $in: LEAD_STATUS_GROUPS[lead_status] };
-        } else {
-          // For individual status, also use $in for consistency
-          filter.status = { $in: [lead_status] };
-        }
-      }
-
-      // Filter by property name
-      if (property) {
-        filter['general.property'] = new RegExp(property.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      }
-
-      if (search) {
-        const q = search.trim();
-        const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-
-        filter.$or = [
-          { 'general.prospect': regex },
-          { 'general.property': regex },
-          { 'general.firstName': regex },
-          { 'general.name': regex },
-          { 'general.lastName': regex },
-          { 'general.email': regex },
-          { 'general.businessName': regex },
-          { 'business.legalName': regex },
-        ];
-      }
-
-      const sort: FilterQuery<Lead> = { [sortBy]: sortOrder === SortOrder.ASC ? 1 : -1 };
-
-      const [data, total] = await Promise.all([
-        this.repo.find(filter, skip, limit, sort),
-        this.repo.count(filter),
-      ]);
-      const mapper = data.map((item) => {
-        const it = item as any;
-        return {
-          ...it,
-          id: it._id?.toString(),
-          fullName: `${it.general?.firstName || ''} ${it.general?.lastName || ''}`.trim(),
-        }
-      })
-      return {
-        data: mapper,
-        meta: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      };
-    }
-
-  async findAllLeases(query: any) {
-    const { page = 1, limit = 20, property, status, sortOrder = SortOrder.DESC, sortBy = 'createdAt' } = query;
     const skip = (page - 1) * limit;
-
     const filter: FilterQuery<Lead> = {};
 
-    filter.lease = { $exists: true, $ne: null };
+    // -------------------------
+    // Status Group Definitions
+    // -------------------------
+    const STATUS_GROUPS = {
+      LEAD_ALL: ['LOI_NEGOTIATION', 'QUALIFYING', 'OUT_FOR_EXECUTION','Prospect'],
+      APPROVAL_ALL: ['IN_REVIEW', 'PENDING'],
+      LEASE_ALL: ['LEASE_NEGOTIATION', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE'],
+    };
 
-    // Filter by property name
+    // -------------------------
+    // Lead Status Filter
+    // -------------------------
+    if (lead_status) {
+      const values =
+        lead_status === 'LEAD_ALL'
+          ? STATUS_GROUPS.LEAD_ALL
+          : [lead_status];
+
+      filter.lead_status = { $in: values };
+    }
+
+    // -------------------------
+    // Approval Status Filter
+    // -------------------------
+    if (approval_status) {
+      const values =
+        approval_status === 'APPROVAL_ALL'
+          ? STATUS_GROUPS.APPROVAL_ALL
+          : [approval_status];
+
+      filter.approval_status = { $in: values };
+    }
+
+    // -------------------------
+    // Lease Status Filter
+    // -------------------------
+    if (lease_status) {
+      const values =
+        lease_status === 'LEASE_ALL'
+          ? STATUS_GROUPS.LEASE_ALL
+          : [lease_status];
+
+      filter.lease_status = { $in: values };
+    }
+
+    // -------------------------
+    // Property Filter
+    // -------------------------
     if (property) {
-      filter['general.property'] = new RegExp(property.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter['general.property'] = new RegExp(
+        property.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        'i'
+      );
     }
 
-    // Filter by lease.status
-    if (status && status !== 'NOTHING') {
-      // Check if it's a group filter
-      if (LEASE_STATUS_GROUPS[status]) {
-        // Use $in for group filters
-        filter['lease.status'] = { $in: LEASE_STATUS_GROUPS[status] };
-      } else {
-        // For individual status, also use $in for consistency
-        filter['lease.status'] = { $in: [status] };
-      }
-    }
+    // -------------------------
+    // Search Filter
+    // -------------------------
+    if (search) {
+      const regex = new RegExp(
+        search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        'i'
+      );
 
-    const sort: FilterQuery<Lead> = { [sortBy]: sortOrder === SortOrder.ASC ? 1 : -1 };
+      filter.$or = [
+        { 'general.prospect': regex },
+        { 'general.property': regex },
+        { 'general.firstName': regex },
+        { 'general.name': regex },
+        { 'general.lastName': regex },
+        { 'general.email': regex },
+        { 'general.businessName': regex },
+        { 'business.legalName': regex },
+      ];
+    }
+    console.log(filter,'caslnasclknacsl')
+    const sort: FilterQuery<Lead> = {
+      [sortBy]: sortOrder === SortOrder.ASC ? 1 : -1,
+    };
 
     const [data, total] = await Promise.all([
       this.repo.find(filter, skip, limit, sort),
       this.repo.count(filter),
     ]);
 
-    const mapper = data.map((item) => {
-      const it = item as any;
-      return {
-        ...it,
-        id: it._id?.toString(),
-        fullName: `${it.general?.firstName || ''} ${it.general?.lastName || ''}`.trim(),
-      }
-    });
-
     return {
-      data: mapper,
+      data: data.map((item: any) => ({
+        ...item,
+        id: item._id?.toString(),
+        fullName: `${item.general?.firstName || ''} ${item.general?.lastName || ''}`.trim(),
+      })),
       meta: {
         total,
         page,
@@ -201,8 +170,6 @@ export class LeadsService {
       },
     };
   }
-
-
   async findOne(id: string) {
     if (!Types.ObjectId.isValid(id)) {
       throw new NotFoundException('Lead not found');
@@ -345,12 +312,12 @@ export class LeadsService {
     const rentPerSf = lead.current_negotiation?.rentPerSf || 0;
     const monthlyRent = (rentPerSf * sf) / 12;
 
-    const round = lead.dealTerms?.rounds?.[0]?.initial?.values;
+    const round = lead.dealTerms?.rounds?.[0]?.initial;
     const nnn = round?.nnn || 0;
 
     return {
-      landlord: 'Global FI',
-      tenant: lead.business?.legalName || (lead.general as any)?.businessName || lead.general?.firstName || '',
+      landlord: 'Global Realty & Management FL',
+      tenant: lead.general?.firstName +''+lead.general.lastName|| '',
       guarantor: (lead.financial as any)?.guarantor || lead.general?.firstName || '',
       property: lead.general?.property || '',
       suite: lead.general?.suite || '',
@@ -930,6 +897,35 @@ export class LeadsService {
     return { success: true, last_saved: progress.last_saved };
   }
 
+  async updateTenantForm(token: string, formData: any) {
+    const progress = await this.validateTenantToken(token);
+    const leadId = progress.tenant_id.toString();
+
+    // Update the form_data in TenantFormProgress
+    progress.form_data = { ...progress.form_data, ...formData };
+    progress.status = FormStatus.IN_PROGRESS;
+    progress.last_saved = new Date();
+    await progress.save();
+
+    // Also update the lead record with the same data
+    const updatePayload: any = {};
+    if (formData.business) updatePayload.business = formData.business;
+    if (formData.financial) updatePayload.financial = formData.financial;
+    if (formData.references) updatePayload.references = formData.references;
+    if (formData.general) updatePayload.general = formData.general;
+
+    if (Object.keys(updatePayload).length > 0) {
+      await this.repo.update(leadId, updatePayload);
+    }
+
+    return { 
+      success: true, 
+      message: 'Form updated successfully',
+      last_saved: progress.last_saved,
+      tenant_id: leadId
+    };
+  }
+
   async submitTenantForm(token: string, dto: SubmitTenantFormDto) {
     const progress = await this.validateTenantToken(token);
 
@@ -957,4 +953,136 @@ export class LeadsService {
     }
     return { success: true, message: 'Application submitted successfully' };
   }
+
+  /**
+   * Generate upload URL for document with specific type
+   * The document type will be included in the S3 key path
+   */
+  async getDocumentUploadUrl(leadId: string, documentType: string, contentType: string) {
+    const lead = await this.repo.findById(leadId);
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    // Validate content type is PDF
+    if (contentType !== 'application/pdf') {
+      throw new BadRequestException('Only PDF files are allowed');
+    }
+
+    // Create folder path with document type
+    const folderPath = `leads/${leadId}/documents/${documentType}`;
+
+    const { key, url } = await this.mediaService.generateUploadUrl(folderPath, contentType);
+
+    return {
+      statusCode: 200,
+      message: 'Upload URL generated successfully',
+      data: {
+        key,
+        url,
+        documentType,
+      },
+    };
+  }
+
+  /**
+   * Public API to update lead details without authentication
+   * Used for public forms where users update their information
+   */
+  async updateLeadPublic(leadId: string, formData: UpdateLeadPublicDto) {
+    if (!Types.ObjectId.isValid(leadId)) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    const lead = await this.repo.findById(leadId);
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    // Build update payload with proper merging
+    const updatePayload: any = {};
+    
+    if (formData.business) {
+      updatePayload.business = { ...(lead.business || {}), ...formData.business };
+    }
+    
+    if (formData.financial) {
+      updatePayload.financial = {
+        ...(lead.financial || {}),
+        ...formData.financial,
+        // Merge nested assets and liabilities
+        assets: formData.financial.assets 
+          ? { ...(lead.financial?.assets || {}), ...formData.financial.assets }
+          : lead.financial?.assets,
+        liabilities: formData.financial.liabilities
+          ? { ...(lead.financial?.liabilities || {}), ...formData.financial.liabilities }
+          : lead.financial?.liabilities,
+      };
+    }
+    
+    if (formData.references) {
+      updatePayload.references = { ...(lead.references || {}), ...formData.references };
+    }
+    
+    // Handle general field with name splitting and merging
+    if (formData.general) {
+      updatePayload.general = { ...(lead.general || {}), ...formData.general };
+      
+      // If name field exists, split it into firstName and lastName
+      if (formData.general.name) {
+        const nameParts = formData.general.name.trim().split(/\s+/);
+        updatePayload.general.firstName = nameParts[0] || '';
+        updatePayload.general.lastName = nameParts.slice(1).join(' ') || '';
+        // Remove the name field as it's not in the schema
+        delete updatePayload.general.name;
+      }
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      throw new BadRequestException('No valid fields to update');
+    }
+
+    const updated = await this.repo.update(leadId, updatePayload);
+
+    return {
+      success: true,
+      message: 'Lead updated successfully',
+      data: updated
+    };
+  }
+
+  /**
+   * Confirm document upload and store metadata in lead
+   */
+  async confirmDocumentUpload(
+    leadId: string,
+    key: string,
+    fileName: string,
+    documentType: string,
+    userName: string = 'System',
+  ) {
+    const lead = await this.repo.findById(leadId);
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    // Create document info
+    const documentInfo = {
+      id: key,
+      fileName,
+      fileType: 'application/pdf',
+      documentType,
+      uploadedBy: userName,
+      uploadedDate: new Date(),
+      updatedBy: userName,
+      updatedAt: new Date(),
+    };
+
+    // Update Lead - add to files array
+    if (!lead.files) lead.files = [];
+    lead.files.push(documentInfo as any);
+
+    await this.repo.update(leadId, { files: lead.files });
+
+    return {
+      statusCode: 200,
+      message: 'Document uploaded successfully',
+      data: documentInfo,
+    };
+  }
 }
+

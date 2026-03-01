@@ -1,11 +1,10 @@
 export enum UserRole {
-  MANAGEMENT = 'MANAGEMENT',
   ADMIN = 'ADMIN',
   LEASING = 'LEASING',
-  PROPERTY_MANAGEMENT = 'PROPERTY_MANAGEMENT',
+  PROPERTY_MANAGER = 'PROPERTY_MANAGER',
   LEGAL = 'LEGAL',
-  ACCOUNTING = 'ACCOUNTING',
-  VIEWER = 'VIEWER',
+  ACQUISITIONS = 'ACQUISITIONS',
+  MANAGEMENT = 'MANAGEMENT'
 }
 export enum MediaEntityType {
   LEAD = 'lead',
@@ -50,10 +49,7 @@ export enum ActivityType {
 export enum LeadStatus {
   PROCESSING = 'PROCESSING',
   REVIEW_REQUIRED = 'REVIEW_REQUIRED',
-  PENDING = 'PENDING',
   FAILED = 'FAILED',
-  LOI_NEGOTIATION = 'LOI Negotiation',
-  QUALIFYING = 'Qualifying',
   NO_CONTACT = 'No Contact',
   RENEWAL_NEGOTIATION = 'Renewal Negotiation',
   DRAFTING_AMENDMENT = 'Drafting Amendment',
@@ -67,10 +63,17 @@ export enum LeadStatus {
   NEGOTIATION = 'negotiation',
   CONTRACT_SENT = 'contract_sent',
   WON = 'won',
-  SEND_TO_ATTORNEY='SEND_TO_ATTORNEY',
-  SEND_COURTESY_NOTICE='SEND_COURTESY_NOTICE',
-  SEND_THREE_DAY_NOTICE='SEND_THREE_DAY_NOTICE',
-  TENANT_AR_ALL='TENANT_AR_ALL',
+  LOI_NEGOTIATION = 'LOI_NEGOTIATION',
+  LEASE_NEGOTIATION = 'LEASE_NEGOTIATION',
+  QUALIFYING = 'QUALIFYING',
+  OUT_FOR_EXECUTION = 'OUT_FOR_EXECUTION',
+  SEND_TO_ATTORNEY = 'SEND_TO_ATTORNEY',
+  SEND_COURTESY_NOTICE = 'SEND_COURTESY_NOTICE',
+  SEND_THREE_DAY_NOTICE = 'SEND_THREE_DAY_NOTICE',
+  PENDING = 'PENDING',
+  IN_REVIEW = 'IN_REVIEW',
+  APPROVED = 'APPROVED',
+  DRAFTING_LEASE = 'DRAFTING_LEASE',
 }
 
 export enum JOBNAME {
@@ -94,3 +97,16 @@ export enum SortOrder {
   DESC = 'DESC',
 }
 
+export enum DocumentType {
+  COURTESY_NOTICE = 'courtesy-notice',
+  THREE_DAY_NOTICE = '3-day-notice',
+  ATTORNEY_NOTICE = 'attorney-notice',
+  LOI = 'loi',
+  APPLICATION = 'application',
+  APPROVAL_LEASE_DRAFT = 'approval-lease-draft',
+  RENEWAL_LETTER = 'renewal-letter',
+  APPROVAL_AMENDMENT_DRAFT = 'approval-amendment-draft',
+  LEASE_DRAFT = 'lease-draft',
+  EXECUTION = 'execution',
+  MRI_UPLOAD = 'mri-upload',
+}
