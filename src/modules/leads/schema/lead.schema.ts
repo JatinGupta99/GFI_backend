@@ -58,6 +58,9 @@ export class Lead {
 
   @Prop({ type: DraftingDetailsSchema, default: () => ({}) })
   budget_negotiation: DraftingDetails;
+  
+  @Prop({ type: DraftingDetailsSchema, default: () => ({}) })
+  approved_terms: DraftingDetails;
 
   @Prop({ type: [ReferenceInfoSchema], default: [] })
   references: ReferenceInfo[];

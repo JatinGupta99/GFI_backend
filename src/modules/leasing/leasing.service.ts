@@ -78,6 +78,9 @@ export class LeasingService {
         // Clear all-renewals cache
         await this.cache.del('all-renewals');
         
+        // Clear stream cache
+        await this.cache.del('renewals-stream-all');
+        
         // Clear property-specific caches
         for (const property of properties) {
             const propertyId = property.propertyId;
@@ -96,7 +99,7 @@ export class LeasingService {
             }
         }
         
-        this.logger.log(`✅ Cleared cache for ${properties.length} properties`);
+        this.logger.log(`✅ Cleared cache for ${properties.length} properties + stream cache`);
     }
 
     async clearSyncQueue(): Promise<{ 
@@ -250,6 +253,178 @@ export class LeasingService {
     async getRenewalNotes(buildingId: string, leaseId: string) {
         this.logger.log(`Fetching renewal notes for lease ${leaseId} in building ${buildingId}`);
         return this.commercialLeaseNotesService.fetchByLease(buildingId, leaseId);
+    }
+
+    /**
+     * Stream renewals in batches with progressive responses
+     * Processes properties in batches and yields results as they complete
+     * Supports caching to avoid repeated MRI API calls
+     */
+    async *streamRenewalsInBatches(
+        batchSize: number = 2,
+        delayMs: number = 300000, // 5 minutes
+        useCache: boolean = true
+    ): AsyncGenerator<{
+        type: 'batch' | 'complete' | 'error' | 'cache';
+        batchNumber?: number;
+        totalBatches?: number;
+        propertiesProcessed?: string[];
+        renewalsCount?: number;
+        data?: UpcomingRenewal[];
+        totalRenewals?: number;
+        error?: string;
+        fromCache?: boolean;
+        cacheAge?: number;
+        progress?: {
+            current: number;
+            total: number;
+            percentage: number;
+        };
+    }> {
+        try {
+            const cacheKey = 'renewals-stream-all';
+            const cacheTTL = 1800; // 30 minutes
+
+            // Check cache first if enabled
+            if (useCache) {
+                const cached = await this.cache.get<{
+                    data: UpcomingRenewal[];
+                    timestamp: number;
+                }>(cacheKey);
+
+                if (cached && cached.data) {
+                    const cacheAge = Math.floor((Date.now() - cached.timestamp) / 1000);
+                    this.logger.log(`📦 Serving from cache (age: ${cacheAge}s)`);
+
+                    // Stream cached data in batches for consistent UX
+                    const totalRenewals = cached.data.length;
+                    const totalBatches = Math.ceil(totalRenewals / 50); // 50 renewals per batch
+
+                    for (let i = 0; i < totalRenewals; i += 50) {
+                        const batchNumber = Math.floor(i / 50) + 1;
+                        const batchData = cached.data.slice(i, i + 50);
+
+                        yield {
+                            type: 'batch',
+                            batchNumber,
+                            totalBatches,
+                            renewalsCount: batchData.length,
+                            data: batchData,
+                            fromCache: true,
+                            cacheAge,
+                            progress: {
+                                current: Math.min(i + 50, totalRenewals),
+                                total: totalRenewals,
+                                percentage: Math.round((Math.min(i + 50, totalRenewals) / totalRenewals) * 100)
+                            }
+                        };
+
+                        // Small delay for UX (optional)
+                        if (i + 50 < totalRenewals) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                    }
+
+                    yield {
+                        type: 'complete',
+                        totalRenewals,
+                        data: cached.data,
+                        fromCache: true,
+                        cacheAge
+                    };
+
+                    return;
+                }
+            }
+
+            // No cache or cache disabled - fetch from MRI
+            this.logger.log(`🔄 Fetching from MRI (cache ${useCache ? 'miss' : 'disabled'})`);
+
+            const properties = await this.propertiesService.findAll();
+            
+            if (!properties?.length) {
+                yield { type: 'error', error: 'No properties found' };
+                return;
+            }
+
+            const totalProperties = properties.length;
+            const totalBatches = Math.ceil(totalProperties / batchSize);
+            let allRenewals: UpcomingRenewal[] = [];
+            let processedCount = 0;
+
+            this.logger.log(`Starting batched renewals: ${totalProperties} properties in ${totalBatches} batches`);
+
+            for (let i = 0; i < totalProperties; i += batchSize) {
+                const batchNumber = Math.floor(i / batchSize) + 1;
+                const batch = properties.slice(i, i + batchSize);
+                const batchPropertyIds = batch.map(p => p.propertyId);
+
+                this.logger.log(`Batch ${batchNumber}/${totalBatches}: ${batchPropertyIds.join(', ')}`);
+
+                const batchRenewals: UpcomingRenewal[] = [];
+                
+                await Promise.all(
+                    batch.map(async (property) => {
+                        try {
+                            const renewals = await this.getUpcomingRenewals(property.propertyId, 1, 50);
+                            batchRenewals.push(...renewals);
+                            this.logger.log(`✓ ${renewals.length} renewals for ${property.propertyId}`);
+                        } catch (error) {
+                            this.logger.error(`✗ Failed ${property.propertyId}: ${error.message}`);
+                        }
+                    })
+                );
+
+                allRenewals.push(...batchRenewals);
+                processedCount += batch.length;
+
+                yield {
+                    type: 'batch',
+                    batchNumber,
+                    totalBatches,
+                    propertiesProcessed: batchPropertyIds,
+                    renewalsCount: batchRenewals.length,
+                    data: batchRenewals,
+                    fromCache: false,
+                    progress: {
+                        current: processedCount,
+                        total: totalProperties,
+                        percentage: Math.round((processedCount / totalProperties) * 100)
+                    }
+                };
+
+                if (i + batchSize < totalProperties) {
+                    this.logger.log(`Waiting ${delayMs / 1000}s before next batch...`);
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                }
+            }
+
+            // Cache the results if caching is enabled
+            if (useCache && allRenewals.length > 0) {
+                await this.cache.set(
+                    cacheKey,
+                    {
+                        data: allRenewals,
+                        timestamp: Date.now()
+                    },
+                    cacheTTL
+                );
+                this.logger.log(`💾 Cached ${allRenewals.length} renewals (TTL: ${cacheTTL}s)`);
+            }
+
+            yield {
+                type: 'complete',
+                totalRenewals: allRenewals.length,
+                data: allRenewals,
+                fromCache: false
+            };
+
+            this.logger.log(`✅ Completed: ${allRenewals.length} total renewals`);
+
+        } catch (error) {
+            this.logger.error(`Error in streamRenewalsInBatches: ${error.message}`);
+            yield { type: 'error', error: error.message };
+        }
     }
 
     /**

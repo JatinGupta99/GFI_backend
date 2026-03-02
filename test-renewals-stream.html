@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Renewals Stream Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .controls {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .controls input {
+            margin: 10px;
+            padding: 8px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .progress {
+            background: #e0e0e0;
+            height: 30px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            background: #28a745;
+            height: 100%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        .log-entry {
+            margin: 5px 0;
+        }
+        .log-batch { color: #00ff00; }
+        .log-complete { color: #00ffff; }
+        .log-error { color: #ff0000; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #007bff;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔄 Renewals Streaming Test</h1>
+    
+    <div class="controls">
+        <h3>Configuration</h3>
+        <label>
+            API URL:
+            <input type="text" id="apiUrl" value="http://localhost:4020/api/leasing/renewals/all/stream" style="width: 400px;">
+        </label>
+        <br>
+        <label>
+            Bearer Token:
+            <input type="text" id="token" placeholder="Paste your JWT token here" style="width: 400px;">
+        </label>
+        <br>
+        <label>
+            Batch Size:
+            <input type="number" id="batchSize" value="2" min="1" max="10">
+        </label>
+        <label>
+            Delay (ms):
+            <input type="number" id="delayMs" value="10000" min="1000" step="1000">
+        </label>
+        <label>
+            Use Cache:
+            <input type="checkbox" id="useCache" checked>
+        </label>
+        <br>
+        <button id="startBtn" onclick="startStream()">Start Stream</button>
+        <button id="stopBtn" onclick="stopStream()" disabled>Stop Stream</button>
+        <button onclick="clearData()">Clear Data</button>
+    </div>
+
+    <div class="progress">
+        <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-value" id="totalRenewals">0</div>
+            <div class="stat-label">Total Renewals</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="batchesProcessed">0</div>
+            <div class="stat-label">Batches Processed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="propertiesProcessed">0</div>
+            <div class="stat-label">Properties Processed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="status">Idle</div>
+            <div class="stat-label">Status</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="cacheStatus">N/A</div>
+            <div class="stat-label">Cache Status</div>
+        </div>
+    </div>
+
+    <h3>📋 Event Log</h3>
+    <div class="log" id="log"></div>
+
+    <h3>📊 Renewals Data (Total: <span id="renewalsCount">0</span>)</h3>
+    <div style="max-height: 400px; overflow-y: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tenant</th>
+                    <th>Property</th>
+                    <th>Suite</th>
+                    <th>SF</th>
+                    <th>Exp Date</th>
+                    <th>Rent/SF</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="renewalsTable">
+                <tr>
+                    <td colspan="7" style="text-align: center; color: #999;">No data yet. Click "Start Stream" to begin.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let allRenewals = [];
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStats(data) {
+            if (data.progress) {
+                document.getElementById('progressBar').style.width = data.progress.percentage + '%';
+                document.getElementById('progressBar').textContent = data.progress.percentage + '%';
+                document.getElementById('propertiesProcessed').textContent = data.progress.current;
+            }
+            document.getElementById('totalRenewals').textContent = allRenewals.length;
+            document.getElementById('renewalsCount').textContent = allRenewals.length;
+        }
+
+        function updateTable() {
+            const tbody = document.getElementById('renewalsTable');
+            tbody.innerHTML = allRenewals.map(renewal => `
+                <tr>
+                    <td>${renewal.tenant || 'N/A'}</td>
+                    <td>${renewal.property || 'N/A'}</td>
+                    <td>${renewal.suite || 'N/A'}</td>
+                    <td>${renewal.sf || 0}</td>
+                    <td>${renewal.expDate || 'N/A'}</td>
+                    <td>$${renewal.rentPerSf || 0}</td>
+                    <td>${renewal.status || 'N/A'}</td>
+                </tr>
+            `).join('');
+        }
+
+        function startStream() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const token = document.getElementById('token').value;
+            const batchSize = document.getElementById('batchSize').value;
+            const delayMs = document.getElementById('delayMs').value;
+            const useCache = document.getElementById('useCache').checked;
+
+            if (!token) {
+                alert('Please enter a Bearer token');
+                return;
+            }
+
+            const url = `${apiUrl}?batchSize=${batchSize}&delayMs=${delayMs}&useCache=${useCache}`;
+            
+            log(`🚀 Starting stream: ${url}`, 'info');
+            document.getElementById('status').textContent = 'Streaming...';
+            document.getElementById('cacheStatus').textContent = 'Checking...';
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+
+            // Note: EventSource doesn't support custom headers in browser
+            // For production, use a proxy or fetch with ReadableStream
+            fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'text/event-stream'
+                }
+            }).then(response => {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                function read() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            log('✅ Stream ended', 'complete');
+                            document.getElementById('status').textContent = 'Complete';
+                            document.getElementById('startBtn').disabled = false;
+                            document.getElementById('stopBtn').disabled = true;
+                            return;
+                        }
+
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n');
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.slice(6));
+                                    handleEvent(data);
+                                } catch (e) {
+                                    console.error('Parse error:', e);
+                                }
+                            }
+                        }
+
+                        read();
+                    });
+                }
+
+                read();
+            }).catch(error => {
+                log(`❌ Error: ${error.message}`, 'error');
+                document.getElementById('status').textContent = 'Error';
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+            });
+        }
+
+        function handleEvent(data) {
+            switch (data.type) {
+                case 'batch':
+                    const batchNum = document.getElementById('batchesProcessed');
+                    batchNum.textContent = data.batchNumber;
+                    
+                    // Update cache status
+                    if (data.fromCache !== undefined) {
+                        const cacheStatus = document.getElementById('cacheStatus');
+                        if (data.fromCache) {
+                            const ageMin = Math.floor(data.cacheAge / 60);
+                            cacheStatus.textContent = `Hit (${ageMin}m old)`;
+                            cacheStatus.style.color = '#28a745';
+                            log(`📦 Cache hit! Data is ${ageMin} minutes old`, 'batch');
+                        } else {
+                            cacheStatus.textContent = 'Miss (Fresh)';
+                            cacheStatus.style.color = '#007bff';
+                            log(`🔄 Cache miss - fetching from MRI`, 'info');
+                        }
+                    }
+                    
+                    const propertiesInfo = data.propertiesProcessed 
+                        ? ` from [${data.propertiesProcessed.join(', ')}]`
+                        : '';
+                    
+                    log(`📦 Batch ${data.batchNumber}/${data.totalBatches} - ${data.renewalsCount} renewals${propertiesInfo}`, 'batch');
+                    
+                    allRenewals.push(...data.data);
+                    updateStats(data);
+                    updateTable();
+                    break;
+
+                case 'complete':
+                    log(`✅ Complete! Total renewals: ${data.totalRenewals}`, 'complete');
+                    document.getElementById('status').textContent = 'Complete';
+                    document.getElementById('progressBar').style.width = '100%';
+                    document.getElementById('progressBar').textContent = '100%';
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    break;
+
+                case 'error':
+                    log(`❌ Error: ${data.error}`, 'error');
+                    document.getElementById('status').textContent = 'Error';
+                    document.getElementById('cacheStatus').textContent = 'Error';
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    break;
+            }
+        }
+
+        function stopStream() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            log('⏹️ Stream stopped by user', 'info');
+            document.getElementById('status').textContent = 'Stopped';
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+        }
+
+        function clearData() {
+            allRenewals = [];
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('renewalsTable').innerHTML = '<tr><td colspan="7" style="text-align: center; color: #999;">No data yet. Click "Start Stream" to begin.</td></tr>';
+            document.getElementById('totalRenewals').textContent = '0';
+            document.getElementById('batchesProcessed').textContent = '0';
+            document.getElementById('propertiesProcessed').textContent = '0';
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressBar').textContent = '0%';
+            document.getElementById('status').textContent = 'Idle';
+            document.getElementById('cacheStatus').textContent = 'N/A';
+            document.getElementById('renewalsCount').textContent = '0';
+            log('🗑️ Data cleared', 'info');
+        }
+    </script>
+</body>
+</html>

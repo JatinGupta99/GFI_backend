@@ -451,9 +451,21 @@ if (lead_status) {
       email: string;
     },
   ) {
-    const lead = await this.repo.findById(id);
-    if (!lead) {
-      throw new NotFoundException('Lead not found');
+    // Check if ID is a valid MongoDB ObjectId format (24 hex characters)
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    
+    let lead: any = null;
+    
+    // Only try to fetch lead if ID is valid ObjectId format
+    if (isValidObjectId) {
+      try {
+        lead = await this.repo.findById(id);
+      } catch (error) {
+        this.logger.warn(`Failed to fetch lead with ID ${id}: ${error.message}`);
+        // Continue without lead data
+      }
+    } else {
+      this.logger.warn(`Invalid ObjectId format: ${id}. Proceeding without lead data.`);
     }
 
     // Best-effort user lookup (do not block email)
@@ -474,12 +486,12 @@ if (lead_status) {
 
     if (!subject || subject.includes('undefined')) {
       const prospect =
-        lead.general?.businessName ||
-        lead.general?.firstName ||
+        lead?.general?.businessName ||
+        lead?.general?.firstName ||
         'Lead';
 
       const property =
-        lead.general?.property ||
+        lead?.general?.property ||
         'Property';
 
       subject = `Approval Request for ${prospect} Deal Terms at ${property}`;
@@ -513,8 +525,8 @@ if (lead_status) {
       cc: dto.cc ?? [],
       subject,
       body: bodyContent,
-      firstName: lead.general?.firstName?.split(' ')[0] ?? '',
-      lastName: lead.general?.lastName ?? '',
+      firstName: lead?.general?.firstName?.split(' ')[0] ?? '',
+      lastName: lead?.general?.lastName ?? '',
       userName: bodyMetadata?.loggedin_name ?? user?.name,
       userTitle:
         bodyMetadata?.loggedin_role ??
