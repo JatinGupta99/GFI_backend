@@ -35,6 +35,21 @@ export class LeadsController {
     return this.service.findAll(query);
   }
 
+  @Get('dashboard/metrics')
+  getDashboardMetrics() {
+    return this.service.getDashboardMetrics();
+  }
+
+  @Get('dashboard/lease-metrics')
+  getLeaseDashboardMetrics() {
+    return this.service.getLeaseDashboardMetrics();
+  }
+
+  @Get('dashboard/overview')
+  getOverviewMetrics() {
+    return this.service.getOverviewMetrics();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);

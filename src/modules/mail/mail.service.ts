@@ -26,6 +26,8 @@ export class MailService {
     this.logger.debug(
       `send() called with type: ${type}, email: ${payload.email}`,
     );
+    this.logger.debug(`CC recipients received: ${JSON.stringify(payload.cc || [])}`);
+    this.logger.debug(`Attachments received: ${payload.attachments?.length || 0} files`);
 
     const config = this.EmailConfigs[type];
     if (!config) {

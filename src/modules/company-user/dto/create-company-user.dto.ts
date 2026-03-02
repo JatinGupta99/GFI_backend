@@ -18,10 +18,10 @@ export class CreateCompanyUserDto {
 
   @ApiProperty({
     enum: UserRole,
-    example: UserRole.ADMIN,
+    example: UserRole.OWNER,
   })
   @IsEnum(UserRole, { message: 'Invalid user role' })
-  role: UserRole = UserRole.ADMIN;
+  role: UserRole = UserRole.OWNER;
 
   @ApiProperty({ example: ['008400'], type: [String] })
   @IsOptional()

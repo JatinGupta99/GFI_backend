@@ -34,12 +34,12 @@ export class SignupDto {
 
   @ApiProperty({
     enum: UserRole,
-    example: UserRole.ADMIN,
+    example: UserRole.OWNER,
   })
   @IsEnum(UserRole, {
     message: `Invalid user role. Allowed roles are: ${Object.values(UserRole).join(', ')}`,
   })
-  role: UserRole = UserRole.ADMIN;
+  role: UserRole = UserRole.OWNER;
 
   @ApiProperty({ example: ['008400'], type: [String], required: false })
   @IsOptional()

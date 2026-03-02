@@ -50,6 +50,9 @@ export class AccountingDetails {
     cam: number;
 
     @Prop({ default: 0 })
+    lateFee: number;
+
+    @Prop({ default: 0 })
     ins: number;
 
     @Prop({ default: 0 })
@@ -66,9 +69,6 @@ export class AccountingDetails {
 
     @Prop({ default: '' })
     lateAfter: string;
-
-    @Prop({ default: 0 })
-    lateFee: number;
 
     @Prop({ default: 0 })
     balance_forward_0131: number;

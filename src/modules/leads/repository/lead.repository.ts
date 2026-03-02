@@ -52,6 +52,10 @@ export class LeadsRepository {
       .exec();
   }
 
+  async aggregate(pipeline: any[]) {
+    return this.leadModel.aggregate(pipeline).exec();
+  }
+
   // ========================================
   // DocuSign Integration Methods
   // ========================================

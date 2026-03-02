@@ -8,6 +8,8 @@ import { MriChargesService } from '../rent-roll/mri/mri-charges.service';
 import { ARBalance, ARStatus, NoticeType, SendNoticeDto } from './dto/ar-balance.dto';
 import { ARNoticeStatus, ARNoticeStatusDocument } from './schema/ar-notice-status.schema';
 import { MailService } from '../mail/mail.service';
+import { MediaService } from '../media/media.service';
+import { TasksService } from '../tasks/tasks.service';
 import { EmailType, LeadStatus } from '../../common/enums/common-enums';
 import { LeadsRepository } from '../leads/repository/lead.repository';
 
@@ -21,6 +23,8 @@ export class PropertyManagementService {
         private readonly arService: MriArService,
         private readonly chargesService: MriChargesService,
         private readonly mailService: MailService,
+        private readonly mediaService: MediaService,
+        private readonly tasksService: TasksService,
         @InjectModel(ARNoticeStatus.name) private noticeStatusModel: Model<ARNoticeStatusDocument>,
         private readonly leadsRepository: LeadsRepository,
     ) { }
@@ -107,14 +111,43 @@ export class PropertyManagementService {
         const newStatus = statusMapping[type];
         const targetEmailType = emailMapping[type];
         const newLeadStatus = leadStatusMapping[type];
-        const { emailData, note } = dto;
+        const { emailData, note, attachments, cc, followUpDays } = dto;
 
         // Logic to trigger notice workflow
         this.logger.log(`Sending ${type} notice for lease ${id}`);
+        this.logger.log(`CC recipients: ${JSON.stringify(cc || [])}`);
+        this.logger.log(`Attachments: ${JSON.stringify(attachments || [])}`);
+        this.logger.log(`Follow-up days: ${followUpDays || 'None'}`);
+
+        // Resolve attachments from S3 keys to file buffers
+        const resolvedAttachments: any[] = [];
+        if (attachments && attachments.length > 0) {
+            for (const fileKey of attachments) {
+                try {
+                    // Extract filename from the S3 key (last part of the path)
+                    const filename = fileKey.split('/').pop() || 'attachment.pdf';
+                    
+                    // Download file buffer from S3
+                    const fileBuffer = await this.mediaService.getFileBuffer(fileKey);
+                    
+                    // Format for nodemailer
+                    resolvedAttachments.push({
+                        filename,
+                        content: fileBuffer,
+                        contentType: 'application/pdf',
+                    });
+                    
+                    this.logger.log(`Resolved attachment: ${fileKey} -> ${filename}`);
+                } catch (error) {
+                    this.logger.error(`Failed to resolve attachment ${fileKey}: ${error.message}`);
+                    // Continue with other attachments even if one fails
+                }
+            }
+        }
 
         if (emailData && emailData.email) {
             try {
-                await this.mailService.send(targetEmailType, {
+                const emailPayload = {
                     ...emailData,
                     firstName: emailData.tenantInfo?.tenant.split(' ')[0] || 'Tenant',
                     tenantName: emailData.tenantInfo?.tenant || 'Tenant',
@@ -131,16 +164,34 @@ export class PropertyManagementService {
                     tenantMail: emailData.tenantMail || emailData.tenantEmail || '',
                     tenantContact: emailData.tenantContact || emailData.tenantPhone || '',
                     currentDate: emailData.currentDate || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-                    outstandingBalance: emailData.outstandingBalance || 0,
-                    lateFee: emailData.lateFee || 0,
-                    totalAmount: emailData.totalAmount || (Number(emailData.outstandingBalance || 0) + Number(emailData.lateFee || 0)),
+                    // Use values from emailData if provided, otherwise default to 0
+                    outstandingBalance: emailData.outstandingBalance ?? emailData.balance ?? 0,
+                    lateFee: emailData.lateFee ?? 0,
+                    totalAmount: emailData.totalAmount ?? ((emailData.outstandingBalance ?? emailData.balance ?? 0) + (emailData.lateFee ?? 0)),
                     monthEnd: emailData.monthEnd || '',
-                    premisesAddress: emailData.premisesAddress || emailData.tenantInfo?.property || '',
+                    premisesAddress: emailData.premisesAddress || emailData.propertyAddress || emailData.tenantInfo?.property || '',
                     expirationDate: emailData.expirationDate || '',
                     payTo: emailData.payTo || emailData.tenantInfo?.property || '',
                     managerName: emailData.managerName || emailData.userName || '',
                     managerTitle: emailData.managerTitle || emailData.userTitle || '',
-                });
+                    // Include additional fields from emailData
+                    balance: emailData.balance ?? 0,
+                    monthlyRent: emailData.monthlyRent ?? 0,
+                    cam: emailData.cam ?? 0,
+                    ins: emailData.ins ?? 0,
+                    tax: emailData.tax ?? 0,
+                    totalMonthly: emailData.totalMonthly ?? 0,
+                    suite: emailData.suite || '',
+                    propertyAddress: emailData.propertyAddress || '',
+                    cc: cc || [],
+                    attachments: resolvedAttachments,
+                };
+                
+                this.logger.log(`Email payload CC: ${JSON.stringify(emailPayload.cc)}`);
+                this.logger.log(`Email payload attachments count: ${emailPayload.attachments.length}`);
+                this.logger.log(`Email payload balance: ${emailPayload.balance}, lateFee: ${emailPayload.lateFee}`);
+                
+                await this.mailService.send(targetEmailType, emailPayload);
             } catch (error) {
                 this.logger.error(`Failed to send email: ${error.message}`);
             }
@@ -163,6 +214,32 @@ export class PropertyManagementService {
             this.logger.log(`Updated lead ${id} status to ${newLeadStatus}`);
         } catch (error) {
             this.logger.warn(`Failed to update lead status: ${error.message}`);
+        }
+
+        // Create follow-up task if requested
+        if (followUpDays && followUpDays > 0) {
+            try {
+                const followUpDate = new Date();
+                followUpDate.setDate(followUpDate.getDate() + followUpDays);
+
+                const tenantName = emailData.tenantInfo?.tenant || 'Tenant';
+                const propertyName = emailData.tenantInfo?.property || 'Property';
+                const noticeTypeLabel = type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ');
+
+                await this.tasksService.create({
+                    title: `Follow up: ${noticeTypeLabel} Notice - ${tenantName}`,
+                    description: `Follow up on ${noticeTypeLabel} notice sent to ${tenantName} at ${propertyName}. Lead ID: ${id}`,
+                    dueDate: followUpDate.toISOString(),
+                    property: propertyName,
+                    priority: 'High',
+                    category: 'Property Management',
+                    ownerName: emailData.userName || 'System',
+                } as any);
+
+                this.logger.log(`Created follow-up task for ${followUpDays} days from now`);
+            } catch (error) {
+                this.logger.error(`Failed to create follow-up task: ${error.message}`);
+            }
         }
 
         return { success: true, status: newLeadStatus };

@@ -6,7 +6,9 @@ import { ARNoticeStatus, ARNoticeStatusSchema } from './schema/ar-notice-status.
 import { PropertiesModule } from '../properties/properties.module';
 import { RentRollModule } from '../rent-roll/rent-roll.module';
 import { MailModule } from '../mail/mail.module';
+import { MediaModule } from '../media/media.module';
 import { LeadsModule } from '../leads/leads.module';
+import { TasksModule } from '../tasks/tasks.module';
 
 @Module({
     imports: [
@@ -14,7 +16,9 @@ import { LeadsModule } from '../leads/leads.module';
         PropertiesModule,
         RentRollModule,
         MailModule,
-        LeadsModule
+        MediaModule,
+        LeadsModule,
+        TasksModule
     ],
     controllers: [PropertyManagementController],
     providers: [PropertyManagementService],

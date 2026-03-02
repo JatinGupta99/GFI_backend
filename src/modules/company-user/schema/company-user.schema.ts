@@ -21,7 +21,7 @@ export class CompanyUser {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
 
-  @Prop({ enum: UserRole, default: UserRole.ADMIN })
+  @Prop({ enum: UserRole, default: UserRole.OWNER })
   role: UserRole;
 
   @Prop({ enum: AccountStatus, default: AccountStatus.ACTIVE })

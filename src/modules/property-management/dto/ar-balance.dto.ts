@@ -29,6 +29,7 @@ export class EmailDataDto {
     @IsString()
     @IsOptional()
     userName: string;
+    
     @IsString()
     @IsOptional()
     userTitle: string;
@@ -93,6 +94,33 @@ export class EmailDataDto {
     @IsString()
     @IsOptional()
     tenantContact?: string;
+
+    // Additional fields from frontend
+    @IsOptional()
+    balance?: number;
+
+    @IsOptional()
+    monthlyRent?: number;
+
+    @IsOptional()
+    cam?: number;
+
+    @IsOptional()
+    ins?: number;
+
+    @IsOptional()
+    tax?: number;
+
+    @IsOptional()
+    totalMonthly?: number;
+
+    @IsString()
+    @IsOptional()
+    suite?: string;
+
+    @IsString()
+    @IsOptional()
+    propertyAddress?: string;
 }
 
 export class SendNoticeDto {
@@ -103,10 +131,26 @@ export class SendNoticeDto {
     @IsNotEmpty()
     emailData: EmailDataDto;
 
+    @ApiProperty({ example: ['cc1@example.com', 'cc2@example.com'], required: false })
+    @IsOptional()
+    cc?: string[];
+
     @ApiProperty({ example: 'Tenant promised to pay', required: false })
     @IsString()
     @IsOptional()
     note?: string;
+
+    @ApiProperty({ example: ['leads/123/files/abc.pdf'], required: false })
+    @IsOptional()
+    attachments?: string[];
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    leadData?: any;
+
+    @ApiProperty({ example: 3, description: 'Number of days after which to create a follow-up task', required: false })
+    @IsOptional()
+    followUpDays?: number;
 }
 
 export class ARBalance {

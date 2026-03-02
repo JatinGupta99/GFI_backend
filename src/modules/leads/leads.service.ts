@@ -28,18 +28,6 @@ export const COMPANY = {
   NAME: 'Global Fund Investments',
 }
 
-// Status group mapping for filtering
-const LEASE_STATUS_GROUPS: Record<string, string[]> = {
-  APPROVAL_ALL: ['PENDING', 'IN_REVIEW'],
-  LEASE_ALL: ['LEASE_NEGOTIATION', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE'],
-};
-
-// Lead status group mapping for filtering
-const LEAD_STATUS_GROUPS: Record<string, string[]> = {
-  TENANT_AR_ALL: ['SEND_TO_ATTORNEY', 'SEND_COURTESY_NOTICE', 'SEND_THREE_DAY_NOTICE'],
-  LEAD_FOR_ALL: ['LOI_NEGOTIATION', 'LEASE_NEGOTIATION', 'QUALIFYING', 'OUT_FOR_EXECUTION'],
-};
-
 @Injectable()
 export class LeadsService {
   private readonly logger = new Logger(LeadsService.name);
@@ -77,20 +65,29 @@ export class LeadsService {
     const STATUS_GROUPS = {
       LEAD_ALL: ['LOI_NEGOTIATION', 'QUALIFYING', 'OUT_FOR_EXECUTION','Prospect'],
       APPROVAL_ALL: ['IN_REVIEW', 'PENDING'],
+      TENANT_AR_ALL: ['SEND_TO_ATTORNEY', 'SEND_COURTESY_NOTICE', 'SEND_THREE_DAY_NOTICE'],
       LEASE_ALL: ['LEASE_NEGOTIATION', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE'],
     };
 
     // -------------------------
     // Lead Status Filter
     // -------------------------
-    if (lead_status) {
-      const values =
-        lead_status === 'LEAD_ALL'
-          ? STATUS_GROUPS.LEAD_ALL
-          : [lead_status];
+    // -------------------------
+// Lead Status Filter
+// -------------------------
+if (lead_status) {
+  let values: string[];
 
-      filter.lead_status = { $in: values };
-    }
+  if (lead_status === 'LEAD_ALL') {
+    values = STATUS_GROUPS.LEAD_ALL;
+  } else if (lead_status === 'TENANT_AR_ALL') {
+    values = STATUS_GROUPS.TENANT_AR_ALL;
+  } else {
+    values = [lead_status];
+  }
+
+  filter.lead_status = { $in: values };
+}
 
     // -------------------------
     // Approval Status Filter
@@ -279,6 +276,29 @@ export class LeadsService {
     }
 
     const normalizedData = this.normalizeLeadData(dto);
+    
+    // Handle references conversion - support both array and object formats
+    if (normalizedData.references) {
+      if (Array.isArray(normalizedData.references)) {
+        // Already an array, use as-is
+        normalizedData.references = normalizedData.references;
+      } else if (typeof normalizedData.references === 'object') {
+        // Convert object with numeric keys to array
+        const referencesObj = normalizedData.references as any;
+        const numericKeys = Object.keys(referencesObj)
+          .filter(key => !isNaN(Number(key))) // Only numeric keys like "0", "1", etc.
+          .sort((a, b) => Number(a) - Number(b));
+        
+        if (numericKeys.length > 0) {
+          // Object with numeric keys - convert to array
+          normalizedData.references = numericKeys.map(key => referencesObj[key]);
+        } else {
+          // Single reference object - wrap in array
+          normalizedData.references = [referencesObj];
+        }
+      }
+    }
+    
     const updateQuery = this.flattenObject(normalizedData);
 
     const updated = await this.repo.update(id, updateQuery);
@@ -1083,6 +1103,751 @@ export class LeadsService {
       message: 'Document uploaded successfully',
       data: documentInfo,
     };
+  }
+
+  /**
+   * Dashboard Metrics
+   */
+
+  /**
+   * Get pending approvals count and total SF
+   */
+  async getPendingApprovals() {
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          approval_status: { $in: ['PENDING', 'IN_REVIEW'] },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalSF: {
+            $sum: {
+              $convert: {
+                input: '$general.sf',
+                to: 'double',
+                onError: 0,
+                onNull: 0,
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    return {
+      count: result[0]?.count || 0,
+      totalSF: Math.round(result[0]?.totalSF || 0),
+    };
+  }
+
+  /**
+   * Get pending approvals older than 2 days
+   */
+  async getPendingApprovalsOverTwoDays() {
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+    const result = await this.repo.aggregate([
+      {
+        $addFields: {
+          submittedDateConverted: {
+            $cond: {
+              if: { $and: [
+                { $ne: ['$lease.submittedDate', null] },
+                { $ne: [{ $type: '$lease.submittedDate' }, 'missing'] }
+              ]},
+              then: {
+                $cond: {
+                  if: { $eq: [{ $type: '$lease.submittedDate' }, 'string'] },
+                  then: { $toDate: '$lease.submittedDate' },
+                  else: '$lease.submittedDate',
+                },
+              },
+              else: '$createdAt',
+            },
+          },
+        },
+      },
+      {
+        $match: {
+          approval_status: { $in: ['PENDING', 'IN_REVIEW'] },
+          submittedDateConverted: { $lte: twoDaysAgo },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalSF: {
+            $sum: {
+              $convert: {
+                input: '$general.sf',
+                to: 'double',
+                onError: 0,
+                onNull: 0,
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    return {
+      count: result[0]?.count || 0,
+      totalSF: Math.round(result[0]?.totalSF || 0),
+    };
+  }
+
+  /**
+   * Get average days to approve
+   */
+  async getAvgDaysToApprove() {
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          approval_status: 'APPROVED',
+          'lease.submittedDate': { $exists: true, $ne: null },
+          'lease.approvedDate': { $exists: true, $ne: null },
+        },
+      },
+      {
+        $addFields: {
+          submittedDateConverted: {
+            $cond: {
+              if: { $eq: [{ $type: '$lease.submittedDate' }, 'string'] },
+              then: { $toDate: '$lease.submittedDate' },
+              else: '$lease.submittedDate',
+            },
+          },
+          approvedDateConverted: {
+            $cond: {
+              if: { $eq: [{ $type: '$lease.approvedDate' }, 'string'] },
+              then: { $toDate: '$lease.approvedDate' },
+              else: '$lease.approvedDate',
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          daysToApprove: {
+            $divide: [
+              { $subtract: ['$approvedDateConverted', '$submittedDateConverted'] },
+              1000 * 60 * 60 * 24, // Convert milliseconds to days
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          avgDays: { $avg: '$daysToApprove' },
+        },
+      },
+    ]);
+
+    return Math.round(result[0]?.avgDays || 0);
+  }
+
+  /**
+   * Get approved deals in the last 30 days
+   */
+  async getApprovedDealsLast30Days() {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const result = await this.repo.aggregate([
+      {
+        $addFields: {
+          approvedDateConverted: {
+            $cond: {
+              if: { $and: [
+                { $ne: ['$lease.approvedDate', null] },
+                { $ne: [{ $type: '$lease.approvedDate' }, 'missing'] }
+              ]},
+              then: {
+                $cond: {
+                  if: { $eq: [{ $type: '$lease.approvedDate' }, 'string'] },
+                  then: { $toDate: '$lease.approvedDate' },
+                  else: '$lease.approvedDate',
+                },
+              },
+              else: null,
+            },
+          },
+        },
+      },
+      {
+        $match: {
+          approval_status: 'APPROVED',
+          approvedDateConverted: { $gte: thirtyDaysAgo, $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalSF: {
+            $sum: {
+              $convert: {
+                input: '$general.sf',
+                to: 'double',
+                onError: 0,
+                onNull: 0,
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    return {
+      count: result[0]?.count || 0,
+      totalSF: Math.round(result[0]?.totalSF || 0),
+    };
+  }
+
+  /**
+   * Get all dashboard metrics in one call
+   */
+  async getDashboardMetrics() {
+    try {
+      const [
+        pendingApprovals,
+        pendingApprovalsOverTwoDays,
+        avgDaysToApprove,
+        approvedDealsLast30Days,
+      ] = await Promise.all([
+        this.getPendingApprovals(),
+        this.getPendingApprovalsOverTwoDays(),
+        this.getAvgDaysToApprove(),
+        this.getApprovedDealsLast30Days(),
+      ]);
+
+      return {
+        statusCode: 200,
+        message: 'Dashboard metrics retrieved successfully',
+        data: {
+          pendingApprovals: {
+            count: pendingApprovals.count,
+            totalSF: pendingApprovals.totalSF,
+          },
+          pendingApprovalsOverTwoDays: {
+            count: pendingApprovalsOverTwoDays.count,
+            totalSF: pendingApprovalsOverTwoDays.totalSF,
+          },
+          avgDaysToApprove,
+          approvedDealsLast30Days: {
+            count: approvedDealsLast30Days.count,
+            totalSF: approvedDealsLast30Days.totalSF,
+          },
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error fetching dashboard metrics:', error);
+      throw new InternalServerErrorException('Failed to fetch dashboard metrics');
+    }
+  }
+
+  /**
+   * Lease Dashboard Metrics
+   */
+
+  /**
+   * Get lease draft requests count
+   */
+  async getLeaseDraftRequests() {
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          lease_status: 'DRAFTING_LEASE',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalSF: {
+            $sum: {
+              $convert: {
+                input: '$general.sf',
+                to: 'double',
+                onError: 0,
+                onNull: 0,
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    return {
+      count: result[0]?.count || 0,
+      totalSF: Math.round(result[0]?.totalSF || 0),
+    };
+  }
+
+  /**
+   * Get new leases in negotiation
+   */
+  async getNewLeasesInNegotiation() {
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          lease_status: 'LEASE_NEGOTIATION',
+          lead_status: { $nin: ['RENEWAL_NEGOTIATION', 'Renewal Negotiation'] },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalSF: {
+            $sum: {
+              $convert: {
+                input: '$general.sf',
+                to: 'double',
+                onError: 0,
+                onNull: 0,
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    return {
+      count: result[0]?.count || 0,
+      totalSF: Math.round(result[0]?.totalSF || 0),
+    };
+  }
+
+  /**
+   * Get renewals in negotiation
+   */
+  async getRenewalsInNegotiation() {
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          $or: [
+            { lead_status: 'RENEWAL_NEGOTIATION' },
+            { lead_status: 'Renewal Negotiation' },
+          ],
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalSF: {
+            $sum: {
+              $convert: {
+                input: '$general.sf',
+                to: 'double',
+                onError: 0,
+                onNull: 0,
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    return {
+      count: result[0]?.count || 0,
+      totalSF: Math.round(result[0]?.totalSF || 0),
+    };
+  }
+
+  /**
+   * Get leases signed in the last 30 days
+   */
+  async getLeasesSigned30Days() {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const result = await this.repo.aggregate([
+      {
+        $addFields: {
+          signedAtConverted: {
+            $cond: {
+              if: { $and: [
+                { $ne: ['$signedAt', null] },
+                { $ne: [{ $type: '$signedAt' }, 'missing'] }
+              ]},
+              then: {
+                $cond: {
+                  if: { $eq: [{ $type: '$signedAt' }, 'string'] },
+                  then: { $toDate: '$signedAt' },
+                  else: '$signedAt',
+                },
+              },
+              else: null,
+            },
+          },
+        },
+      },
+      {
+        $match: {
+          signatureStatus: 'SIGNED',
+          signedAtConverted: { $gte: thirtyDaysAgo, $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalSF: {
+            $sum: {
+              $convert: {
+                input: '$general.sf',
+                to: 'double',
+                onError: 0,
+                onNull: 0,
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    return {
+      count: result[0]?.count || 0,
+      totalSF: Math.round(result[0]?.totalSF || 0),
+    };
+  }
+
+  /**
+   * Get all lease dashboard metrics in one call
+   */
+  async getLeaseDashboardMetrics() {
+    try {
+      const [
+        leaseDraftRequests,
+        newLeasesInNegotiation,
+        renewalsInNegotiation,
+        leasesSigned30Days,
+      ] = await Promise.all([
+        this.getLeaseDraftRequests(),
+        this.getNewLeasesInNegotiation(),
+        this.getRenewalsInNegotiation(),
+        this.getLeasesSigned30Days(),
+      ]);
+
+      return {
+        statusCode: 200,
+        message: 'Lease dashboard metrics retrieved successfully',
+        data: {
+          leaseDraftRequests: {
+            count: leaseDraftRequests.count,
+            totalSF: leaseDraftRequests.totalSF,
+          },
+          newLeasesInNegotiation: {
+            count: newLeasesInNegotiation.count,
+            totalSF: newLeasesInNegotiation.totalSF,
+          },
+          renewalsInNegotiation: {
+            count: renewalsInNegotiation.count,
+            totalSF: renewalsInNegotiation.totalSF,
+          },
+          leasesSigned30Days: {
+            count: leasesSigned30Days.count,
+            totalSF: leasesSigned30Days.totalSF,
+          },
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error fetching lease dashboard metrics:', error);
+      throw new InternalServerErrorException('Failed to fetch lease dashboard metrics');
+    }
+  }
+
+  /**
+   * Overview Metrics - Leasing Section
+   */
+
+  /**
+   * Get active leads count
+   */
+  async getActiveLeadsCount() {
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          lead_status: { $in: ['LOI_NEGOTIATION', 'QUALIFYING', 'OUT_FOR_EXECUTION', 'Prospect'] },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    return result[0]?.count || 0;
+  }
+
+  /**
+   * Get LOI negotiation count
+   */
+  async getLoiNegotiationCount() {
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          lead_status: 'LOI_NEGOTIATION',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    return result[0]?.count || 0;
+  }
+
+  /**
+   * Get upcoming renewals (next 90 days)
+   */
+  async getUpcomingRenewals() {
+    // This would require a lease expiration date field
+    // For now, returning count of renewals in negotiation
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          $or: [
+            { lead_status: 'RENEWAL_NEGOTIATION' },
+            { lead_status: 'Renewal Negotiation' },
+          ],
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    return result[0]?.count || 0;
+  }
+
+  /**
+   * Overview Metrics - Property Management Section
+   */
+
+  /**
+   * Get tenants with AR (Accounts Receivable)
+   */
+  async getTenantsWithAR() {
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          'accounting.balanceDue': { $gt: 0 },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalBalance: { $sum: '$accounting.balanceDue' },
+        },
+      },
+    ]);
+
+    return {
+      count: result[0]?.count || 0,
+      totalBalance: Math.round(result[0]?.totalBalance || 0),
+    };
+  }
+
+  /**
+   * Get tenants with 3-day notice
+   */
+  async getTenantsWith3Day() {
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          lead_status: 'SEND_THREE_DAY_NOTICE',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalBalance: { $sum: '$accounting.balanceDue' },
+        },
+      },
+    ]);
+
+    return {
+      count: result[0]?.count || 0,
+      totalBalance: Math.round(result[0]?.totalBalance || 0),
+    };
+  }
+
+  /**
+   * Get tenants with attorney
+   */
+  async getTenantsWithAttorney() {
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          lead_status: 'SEND_TO_ATTORNEY',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalBalance: { $sum: '$accounting.balanceDue' },
+        },
+      },
+    ]);
+
+    return {
+      count: result[0]?.count || 0,
+      totalBalance: Math.round(result[0]?.totalBalance || 0),
+    };
+  }
+
+  /**
+   * Get tenants negotiating settlement
+   */
+  async getTenantsNegotiatingSettlement() {
+    const result = await this.repo.aggregate([
+      {
+        $match: {
+          lead_status: 'SEND_COURTESY_NOTICE',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalBalance: { $sum: '$accounting.balanceDue' },
+        },
+      },
+    ]);
+
+    return {
+      count: result[0]?.count || 0,
+      totalBalance: Math.round(result[0]?.totalBalance || 0),
+    };
+  }
+
+  /**
+   * Get all overview metrics in one call
+   */
+  async getOverviewMetrics() {
+    try {
+      const [
+        activeLeads,
+        loiNegotiation,
+        upcomingRenewals,
+        tenantsWithAR,
+        tenantsWith3Day,
+        tenantsWithAttorney,
+        tenantsNegotiatingSettlement,
+        leaseDraftRequests,
+        newLeasesInNegotiation,
+        renewalsInNegotiation,
+        leasesSigned30Days,
+      ] = await Promise.all([
+        this.getActiveLeadsCount(),
+        this.getLoiNegotiationCount(),
+        this.getUpcomingRenewals(),
+        this.getTenantsWithAR(),
+        this.getTenantsWith3Day(),
+        this.getTenantsWithAttorney(),
+        this.getTenantsNegotiatingSettlement(),
+        this.getLeaseDraftRequests(),
+        this.getNewLeasesInNegotiation(),
+        this.getRenewalsInNegotiation(),
+        this.getLeasesSigned30Days(),
+      ]);
+
+      // Calculate totals
+      const totalARBalance = 
+        tenantsWithAR.totalBalance +
+        tenantsWith3Day.totalBalance +
+        tenantsWithAttorney.totalBalance +
+        tenantsNegotiatingSettlement.totalBalance;
+
+      const totalSFInPipeline =
+        leaseDraftRequests.totalSF +
+        newLeasesInNegotiation.totalSF +
+        renewalsInNegotiation.totalSF;
+
+      const totalActiveItems =
+        activeLeads +
+        upcomingRenewals +
+        tenantsWithAR.count +
+        tenantsWith3Day.count +
+        tenantsWithAttorney.count +
+        tenantsNegotiatingSettlement.count;
+
+      return {
+        statusCode: 200,
+        message: 'Overview metrics retrieved successfully',
+        data: {
+          leasing: {
+            activeLeads,
+            loiNegotiation,
+            upcomingRenewals,
+          },
+          propertyManagement: {
+            tenantsWithAR: {
+              count: tenantsWithAR.count,
+              totalBalance: tenantsWithAR.totalBalance,
+            },
+            tenantsWith3Day: {
+              count: tenantsWith3Day.count,
+              totalBalance: tenantsWith3Day.totalBalance,
+            },
+            tenantsWithAttorney: {
+              count: tenantsWithAttorney.count,
+              totalBalance: tenantsWithAttorney.totalBalance,
+            },
+            tenantsNegotiatingSettlement: {
+              count: tenantsNegotiatingSettlement.count,
+              totalBalance: tenantsNegotiatingSettlement.totalBalance,
+            },
+          },
+          legal: {
+            leaseDraftRequests: {
+              count: leaseDraftRequests.count,
+              totalSF: leaseDraftRequests.totalSF,
+            },
+            newLeasesInNegotiation: {
+              count: newLeasesInNegotiation.count,
+              totalSF: newLeasesInNegotiation.totalSF,
+            },
+            renewalsInNegotiation: {
+              count: renewalsInNegotiation.count,
+              totalSF: renewalsInNegotiation.totalSF,
+            },
+            leasesSigned30Days: {
+              count: leasesSigned30Days.count,
+              totalSF: leasesSigned30Days.totalSF,
+            },
+          },
+          summary: {
+            totalActiveItems,
+            totalARBalance,
+            totalSFInPipeline,
+          },
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error fetching overview metrics:', error);
+      throw new InternalServerErrorException('Failed to fetch overview metrics');
+    }
   }
 }
 
