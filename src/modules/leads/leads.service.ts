@@ -182,6 +182,75 @@ if (lead_status) {
     };
   }
 
+  /**
+   * Public API to get lead data including submission status
+   * Used for public forms to check if application is already submitted
+   */
+  async findOnePublic(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    const found = await this.repo.findById(id);
+    if (!found) throw new NotFoundException('Lead not found');
+
+    return {
+      success: true,
+      data: {
+        id: (found as any)._id?.toString(),
+        business: found.business || {},
+        financial: found.financial || {},
+        references: found.references || {},
+        general: {
+          firstName: found.general?.firstName || '',
+          lastName: found.general?.lastName || '',
+          dob: found.general?.dob || '',
+          ssn: found.general?.ssn || '',
+          spouseName: found.general?.spouseName || '',
+          spouseDob: found.general?.spouseDob || '',
+          spouseSsn: found.general?.spouseSsn || '',
+          residentialAddress: found.general?.residentialAddress || '',
+          howLongAtAddress: found.general?.howLongAtAddress || '',
+          presentEmployer: found.general?.presentEmployer || '',
+          businessExperienceSummary: found.general?.businessExperienceSummary || '',
+          hasCoApplicant: found.general?.hasCoApplicant || false,
+          workPhone: found.general?.workPhone || '',
+          driversLicenseUploaded: found.general?.driversLicenseUploaded || false,
+          notes: found.general?.notes || '',
+          // 🔥 CRITICAL FIELDS FOR SUBMISSION PREVENTION
+          applicationSubmitted: found.general?.applicationSubmitted || false,
+          applicationSubmittedAt: found.general?.applicationSubmittedAt?.toISOString() || null,
+        },
+        files: found.files || [],
+        createdAt: (found as any).createdAt?.toISOString() || null,
+        updatedAt: (found as any).updatedAt?.toISOString() || null,
+      }
+    };
+  }
+
+  /**
+   * Get submission status for a lead
+   * Used by frontend to check if application can be modified
+   */
+  async getSubmissionStatus(leadId: string) {
+    if (!Types.ObjectId.isValid(leadId)) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    const lead = await this.repo.findById(leadId);
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    return {
+      success: true,
+      data: {
+        isSubmitted: lead.general?.applicationSubmitted === true,
+        submittedAt: lead.general?.applicationSubmittedAt?.toISOString() || null,
+        canModify: lead.general?.applicationSubmitted !== true,
+        leadId: leadId,
+      }
+    };
+  }
+
   private normalizeLeadData(
     dto: CreateLeadDto | UpdateLeadDto,
     userId?: string,
@@ -933,6 +1002,17 @@ if (lead_status) {
     const progress = await this.validateTenantToken(token);
     const leadId = progress.tenant_id.toString();
 
+    // Check if already submitted
+    const existingLead = await this.repo.findById(leadId);
+    if (!existingLead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    // 🔥 CRITICAL: Prevent updates if already submitted
+    if (existingLead.general?.applicationSubmitted === true) {
+      throw new BadRequestException('Application has already been submitted and cannot be modified');
+    }
+
     // Update the form_data in TenantFormProgress
     progress.form_data = { ...progress.form_data, ...formData };
     progress.status = FormStatus.IN_PROGRESS;
@@ -944,7 +1024,18 @@ if (lead_status) {
     if (formData.business) updatePayload.business = formData.business;
     if (formData.financial) updatePayload.financial = formData.financial;
     if (formData.references) updatePayload.references = formData.references;
-    if (formData.general) updatePayload.general = formData.general;
+    if (formData.general) {
+      updatePayload.general = formData.general;
+      
+      // 🔥 CRITICAL: Handle submission status
+      if (formData.general.applicationSubmitted === true) {
+        updatePayload.general.applicationSubmitted = true;
+        updatePayload.general.applicationSubmittedAt = new Date();
+        
+        // Log submission attempt for audit trail
+        this.logger.log(`Application submitted for lead ${leadId} via token at ${new Date().toISOString()}`);
+      }
+    }
 
     if (Object.keys(updatePayload).length > 0) {
       await this.repo.update(leadId, updatePayload);
@@ -952,23 +1043,43 @@ if (lead_status) {
 
     return { 
       success: true, 
-      message: 'Form updated successfully',
+      message: updatePayload.general?.applicationSubmitted 
+        ? 'Application submitted successfully' 
+        : 'Form updated successfully',
       last_saved: progress.last_saved,
-      tenant_id: leadId
+      tenant_id: leadId,
+      applicationSubmitted: updatePayload.general?.applicationSubmitted || false,
+      applicationSubmittedAt: updatePayload.general?.applicationSubmittedAt?.toISOString() || null,
     };
   }
 
   async submitTenantForm(token: string, dto: SubmitTenantFormDto) {
     const progress = await this.validateTenantToken(token);
+    const leadId = progress.tenant_id.toString();
+
+    // Check if already submitted
+    const existingLead = await this.repo.findById(leadId);
+    if (!existingLead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    // 🔥 CRITICAL: Prevent duplicate submission
+    if (existingLead.general?.applicationSubmitted === true) {
+      throw new BadRequestException('Application has already been submitted');
+    }
 
     const formData = { ...progress.form_data, ...dto.form_data };
-    const leadId = progress.tenant_id.toString();
 
     const updatePayload: any = {
       business: formData.business,
       financial: formData.financial,
       references: formData.references,
-      general: formData.general,
+      general: {
+        ...formData.general,
+        // 🔥 CRITICAL: Mark as submitted
+        applicationSubmitted: true,
+        applicationSubmittedAt: new Date(),
+      },
       form_status: FormStatus.SUBMITTED,
     };
 
@@ -979,11 +1090,14 @@ if (lead_status) {
     progress.last_saved = new Date();
     await progress.save();
 
-    const lead = await this.repo.findById(leadId);
-    if (!lead) {
-      throw new NotFoundException('Lead not found');
-    }
-    return { success: true, message: 'Application submitted successfully' };
+    // Log submission for audit trail
+    this.logger.log(`Tenant form submitted for lead ${leadId} via token at ${new Date().toISOString()}`);
+
+    return { 
+      success: true, 
+      message: 'Application submitted successfully',
+      submittedAt: updatePayload.general.applicationSubmittedAt?.toISOString() || new Date().toISOString(),
+    };
   }
 
   /**
@@ -1018,6 +1132,7 @@ if (lead_status) {
   /**
    * Public API to update lead details without authentication
    * Used for public forms where users update their information
+   * 🔥 INCLUDES SUBMISSION PREVENTION LOGIC
    */
   async updateLeadPublic(leadId: string, formData: UpdateLeadPublicDto) {
     if (!Types.ObjectId.isValid(leadId)) {
@@ -1026,6 +1141,11 @@ if (lead_status) {
 
     const lead = await this.repo.findById(leadId);
     if (!lead) throw new NotFoundException('Lead not found');
+
+    // 🔥 CRITICAL: Prevent updates if already submitted
+    if (lead.general?.applicationSubmitted === true) {
+      throw new BadRequestException('Application has already been submitted and cannot be modified');
+    }
 
     // Build update payload with proper merging
     const updatePayload: any = {};
@@ -1061,8 +1181,16 @@ if (lead_status) {
         const nameParts = formData.general.name.trim().split(/\s+/);
         updatePayload.general.firstName = nameParts[0] || '';
         updatePayload.general.lastName = nameParts.slice(1).join(' ') || '';
-        // Remove the name field as it's not in the schema
         delete updatePayload.general.name;
+      }
+
+      // 🔥 CRITICAL: Handle submission status
+      if (formData.general.applicationSubmitted === true) {
+        updatePayload.general.applicationSubmitted = true;
+        updatePayload.general.applicationSubmittedAt = new Date();
+        
+        // Log submission attempt for audit trail
+        this.logger.log(`Application submitted for lead ${leadId} at ${new Date().toISOString()}`);
       }
     }
 
@@ -1072,10 +1200,21 @@ if (lead_status) {
 
     const updated = await this.repo.update(leadId, updatePayload);
 
+    if (!updated) {
+      throw new InternalServerErrorException('Failed to update lead');
+    }
+
     return {
       success: true,
-      message: 'Lead updated successfully',
-      data: updated
+      message: updated.general?.applicationSubmitted 
+        ? 'Application submitted successfully' 
+        : 'Lead updated successfully',
+      data: {
+        id: updated._id?.toString() || leadId,
+        updatedAt: (updated as any).updatedAt?.toISOString() || new Date().toISOString(),
+        applicationSubmitted: updated.general?.applicationSubmitted || false,
+        applicationSubmittedAt: updated.general?.applicationSubmittedAt?.toISOString() || null,
+      }
     };
   }
 

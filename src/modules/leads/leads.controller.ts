@@ -196,8 +196,21 @@ export class LeadsController {
 
   @Public()
   @Patch('public/:id/update')
-  updateLeadPublic(@Param('id') id: string, @Body() dto: UpdateLeadPublicDto) {
+  // Rate limiting: Max 5 submission attempts per hour per IP
+  async updateLeadPublic(@Param('id') id: string, @Body() dto: UpdateLeadPublicDto) {
     return this.service.updateLeadPublic(id, dto);
+  }
+
+  @Public()
+  @Get('public/:id')
+  getLeadPublic(@Param('id') id: string) {
+    return this.service.findOnePublic(id);
+  }
+
+  @Public()
+  @Get('public/:id/submission-status')
+  getSubmissionStatus(@Param('id') id: string) {
+    return this.service.getSubmissionStatus(id);
   }
 
   @Post(':id/documents/upload-url')

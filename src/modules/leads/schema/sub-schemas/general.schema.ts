@@ -71,6 +71,12 @@ export class GeneralDetails {
 
     @Prop({ default: '' })
     notes?: string;
+
+    @Prop({ default: false, index: true })
+    applicationSubmitted: boolean;
+
+    @Prop({ type: Date, index: true })
+    applicationSubmittedAt?: Date;
 }
 
 export const GeneralDetailsSchema = SchemaFactory.createForClass(GeneralDetails);

@@ -88,6 +88,9 @@ export class PublicGeneralDto {
   @IsOptional() @IsBoolean() hasCoApplicant?: boolean;
   @IsOptional() @IsBoolean() driversLicenseUploaded?: boolean;
   @IsOptional() @IsString() notes?: string;
+  
+  @IsOptional() @IsBoolean() applicationSubmitted?: boolean;
+  @IsOptional() @IsString() applicationSubmittedAt?: string; // ISO 8601 datetime string
 }
 
 // Main Public Update DTO
