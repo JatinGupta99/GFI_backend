@@ -113,4 +113,71 @@ export class ActivitiesService {
             data: result,
         };
     }
+
+    /**
+     * Get pending automated follow-ups that are due for processing
+     * Used by cron jobs to process automated follow-ups
+     */
+    async getPendingAutomatedFollowUps(limit: number = 100): Promise<Activity[]> {
+        const now = new Date();
+        
+        return this.activityModel
+            .find({
+                isAutomatedFollowUp: true,
+                followUpCompleted: false,
+                followUpDate: { $lte: now }, // Due date has passed
+            })
+            .sort({ followUpDate: 1 }) // Oldest first
+            .limit(limit)
+            .exec();
+    }
+
+    /**
+     * Mark a follow-up activity as completed
+     * Used after processing automated follow-ups
+     */
+    async markFollowUpCompleted(activityId: string, completedBy: string = 'system'): Promise<Activity> {
+        const activity = await this.activityModel
+            .findByIdAndUpdate(
+                activityId,
+                {
+                    followUpCompleted: true,
+                    updatedBy: completedBy,
+                },
+                { new: true }
+            )
+            .exec();
+
+        if (!activity) {
+            throw new NotFoundException(`Activity with ID ${activityId} not found`);
+        }
+
+        return activity;
+    }
+
+    /**
+     * Get follow-up activities by date range
+     * Useful for reporting and monitoring
+     */
+    async getFollowUpsByDateRange(
+        startDate: Date,
+        endDate: Date,
+        isAutomated?: boolean
+    ): Promise<Activity[]> {
+        const query: any = {
+            followUpDate: {
+                $gte: startDate,
+                $lte: endDate,
+            },
+        };
+
+        if (isAutomated !== undefined) {
+            query.isAutomatedFollowUp = isAutomated;
+        }
+
+        return this.activityModel
+            .find(query)
+            .sort({ followUpDate: 1 })
+            .exec();
+    }
 }

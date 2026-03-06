@@ -4,7 +4,7 @@ export class DraftingDetailsDto {
     @IsOptional() @IsNumber() rentPerSf?: number;
     @IsOptional() @IsNumber() annInc?: number;
     @IsOptional() @IsNumber() freeMonths?: number;
-    @IsOptional() @IsString() ti?: string;
+    @IsOptional() @IsString() term?: string;
     @IsOptional() @IsNumber() tiPerSf?: number;
     @IsOptional() @IsString() rcd?: string;
 }

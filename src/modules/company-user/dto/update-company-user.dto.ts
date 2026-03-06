@@ -1,6 +1,6 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { CreateCompanyUserDto } from './create-company-user.dto';
-import { IsArray, IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
 import { IsStrongPassword } from '../../../common/validators/isStrongPassword';
 import { Transform } from 'class-transformer';
 
@@ -39,4 +39,20 @@ export class UpdateCompanyUserDto {
   @IsString()
   @IsOptional()
   role?: string;
+
+  @IsString()
+  @IsOptional()
+  signature?: string;
+
+  @IsString()
+  @IsOptional()
+  signatureFileName?: string;
+
+  @IsOptional()
+  @IsNumber()
+  signatureFileSize?: number;
+
+  @IsString()
+  @IsOptional()
+  signatureFileType?: string;
 }

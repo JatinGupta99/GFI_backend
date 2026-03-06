@@ -18,6 +18,18 @@ export class CompanyUser {
   @Prop({ required: true, trim: true })
   name: string;
 
+  @Prop({ required: false, default: null })
+  signature: string;
+
+  @Prop({ required: false, default: null })
+  signatureFileName: string;
+
+  @Prop({ required: false, default: null })
+  signatureFileSize: number;
+
+  @Prop({ required: false, default: null })
+  signatureFileType: string;
+
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
 

@@ -63,6 +63,10 @@ export class DocuSignController {
         const response = await firstValueFrom(
           this.httpService.get(presignedUrl, {
             responseType: 'arraybuffer',
+            timeout: 30000, // 30 second timeout
+            httpsAgent: new (require('https').Agent)({
+              rejectUnauthorized: false, // Allow self-signed certificates
+            }),
           })
         );
         
@@ -74,15 +78,57 @@ export class DocuSignController {
       if (pdfUrl.includes('amazonaws.com') || pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
         this.logger.log(`Downloading PDF from URL: ${pdfUrl.substring(0, 100)}...`);
         
-        // Download directly from the presigned URL
-        const response = await firstValueFrom(
-          this.httpService.get(pdfUrl, {
-            responseType: 'arraybuffer',
-          })
-        );
+        // Configure HTTP client with SSL options for external URLs
+        const httpConfig: any = {
+          responseType: 'arraybuffer',
+          timeout: 30000, // 30 second timeout
+          maxRedirects: 5,
+          validateStatus: (status: number) => status >= 200 && status < 300,
+        };
+
+        // Add HTTPS agent for SSL certificate handling
+        if (pdfUrl.startsWith('https://')) {
+          httpConfig.httpsAgent = new (require('https').Agent)({
+            rejectUnauthorized: false, // Allow self-signed certificates
+            timeout: 30000,
+          });
+        }
         
-        this.logger.log(`Successfully downloaded PDF from URL`);
-        return Buffer.from(response.data);
+        // Download directly from the URL with retry logic
+        let lastError: any;
+        const maxRetries = 3;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            this.logger.debug(`Download attempt ${attempt}/${maxRetries} for URL: ${pdfUrl.substring(0, 100)}...`);
+            
+            const response = await firstValueFrom(
+              this.httpService.get(pdfUrl, httpConfig)
+            );
+            
+            // Validate response
+            if (!response.data || response.data.byteLength === 0) {
+              throw new Error('Downloaded PDF is empty');
+            }
+            
+            this.logger.log(`Successfully downloaded PDF from URL (${response.data.byteLength} bytes)`);
+            return Buffer.from(response.data);
+            
+          } catch (error) {
+            lastError = error;
+            this.logger.warn(`Download attempt ${attempt} failed: ${error.message}`);
+            
+            if (attempt < maxRetries) {
+              // Wait before retry (exponential backoff)
+              const delay = Math.pow(2, attempt) * 1000;
+              this.logger.debug(`Retrying in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+        }
+        
+        // All retries failed
+        throw new Error(`Failed to download PDF after ${maxRetries} attempts. Last error: ${lastError.message}`);
       }
       
       // Check if it's an S3 key (doesn't start with / or C:\ etc.)
@@ -98,18 +144,38 @@ export class DocuSignController {
         const response = await firstValueFrom(
           this.httpService.get(presignedUrl, {
             responseType: 'arraybuffer',
+            timeout: 30000,
+            httpsAgent: new (require('https').Agent)({
+              rejectUnauthorized: false,
+            }),
           })
         );
         
-        this.logger.log(`Successfully downloaded PDF from S3: ${pdfUrl}`);
+        if (!response.data || response.data.byteLength === 0) {
+          throw new Error('Downloaded PDF from S3 is empty');
+        }
+        
+        this.logger.log(`Successfully downloaded PDF from S3: ${pdfUrl} (${response.data.byteLength} bytes)`);
         return Buffer.from(response.data);
       } else {
         // Local file path
         this.logger.log(`Reading PDF from local file: ${pdfUrl}`);
-        return await readFile(pdfUrl);
+        const fileBuffer = await readFile(pdfUrl);
+        
+        if (!fileBuffer || fileBuffer.length === 0) {
+          throw new Error('Local PDF file is empty');
+        }
+        
+        this.logger.log(`Successfully read local PDF file (${fileBuffer.length} bytes)`);
+        return fileBuffer;
       }
     } catch (error) {
-      this.logger.error(`Failed to download PDF from ${pdfUrl.substring(0, 100)}`, error);
+      this.logger.error(`Failed to download PDF from ${pdfUrl.substring(0, 100)}`, {
+        error: error.message,
+        stack: error.stack,
+        code: error.code,
+        url: pdfUrl.substring(0, 100)
+      });
       throw error;
     }
   }
@@ -150,22 +216,53 @@ export class DocuSignController {
       // Retrieve PDF document (optional - supports presigned URL, S3 key, or local file path)
       let pdfBuffer: Buffer | undefined;
       
-      // Use local test file if isTesting flag is true
-      if (dto.isTesting === true) {
-        lease.pdfDocumentUrl = 'Mathnasium Southlake - LOI. 2.12.2021.pdf';
-        this.logger.log(`Testing mode enabled - using local file: ${lease.pdfDocumentUrl}`);
-      }
-      
-      if (lease.pdfDocumentUrl) {
+      if (dto.Key) {
         try {
-          pdfBuffer = await this.downloadPdf(lease.pdfDocumentUrl);
-          this.logger.log(`PDF document loaded for lease ${leaseId}`);
+          this.logger.log(`Attempting to download PDF from: ${dto.Key.substring(0, 100)}...`);
+          pdfBuffer = await this.downloadPdf(dto.Key);
+          
+          if (!pdfBuffer || pdfBuffer.length === 0) {
+            this.logger.error(`Downloaded PDF buffer is empty for lease ${leaseId}`);
+            throw new BadRequestException('PDF document is empty or corrupted');
+          }
+          
+          this.logger.log(`PDF document loaded successfully for lease ${leaseId} (${pdfBuffer.length} bytes)`);
         } catch (error) {
-          this.logger.warn(`Failed to retrieve PDF for lease ${leaseId}, continuing without it`, error);
-          // Continue without PDF - it's optional
+          this.logger.error(`Failed to retrieve PDF for lease ${leaseId}`, {
+            url: lease.pdfDocumentUrl,
+            error: error.message,
+            code: error.code,
+            stack: error.stack
+          });
+          
+          // Provide specific error messages based on error type
+          if (error.code === 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY') {
+            throw new BadRequestException(
+              'Failed to download PDF: SSL certificate validation failed. Please ensure the PDF URL uses a valid SSL certificate or contact support.'
+            );
+          } else if (error.code === 'ENOTFOUND') {
+            throw new BadRequestException(
+              'Failed to download PDF: URL not found. Please verify the PDF URL is correct.'
+            );
+          } else if (error.code === 'ECONNREFUSED') {
+            throw new BadRequestException(
+              'Failed to download PDF: Connection refused. Please verify the PDF URL is accessible.'
+            );
+          } else if (error.message?.includes('timeout')) {
+            throw new BadRequestException(
+              'Failed to download PDF: Request timeout. The PDF server may be slow or unavailable.'
+            );
+          } else {
+            throw new BadRequestException(
+              `Failed to download PDF: ${error.message}. Please verify the PDF URL is valid and accessible.`
+            );
+          }
         }
       } else {
-        this.logger.warn(`No PDF document URL found for lease ${leaseId}, continuing without it`);
+        this.logger.warn(`No PDF document URL found for lease ${leaseId}`);
+        throw new BadRequestException(
+          'PDF document URL is required to send lease for signature. Please ensure the lease has a valid PDF document URL.'
+        );
       }
 
       // Get tenant information from lead
@@ -177,9 +274,15 @@ export class DocuSignController {
       }
 
       // Call DocuSignService to create and send envelope (Requirement 6.3)
+      if (!pdfBuffer || pdfBuffer.length === 0) {
+        throw new BadRequestException(
+          'PDF document is required to send lease for signature. Please ensure the lease has a valid PDF document.'
+        );
+      }
+
       const envelopeResponse = await this.docuSignService.sendLeaseForSignatureWithIntegration(
         dto,
-        pdfBuffer || Buffer.from(''), // Empty buffer if no PDF
+        pdfBuffer,
         tenantEmail,
         tenantName,
       );
@@ -196,53 +299,53 @@ export class DocuSignController {
       );
 
       // Send custom email with signing URL if available
-      if (envelopeResponse.signingUrl) {
-        try {
-          const propertyInfo = lease.general?.property || 'Property';
-          const suiteInfo = lease.general?.suite || '';
-          const propertyDisplay = suiteInfo ? `${propertyInfo}, Suite ${suiteInfo}` : propertyInfo;
+      // if (envelopeResponse.signingUrl) {
+      //   try {
+      //     const propertyInfo = lease.general?.property || 'Property';
+      //     const suiteInfo = lease.general?.suite || '';
+      //     const propertyDisplay = suiteInfo ? `${propertyInfo}, Suite ${suiteInfo}` : propertyInfo;
 
-          // Read email template from file
-          const templatePath = 'src/modules/leasing/templates/execution-email.html';
-          let emailHtml = await readFile(templatePath, 'utf-8');
+      //     // Read email template from file
+      //     const templatePath = 'src/modules/leasing/templates/execution-email.html';
+      //     let emailHtml = await readFile(templatePath, 'utf-8');
 
-          // Replace template variables with actual values
-          emailHtml = emailHtml
-            .replace(/\$\{lease\.general\?\.firstName \|\| 'there'\}/g, lease.general?.firstName || 'there')
-            .replace(/\$\{propertyDisplay\}/g, propertyDisplay)
-            .replace(/\$\{envelopeResponse\.signingUrl\}/g, envelopeResponse.signingUrl)
-            .replace(/\$\{lease\.general\?\.businessName \|\| ''\}/g, lease.general?.businessName || '')
-            .replace(/\$\{lease\.general\?\.suite \|\| ''\}/g, lease.general?.suite || '')
-            .replace(/\$\{user\.name\}/g, user.name)
-            .replace(/\$\{user\.role\}/g, user.role);
+      //     // Replace template variables with actual values
+      //     emailHtml = emailHtml
+      //       .replace(/\$\{lease\.general\?\.firstName \|\| 'there'\}/g, lease.general?.firstName || 'there')
+      //       .replace(/\$\{propertyDisplay\}/g, propertyDisplay)
+      //       .replace(/\$\{envelopeResponse\.signingUrl\}/g, envelopeResponse.signingUrl)
+      //       .replace(/\$\{lease\.general\?\.businessName \|\| ''\}/g, lease.general?.businessName || '')
+      //       .replace(/\$\{lease\.general\?\.suite \|\| ''\}/g, lease.general?.suite || '')
+      //       .replace(/\$\{user\.name\}/g, user.name)
+      //       .replace(/\$\{user\.role\}/g, user.role);
 
-          // Prepare attachments if PDF is available
-          const attachments = pdfBuffer ? [{
-            filename: `${tenantName} - Lease Agreement.pdf`,
-            content: pdfBuffer,
-            contentType: 'application/pdf',
-          }] : [];
+      //     // Prepare attachments if PDF is available
+      //     // const attachments = pdfBuffer ? [{
+      //     //   filename: `${tenantName} - Lease Agreement.pdf`,
+      //     //   content: pdfBuffer,
+      //     //   contentType: 'application/pdf',
+      //     // }] : [];
 
-          // Send email
-          await this.mailService.send(EmailType.GENERAL, {
-            email: tenantEmail,
-            cc: dto.cc, // Support CC from request
-            subject: `Lease Agreement - ${propertyDisplay}`,
-            body: emailHtml,
-            attachments,
-          });
+      //     // // Send email
+      //     // // await this.mailService.send(EmailType.GENERAL, {
+      //     // //   email: tenantEmail,
+      //     // //   cc: dto.cc, // Support CC from request
+      //     // //   subject: `Lease Agreement - ${propertyDisplay}`,
+      //     // //   body: emailHtml,
+      //     // //   attachments,
+      //     // // });
 
-          this.logger.log(
-            `Custom signing email sent to ${tenantEmail} for lease ${leaseId}`,
-          );
-        } catch (emailError) {
-          // Log error but don't fail the request - envelope was created successfully
-          this.logger.error(
-            `Failed to send custom signing email for lease ${leaseId}`,
-            emailError.message,
-          );
-        }
-      }
+      //     this.logger.log(
+      //       `Custom signing email sent to ${tenantEmail} for lease ${leaseId}`,
+      //     );
+      //   } catch (emailError) {
+      //     // Log error but don't fail the request - envelope was created successfully
+      //     this.logger.error(
+      //       `Failed to send custom signing email for lease ${leaseId}`,
+      //       emailError.message,
+      //     );
+      //   }
+      // }
 
       // Return envelope response with proper status code (Requirement 6.4)
       return envelopeResponse;

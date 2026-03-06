@@ -10,6 +10,7 @@ import { MailModule } from '../mail/mail.module';
 import { MediaModule } from '../media/media.module';
 import { CompanyUserModule } from '../company-user/company-user.module';
 import { TasksModule } from '../tasks/tasks.module';
+import { PropertyAssetsModule } from '../property-assets/property-assets.module';
 import { BullModule } from '@nestjs/bullmq';
 import { DocumentAiModule } from '../document-ai/document-ai.module';
 import { JOBNAME } from '../../common/enums/common-enums';
@@ -24,6 +25,7 @@ import { JOBNAME } from '../../common/enums/common-enums';
     MediaModule,
     CompanyUserModule,
     TasksModule,
+    PropertyAssetsModule,
     DocumentAiModule,
     BullModule.registerQueue({
       name: JOBNAME.LEADS_PROCESSING,

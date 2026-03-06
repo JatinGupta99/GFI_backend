@@ -45,4 +45,8 @@ export class SendForSignatureDto {
   @IsBoolean()
   @IsOptional()
   isTesting?: boolean = true;
+
+  @IsString()
+  @IsOptional()
+  Key?: string;
 }

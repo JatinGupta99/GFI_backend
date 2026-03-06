@@ -1,4 +1,4 @@
-import { IsString, IsArray, IsOptional, IsObject } from 'class-validator';
+import { IsString, IsArray, IsOptional, IsObject, IsNumber, IsBoolean } from 'class-validator';
 
 export class SendLoiEmailDto {
     @IsString()
@@ -20,6 +20,21 @@ export class SendLoiEmailDto {
     @IsString({ each: true })
     @IsOptional()
     cc?: string[];
+
+    @IsOptional()
+    @IsString()
+    Key?: string; // S3 key for LOI PDF document
+
+    @IsOptional()
+    @IsNumber()
+    followUpDays?: number; // Number of days after which to create follow-up activity
+
+    @IsOptional()
+    @IsNumber()
+    followUpAutomatedDay?: number;
+    
+    @IsOptional()
+    items?:string[]// Whether to create automated follow-up activity
 }
 
 export class SendAppEmailDto {

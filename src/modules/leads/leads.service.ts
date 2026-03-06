@@ -10,6 +10,7 @@ import { Lead } from './schema/lead.schema';
 import { MailService } from '../mail/mail.service';
 import { MediaService } from '../media/media.service';
 import { CompanyUserService } from '../company-user/company-user.service';
+import { ActivitiesService } from '../property-assets/activities.service';
 import { SendLoiEmailDto, SendAppEmailDto, SendApprovalEmailDto, SendRenewalLetterDto, SendTenantMagicLinkDto } from './dto/send-email.dto';
 import { EmailType } from '../../common/enums/common-enums';
 import { TasksService } from '../tasks/tasks.service';
@@ -38,6 +39,7 @@ export class LeadsService {
     private readonly mediaService: MediaService,
     private readonly companyUserService: CompanyUserService,
     private readonly tasksService: TasksService,
+    private readonly activitiesService: ActivitiesService,
     @InjectQueue(JOBNAME.LEADS_PROCESSING) private leadsQueue: Queue,
     @InjectModel(TenantFormProgress.name) private tenantFormModel: Model<TenantFormProgressDocument>,
     private readonly configService: ConfigService,
@@ -167,6 +169,25 @@ if (lead_status) {
       },
     };
   }
+  /**
+   * Extract filename from S3 key
+   * @param key S3 key path
+   * @returns Extracted filename or null
+   */
+  private extractFilenameFromKey(key: string): string | null {
+    if (!key) return null;
+    
+    const parts = key.split('/');
+    const filename = parts[parts.length - 1];
+    
+    // If filename has no extension, add .pdf
+    if (filename && !filename.includes('.')) {
+      return `${filename}.pdf`;
+    }
+    
+    return filename || null;
+  }
+
   async findOne(id: string) {
     if (!Types.ObjectId.isValid(id)) {
       throw new NotFoundException('Lead not found');
@@ -217,7 +238,6 @@ if (lead_status) {
           workPhone: found.general?.workPhone || '',
           driversLicenseUploaded: found.general?.driversLicenseUploaded || false,
           notes: found.general?.notes || '',
-          // 🔥 CRITICAL FIELDS FOR SUBMISSION PREVENTION
           applicationSubmitted: found.general?.applicationSubmitted || false,
           applicationSubmittedAt: found.general?.applicationSubmittedAt?.toISOString() || null,
         },
@@ -453,23 +473,81 @@ if (lead_status) {
 
     // Resolve attachment symbols to signed URLs
     const resolvedAttachments: any[] = [];
+    
+    // Handle regular attachments from lead files
     if (dto.attachments && dto.attachments.length > 0) {
       for (const fileId of dto.attachments) {
         // Find the file in the lead's files
         const file = lead.files?.find((f: any) => f.id === fileId);
         if (file) {
           try {
-            const url = await this.mediaService.generateDownloadUrl(file.id);
+            // Download the file buffer instead of using signed URL
+            const fileBuffer = await this.mediaService.getFileBuffer(file.id);
             resolvedAttachments.push({
               filename: file.fileName,
-              path: url,
+              content: fileBuffer,
+              contentType: file.fileType || 'application/octet-stream',
             });
           } catch (err) {
-            console.error(`Failed to resolve attachment ${fileId}:`, err);
+            this.logger.error(`Failed to resolve attachment ${fileId}:`, err);
           }
         }
       }
     }
+
+    // Handle PDF key attachment (LOI document)
+    if (dto.Key) {
+      try {
+        this.logger.log(`Processing PDF key attachment: ${dto.Key}`);
+        
+        // Validate the key format
+        if (!dto.Key.trim()) {
+          throw new Error('PDF key is empty');
+        }
+        
+        // Download the PDF buffer for email attachment
+        const pdfBuffer = await this.mediaService.getFileBuffer(dto.Key);
+        
+        if (!pdfBuffer || pdfBuffer.length === 0) {
+          throw new Error('PDF buffer is empty');
+        }
+        
+        // Extract filename from S3 key or use default
+        const filename = this.extractFilenameFromKey(dto.Key) || 'LOI-Document.pdf';
+        
+        // Add PDF as attachment with buffer (for direct email attachment)
+        resolvedAttachments.push({
+          filename: filename,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        });
+
+        this.logger.log(`Successfully added PDF attachment: ${filename} (${pdfBuffer.length} bytes)`);
+        
+      } catch (err) {
+        this.logger.error(`Failed to process PDF key ${dto.Key}:`, {
+          error: err.message,
+          stack: err.stack,
+          key: dto.Key
+        });
+        // Continue without the PDF attachment rather than failing the entire email
+      }
+    }
+
+    // Send the email
+    this.logger.debug('Sending email with payload:', {
+      to: dto.to,
+      cc: dto.cc,
+      subject: dto.subject,
+      bodyLength: dto.body?.length || 0,
+      attachmentCount: resolvedAttachments.length,
+      attachments: resolvedAttachments.map(att => ({
+        filename: att.filename,
+        hasContent: !!att.content,
+        hasPath: !!att.path,
+        contentType: att.contentType
+      }))
+    });
 
     await this.mailService.send(EmailType.GENERAL as any, {
       email: dto.to,
@@ -480,7 +558,53 @@ if (lead_status) {
       attachments: resolvedAttachments,
     });
 
-    return { success: true };
+    // Create follow-up activity if followUpDays is provided
+    let followUpActivityId: string | null = null;
+    if (dto.followUpDays && dto.followUpDays > 0) {
+      try {
+        this.logger.log(`Creating follow-up activity for lead ${id} in ${dto.followUpDays} days`);
+        
+        // Calculate follow-up date
+        const followUpDate = new Date();
+        followUpDate.setDate(followUpDate.getDate() + dto.followUpDays);
+        
+        // Create follow-up activity with scheduling information
+        const followUpActivity = await this.activitiesService.create(
+          id,
+          {
+            activityName: `Follow-up: ${dto.subject}`,
+            department: dto.followUpAutomatedDay ? 'Automated Follow-up' : 'Manual Follow-up',
+            followUpDate: followUpDate,
+            isAutomatedFollowUp: dto.followUpAutomatedDay,
+            followUpCompleted: false,
+            originalEmailSubject: dto.subject,
+            followUpType: 'email', // Default to email follow-up
+          },
+          {
+            userId: 'system', // System-generated activity
+            name: 'System',
+            email: 'system@company.com',
+            role: 'SYSTEM'
+          }
+        );
+
+        followUpActivityId = String(followUpActivity._id) || followUpActivity.id;
+        
+        this.logger.log(`Created follow-up activity ${followUpActivityId} for lead ${id}, scheduled for ${followUpDate.toISOString()}`);
+        
+      } catch (err) {
+        this.logger.error(`Failed to create follow-up activity for lead ${id}:`, err);
+        // Don't fail the email sending if activity creation fails
+      }
+    }
+
+    return { 
+      success: true,
+      attachmentCount: resolvedAttachments.length,
+      message: `Email sent successfully with ${resolvedAttachments.length} attachment(s)`,
+      followUpActivityId: followUpActivityId,
+      followUpDays: dto.followUpDays || null,
+    };
   }
 
   async sendAppEmail(id: string, dto: SendAppEmailDto, userId: string) {

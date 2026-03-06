@@ -412,7 +412,7 @@ export class DocuSignService {
     const expireEnabled = this.configService.get<string>('DOCUSIGN_ENVELOPE_EXPIRE_ENABLED') === 'true';
 
     const envelopeDefinition: EnvelopeDefinition = {
-      emailSubject: `Please sign your lease agreement - ${leaseId}`,
+      emailSubject: `Please sign your letter of Intent agreement - ${leaseId}`,
       documents: [
         {
           documentBase64: pdfBase64,
@@ -1093,7 +1093,7 @@ export class DocuSignService {
     };
 
     const envelopeDefinition: EnvelopeDefinition = {
-      emailSubject: `Please sign your lease agreement - ${leaseId}`,
+      emailSubject: `Please sign your letter of Intent agreement - ${leaseId}`,
       documents: [
         {
           documentBase64: pdfBase64,

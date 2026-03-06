@@ -92,7 +92,7 @@ export class LeadsController {
     return this.service.getLoiAttachments(id);
   }
 
-  @Post(':id/loi/send')
+  @Post(':id/send')
   sendLoiEmail(@Param('id') id: string, @Body() dto: SendLoiEmailDto) {
     return this.service.sendLoiEmail(id, dto);
   }

@@ -12,7 +12,7 @@ export class DraftingDetails {
     freeMonths: number;
 
     @Prop({ default: '' })
-    ti: string;
+    term: string;
 
     @Prop({ default: 0 })
     tiPerSf: number;
