@@ -22,9 +22,14 @@ export class LeadsProcessor extends WorkerHost {
         this.logger.debug(`Processing job ${job.id} of type ${job.name}`);
 
         if (job.name === JOBNAME.PROCESS_DOCUMENT) {
-            const { leadId, fileId, fileKey, mimeType } = job.data;
+            const { leadId, fileId, fileKey, mimeType, documentType } = job.data;
             try {
-                await this.leadsService.updateFileStatus(leadId, fileId, LeadStatus.PROCESSING);
+                // Update status based on document type
+                if (documentType === 'loi') {
+                    this.logger.log(`Processing LOI document for lead ${leadId}`);
+                } else {
+                    await this.leadsService.updateFileStatus(leadId, fileId, LeadStatus.PROCESSING);
+                }
 
                 this.logger.debug(`Fetching file buffer for ${fileKey}`);
                 const buffer = await this.mediaService.getFileBuffer(fileKey);
@@ -33,12 +38,23 @@ export class LeadsProcessor extends WorkerHost {
                 const extractionResult = await this.documentAiService.processDocument(buffer, mimeType);
 
                 this.logger.debug(`Extraction complete, updating lead`);
-                await this.leadsService.updateWithExtraction(leadId, fileId, extractionResult);
+                
+                // Route to appropriate update method based on document type
+                if (documentType === 'loi') {
+                    console.log(extractionResult,'casnlkcnsa')
+                    await this.leadsService.updateWithLoiExtraction(leadId, fileKey, extractionResult);
+                } else {
+                    await this.leadsService.updateWithExtraction(leadId, fileId, extractionResult);
+                }
 
-                return { success: true, leadId, fileId };
+                return { success: true, leadId, fileId, documentType };
             } catch (error) {
                 this.logger.error(`Failed to process document for lead ${leadId}`, error);
-                await this.leadsService.updateFileStatus(leadId, fileId, LeadStatus.FAILED);
+                
+                if (documentType !== 'loi') {
+                    await this.leadsService.updateFileStatus(leadId, fileId, LeadStatus.FAILED);
+                }
+                
                 throw error;
             }
         }

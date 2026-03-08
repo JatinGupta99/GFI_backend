@@ -3,6 +3,7 @@ import { FilterQuery, Types } from 'mongoose';
 import { ActivityType, JOBNAME, LeadStatus, Role, SortOrder } from '../../common/enums/common-enums';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { PaginationHelper } from '../../common/helpers/pagination.helper';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { UpdateLeadPublicDto } from './dto/update-lead-public.dto';
 import { LeadsRepository } from './repository/lead.repository';
@@ -50,6 +51,7 @@ export class LeadsService {
       page = 1,
       limit = 20,
       search,
+      use,
       sortOrder = SortOrder.DESC,
       sortBy = 'createdAt',
       lead_status,
@@ -126,6 +128,13 @@ if (lead_status) {
     }
 
     // -------------------------
+    // Business Category (Use) Filter
+    // -------------------------
+    if (use) {
+      filter['general.use'] = use;
+    }
+
+    // -------------------------
     // Search Filter
     // -------------------------
     if (search) {
@@ -161,12 +170,7 @@ if (lead_status) {
         id: item._id?.toString(),
         fullName: `${item.general?.firstName || ''} ${item.general?.lastName || ''}`.trim(),
       })),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      meta: PaginationHelper.buildMetaFromPage(total, page, limit),
     };
   }
   /**
@@ -887,6 +891,7 @@ if (lead_status) {
     // Create FileInfo
     const fileInfo = {
       id: key,
+      key: key,
       fileName,
       fileSize,
       fileType,
@@ -1010,6 +1015,267 @@ if (lead_status) {
 
       await this.repo.update(leadId, updatePayload);
     }
+  }
+
+  /**
+   * Upload LOI document and process with Document AI
+   * Following SOLID principles - Single Responsibility
+   * @param leadId - Lead ID
+   * @param file - Uploaded file buffer
+   * @param fileName - Original filename
+   * @param userName - User who uploaded
+   * @returns Upload result with S3 key and processing status
+   */
+  async uploadAndProcessLoiDocument(
+    leadId: string,
+    file: Buffer,
+    fileName: string,
+    userName: string = 'System',
+  ) {
+    // Validate lead exists
+    const lead = await this.repo.findById(leadId);
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    this.logger.log(`Uploading LOI document for lead ${leadId}: ${fileName}`);
+
+    // Upload to S3 (DRY - reuse existing MediaService)
+    const folderPath = `leads/${leadId}/loi`;
+    const mimeType = 'application/pdf';
+    
+    const { key } = await this.mediaService.uploadFile(file, mimeType, folderPath);
+
+    this.logger.log(`LOI document uploaded to S3: ${key}`);
+
+    // Update lead with LOI document URL
+    await this.repo.update(leadId, { loiDocumentUrl: key });
+
+    // Queue document for AI processing (async)
+    await this.leadsQueue.add(JOBNAME.PROCESS_DOCUMENT, {
+      leadId,
+      fileId: key,
+      fileKey: key,
+      mimeType,
+      documentType: 'loi', // Mark as LOI for special handling
+    });
+
+    this.logger.log(`LOI document queued for processing: ${key}`);
+
+    return {
+      success: true,
+      message: 'LOI document uploaded and queued for processing',
+      data: {
+        key,
+        fileName,
+        uploadedBy: userName,
+        uploadedAt: new Date().toISOString(),
+        processingStatus: 'PENDING',
+      },
+    };
+  }
+
+  /**
+   * Get upload URL for LOI document (3-step upload process)
+   * Following DRY principle - reuse existing pattern
+   * @param leadId - Lead ID
+   * @returns Presigned S3 upload URL and key
+   */
+  async getLoiUploadUrl(leadId: string) {
+    const lead = await this.repo.findById(leadId);
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    const folderPath = `leads/${leadId}/loi`;
+    const contentType = 'application/pdf';
+
+    const { key, url } = await this.mediaService.generateUploadUrl(folderPath, contentType);
+
+    return {
+      statusCode: 200,
+      message: 'LOI upload URL generated successfully',
+      data: {
+        key,
+        url,
+        contentType,
+      },
+    };
+  }
+
+  /**
+   * Confirm LOI document upload and trigger processing
+   * Following DRY principle - reuse existing pattern
+   * @param leadId - Lead ID
+   * @param key - S3 key from upload
+   * @param fileName - Original filename
+   * @param fileSize - File size in bytes
+   * @param userName - User who uploaded
+   * @returns Confirmation result
+   */
+  async confirmLoiUpload(
+    leadId: string,
+    key: string,
+    fileName: string,
+    fileSize: number,
+    userName: string = 'System',
+  ) {
+    const lead = await this.repo.findById(leadId);
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    this.logger.log(`Confirming LOI upload for lead ${leadId}: ${key}`);
+
+    // Update lead with LOI document URL
+    const updateResult = await this.repo.update(leadId, { loiDocumentUrl: key });
+    
+    if (!updateResult) {
+      this.logger.error(`Failed to update lead ${leadId} with LOI document URL: ${key}`);
+      throw new InternalServerErrorException('Failed to save LOI document URL to database');
+    }
+    
+    this.logger.log(`Successfully saved LOI document URL to database: ${key}`);
+    this.logger.debug(`Updated lead loiDocumentUrl field: ${updateResult.loiDocumentUrl}`);
+
+    // Queue for Document AI processing
+    await this.leadsQueue.add(JOBNAME.PROCESS_DOCUMENT, {
+      leadId,
+      fileId: key,
+      fileKey: key,
+      mimeType: 'application/pdf',
+      documentType: 'loi',
+    });
+
+    this.logger.log(`LOI document confirmed and queued for processing: ${key}`);
+
+    return {
+      statusCode: 200,
+      message: 'LOI document uploaded and queued for processing',
+      data: {
+        key,
+        fileName,
+        fileSize,
+        uploadedBy: userName,
+        uploadedAt: new Date().toISOString(),
+        processingStatus: 'PENDING',
+        loiDocumentUrl: key, // Include the saved URL in response
+      },
+    };
+  }
+
+  /**
+   * Update lead with LOI extraction results
+   * Following Single Responsibility Principle
+   * ONLY updates current_negotiation fields, NOT general fields
+   * @param leadId - Lead ID
+   * @param key - S3 key of LOI document
+   * @param result - Extraction result from Document AI
+   */
+  async updateWithLoiExtraction(leadId: string, key: string, result: any) {
+    const lead = await this.repo.findById(leadId);
+    if (!lead) return;
+
+    this.logger.log(`Updating lead ${leadId} with LOI extraction results`);
+    this.logger.log(`Document AI Overall Confidence: ${result.overallConfidence}`);
+    
+    const CONFIDENCE_THRESHOLD = 0.85;
+    const data = result.data || {};
+    
+    // Log ALL extracted fields from Document AI
+    this.logger.log(`=== Document AI Extracted Fields (${Object.keys(data).length} total) ===`);
+    Object.keys(data).forEach(key => {
+      const field = data[key];
+      this.logger.log(`  ${key}: "${field.value}" (confidence: ${field.confidence?.toFixed(2)})`);
+    });
+    this.logger.log(`=== End of Extracted Fields ===`);
+
+    // Helper to safely get value if confidence is good and non-empty
+    const getValue = (field: any) => {
+      if (field && field.value && field.confidence >= CONFIDENCE_THRESHOLD) {
+        const value = field.value;
+        // Skip empty strings, null, undefined, or 0
+        if (value === '' || value === null || value === undefined || value === 0) {
+          return null;
+        }
+        return value;
+      }
+      return null;
+    };
+
+    // Initialize current_negotiation if it doesn't exist
+    if (!lead.current_negotiation) lead.current_negotiation = {} as any;
+
+    // Extract and update ONLY current_negotiation fields from LOI
+    const updatePayload: any = {};
+    let hasUpdates = false;
+
+    // Extract current_negotiation fields with EXACT Document AI field names
+    // Document AI returns: rent_psf, annual_increase, tenant_improvement_psf, rent_commencement_date, free_rent_months, term
+    const rentPerSf = getValue(data.rent_psf) || getValue(data.rent_per_sf) || getValue(data.base_rent_per_sf);
+    const annInc = getValue(data.annual_increase) || getValue(data.ann_inc) || getValue(data.rent_increase);
+    const freeMonths = getValue(data.free_rent_months) || getValue(data.free_months);
+    const term = getValue(data.term) || getValue(data.lease_term);
+    const tiPerSf = getValue(data.tenant_improvement_psf) || getValue(data.ti_per_sf) || getValue(data.tenant_improvement_per_sf);
+    const rcd = getValue(data.rent_commencement_date) || getValue(data.rcd);
+
+    // Only update fields that have non-empty values
+    if (rentPerSf !== null) {
+      lead.current_negotiation.rentPerSf = parseFloat(rentPerSf);
+      hasUpdates = true;
+      this.logger.debug(`Extracted rentPerSf: ${rentPerSf}`);
+    }
+
+    if (annInc !== null) {
+      lead.current_negotiation.annInc = parseFloat(annInc);
+      hasUpdates = true;
+      this.logger.debug(`Extracted annInc: ${annInc}`);
+    }
+
+    if (freeMonths !== null) {
+      lead.current_negotiation.freeMonths = parseFloat(freeMonths);
+      hasUpdates = true;
+      this.logger.debug(`Extracted freeMonths: ${freeMonths}`);
+    }
+
+    if (term !== null) {
+      lead.current_negotiation.term = term;
+      hasUpdates = true;
+      this.logger.debug(`Extracted term: ${term}`);
+    }
+
+    if (tiPerSf !== null) {
+      lead.current_negotiation.tiPerSf = parseFloat(tiPerSf);
+      hasUpdates = true;
+      this.logger.debug(`Extracted tiPerSf: ${tiPerSf}`);
+    }
+
+    if (rcd !== null) {
+      lead.current_negotiation.rcd = rcd;
+      hasUpdates = true;
+      this.logger.debug(`Extracted rcd: ${rcd}`);
+    }
+
+    // Only include current_negotiation in update if we have changes
+    if (hasUpdates) {
+      updatePayload.current_negotiation = lead.current_negotiation;
+    }
+
+    // Store extraction metadata
+    updatePayload.loiExtractionData = {
+      extractedAt: new Date(),
+      confidence: result.overallConfidence,
+      rawData: data,
+      fieldsUpdated: hasUpdates ? Object.keys(lead.current_negotiation).filter(key => 
+        lead.current_negotiation[key] !== null && 
+        lead.current_negotiation[key] !== undefined && 
+        lead.current_negotiation[key] !== ''
+      ) : [],
+    };
+
+    await this.repo.update(leadId, updatePayload);
+
+    this.logger.log(`Lead ${leadId} updated with LOI extraction results (confidence: ${result.overallConfidence}, fields updated: ${hasUpdates})`);
   }
 
   async sendTenantMagicLink(leadId: string, dto: SendTenantMagicLinkDto) {

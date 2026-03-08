@@ -36,39 +36,191 @@ export class Lead {
   @Prop({
     type: String,
     enum: Object.values(LeadStatus),
-    default: LeadStatus.PROSPECT,
+    default: LeadStatus.QUALIFYING,
     index: true,
   })
   lead_status: LeadStatus;
 
-  @Prop({ type: GeneralDetailsSchema, default: () => ({}) })
+  @Prop({ 
+    type: GeneralDetailsSchema, 
+    default: () => ({
+      firstName: '',
+      lastName: '',
+      email: '',
+      cellPhone: '',
+      workPhone: '',
+      dob: '',
+      jobTitle: '',
+      ssn: '',
+      spouseName: '',
+      spouseDob: '',
+      businessName: '',
+      spouseSsn: '',
+      mailingAddress: '',
+      residentialAddress: '',
+      howLongAtAddress: '',
+      presentEmployer: '',
+      businessExperienceSummary: '',
+      hasCoApplicant: false,
+      driversLicenseUploaded: false,
+      suite: '',
+      use: '',
+      sf: '',
+      notes: '',
+      applicationSubmitted: false,
+    })
+  })
   general: GeneralDetails;
 
-  @Prop({ type: BusinessDetailsSchema, default: () => ({}) })
+  @Prop({ 
+    type: BusinessDetailsSchema, 
+    default: () => ({
+      legalName: '',
+      fein: '',
+      stateOfIncorporation: '',
+      tradeName: '',
+      currentBusinessAddress: '',
+      proposedBusinessDescription: '',
+      businessTelephone: '',
+      isRelocating: '',
+      howLongInBusiness: '',
+      howManyLocations: '',
+      typeOfEntity: '',
+    })
+  })
   business: BusinessDetails;
 
-  @Prop({ type: FinancialDetailsSchema, default: () => ({}) })
+  @Prop({ 
+    type: FinancialDetailsSchema, 
+    default: () => ({
+      assets: {
+        checkingSavings: false,
+        stocksBonds: false,
+        retirementAccounts: false,
+        automobiles: '',
+        realEstateResidence: '',
+        realEstateInvestment: '',
+        otherAssets: '',
+      },
+      liabilities: {
+        creditCardBalances: '',
+        taxesPayable: '',
+        mortgagesDue: '',
+        otherLiabilities: '',
+      },
+      annualIncome: '',
+      monthlyMortgageRent: '',
+      guarantor: '',
+      guarantorSsn: '',
+      totalAssets: '',
+      liquidAssets: '',
+      creditScore: '',
+      netWorth: '',
+      totalLiabilities: '',
+      assetsCheckingAcct: '',
+      assetsSavingsAcct: '',
+      assetsRealEstate: '',
+      assetsStocksBonds: '',
+    })
+  })
   financial: FinancialDetails;
 
-  @Prop({ type: DealTermsSchema, default: () => ({}) })
+  @Prop({ 
+    type: DealTermsSchema, 
+    default: () => ({
+      rounds: [],
+    })
+  })
   dealTerms: DealTerms;
 
-  @Prop({ type: DraftingDetailsSchema, default: () => ({}) })
+  @Prop({ 
+    type: DraftingDetailsSchema, 
+    default: () => ({
+      rentPerSf: 0,
+      annInc: 0,
+      freeMonths: 0,
+      term: '',
+      tiPerSf: 0,
+      rcd: '',
+    })
+  })
   current_negotiation: DraftingDetails;
 
-  @Prop({ type: DraftingDetailsSchema, default: () => ({}) })
+  @Prop({ 
+    type: DraftingDetailsSchema, 
+    default: () => ({
+      rentPerSf: 0,
+      annInc: 0,
+      freeMonths: 0,
+      term: '',
+      tiPerSf: 0,
+      rcd: '',
+    })
+  })
   budget_negotiation: DraftingDetails;
   
-  @Prop({ type: DraftingDetailsSchema, default: () => ({}) })
+  @Prop({ 
+    type: DraftingDetailsSchema, 
+    default: () => ({
+      rentPerSf: 0,
+      annInc: 0,
+      freeMonths: 0,
+      term: '',
+      tiPerSf: 0,
+      rcd: '',
+    })
+  })
   approved_terms: DraftingDetails;
 
   @Prop({ type: [ReferenceInfoSchema], default: [] })
   references: ReferenceInfo[];
 
-  @Prop({ type: AccountingDetailsSchema, default: () => ({}) })
+  @Prop({ 
+    type: AccountingDetailsSchema, 
+    default: () => ({
+      baseRent: 0,
+      cam: 0,
+      lateFee: 0,
+      ins: 0,
+      tax: 0,
+      totalDue: 0,
+      balanceDue: 0,
+      rentDueDate: '',
+      lateAfter: '',
+      balance_forward_0131: 0,
+      feb_cash_received: 0,
+      annualPMT: {
+        janPmt: 0,
+        febPmt: 0,
+        marPmt: 0,
+        aprPmt: 0,
+        mayPmt: 0,
+        junPmt: 0,
+        julPmt: 0,
+        augPmt: 0,
+        septPmt: 0,
+        octPmt: 0,
+        novPmt: 0,
+        decPmt: 0,
+      },
+    })
+  })
   accounting: AccountingDetails;
 
-  @Prop({ type: BrokerInfoSchema, default: () => ({}) })
+  @Prop({ 
+    type: BrokerInfoSchema, 
+    default: () => ({
+      brokerParticipation: '',
+      companyName: '',
+      companyAddress: '',
+      companyPhone: '',
+      contactName: '',
+      email: '',
+      phone: '',
+      commissionStructure: '',
+      commissionAmount: 0,
+    })
+  })
   broker: BrokerInfo;
 
   @Prop({ type: [FileInfoSchema], default: [] })
@@ -115,6 +267,9 @@ export class Lead {
 
   @Prop({ type: String })
   pdfDocumentUrl?: string;
+
+  @Prop({ type: String })
+  loiDocumentUrl?: string; // S3 key for LOI document
 
   @Prop({ type: LeaseInfoSchema })
   lease?: LeaseInfo;

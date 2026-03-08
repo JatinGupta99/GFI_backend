@@ -33,6 +33,10 @@ export class PaginationQueryDto {
   search?: string;
 
   @IsOptional()
+  @IsString()
+  use?: string;
+
+  @IsOptional()
   @IsEnum(SortOrder)
   sortOrder: SortOrder = SortOrder.DESC;
 

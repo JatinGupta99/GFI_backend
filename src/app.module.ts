@@ -23,6 +23,7 @@ import { AppCacheModule } from './common/cache/app-cache.module';
 import { DocuSignModule } from './modules/integration/docusign/docusign.module';
 import { CacheManagementModule } from './modules/cache/cache.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { RenewalsModule } from './modules/renewals/renewals.module';
 
 
 @Module({
@@ -46,6 +47,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
     DocuSignModule,
     CacheManagementModule,
     DocumentsModule,
+    RenewalsModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

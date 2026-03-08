@@ -12,7 +12,13 @@ import { LeadStatus } from '../../../common/enums/common-enums';
 
 export class UpdateLeadDto extends PartialType(CreateLeadDto) {
 
+  @IsOptional()
+  @IsString()
+  loiDocumentUrl?:string;
   
+  @IsOptional()
+  @IsString()
+  pdfDocumentUrl?:string;
 }
 
 export class FindLeadsDto {

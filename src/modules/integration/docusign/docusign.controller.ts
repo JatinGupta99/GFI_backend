@@ -213,23 +213,27 @@ export class DocuSignController {
         throw new NotFoundException(`Lease not found with ID ${leaseId}`);
       }
 
-      // Retrieve PDF document (optional - supports presigned URL, S3 key, or local file path)
+      // Retrieve main PDF document for DocuSign (from Key parameter)
       let pdfBuffer: Buffer | undefined;
+      let pdfSource: string | undefined;
       
-      if (dto.Key) {
+      const {Key,body}=dto;
+      pdfSource=Key;
+      console.log(pdfSource,'acslacslknasc')
+      if (pdfSource) {
         try {
-          this.logger.log(`Attempting to download PDF from: ${dto.Key.substring(0, 100)}...`);
-          pdfBuffer = await this.downloadPdf(dto.Key);
-          
+          this.logger.log(`Attempting to download main PDF from: ${pdfSource.substring(0, 100)}...`);
+          pdfBuffer = await this.downloadPdf(pdfSource);
+          console.log(pdfBuffer,'dnclsknclkd')
           if (!pdfBuffer || pdfBuffer.length === 0) {
             this.logger.error(`Downloaded PDF buffer is empty for lease ${leaseId}`);
             throw new BadRequestException('PDF document is empty or corrupted');
           }
           
-          this.logger.log(`PDF document loaded successfully for lease ${leaseId} (${pdfBuffer.length} bytes)`);
+          this.logger.log(`Main PDF document loaded successfully for lease ${leaseId} (${pdfBuffer.length} bytes)`);
         } catch (error) {
-          this.logger.error(`Failed to retrieve PDF for lease ${leaseId}`, {
-            url: lease.pdfDocumentUrl,
+          this.logger.error(`Failed to retrieve main PDF for lease ${leaseId}`, {
+            url: pdfSource,
             error: error.message,
             code: error.code,
             stack: error.stack
@@ -261,8 +265,42 @@ export class DocuSignController {
       } else {
         this.logger.warn(`No PDF document URL found for lease ${leaseId}`);
         throw new BadRequestException(
-          'PDF document URL is required to send lease for signature. Please ensure the lease has a valid PDF document URL.'
+          'PDF document URL is required to send lease for signature. Please provide Key parameter or ensure the lease has a valid pdfDocumentUrl.'
         );
+      }
+
+      // Download additional attachments from fileKey array (for email)
+      const emailAttachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+      
+      if (dto.fileKey && dto.fileKey.length > 0) {
+        const validFileKeys = dto.fileKey.filter(key => key && key.trim() !== '');
+        
+        this.logger.log(`Processing ${validFileKeys.length} additional file(s) for email attachments`);
+        
+        for (const fileKey of validFileKeys) {
+          try {
+            this.logger.log(`Downloading attachment: ${fileKey.substring(0, 100)}...`);
+            const fileBuffer = await this.downloadPdf(fileKey);
+            
+            if (fileBuffer && fileBuffer.length > 0) {
+              // Extract filename from key
+              const filename = fileKey.split('/').pop() || 'attachment.pdf';
+              
+              emailAttachments.push({
+                filename,
+                content: fileBuffer,
+                contentType: 'application/pdf',
+              });
+              
+              this.logger.log(`Successfully downloaded attachment: ${filename} (${fileBuffer.length} bytes)`);
+            }
+          } catch (error) {
+            // Log error but don't fail the request - attachments are optional
+            this.logger.warn(`Failed to download attachment ${fileKey}: ${error.message}`);
+          }
+        }
+        
+        this.logger.log(`Successfully downloaded ${emailAttachments.length} email attachment(s)`);
       }
 
       // Get tenant information from lead
@@ -273,6 +311,15 @@ export class DocuSignController {
         throw new BadRequestException('Tenant email is required');
       }
 
+      // Filter out empty strings from CC array
+      const ccEmails = dto.cc?.filter(email => email && email.trim() !== '') || [];
+      
+      // Update DTO with filtered CC emails
+      const cleanedDto = {
+        ...dto,
+        cc: ccEmails.length > 0 ? ccEmails : undefined,
+      };
+
       // Call DocuSignService to create and send envelope (Requirement 6.3)
       if (!pdfBuffer || pdfBuffer.length === 0) {
         throw new BadRequestException(
@@ -281,7 +328,7 @@ export class DocuSignController {
       }
 
       const envelopeResponse = await this.docuSignService.sendLeaseForSignatureWithIntegration(
-        dto,
+        cleanedDto,
         pdfBuffer,
         tenantEmail,
         tenantName,
@@ -298,54 +345,36 @@ export class DocuSignController {
         `Successfully sent lease ${leaseId} for signature. Envelope ID: ${envelopeResponse.envelopeId}`,
       );
 
-      // Send custom email with signing URL if available
-      // if (envelopeResponse.signingUrl) {
-      //   try {
-      //     const propertyInfo = lease.general?.property || 'Property';
-      //     const suiteInfo = lease.general?.suite || '';
-      //     const propertyDisplay = suiteInfo ? `${propertyInfo}, Suite ${suiteInfo}` : propertyInfo;
+      // Send custom email with signing URL (with or without attachments)
+      if (envelopeResponse.signingUrl) {
+        try {
+          const propertyInfo = lease.general?.property || 'Property';
+          const suiteInfo = lease.general?.suite || '';
+          const propertyDisplay = suiteInfo ? `${propertyInfo}, Suite ${suiteInfo}` : propertyInfo;
 
-      //     // Read email template from file
-      //     const templatePath = 'src/modules/leasing/templates/execution-email.html';
-      //     let emailHtml = await readFile(templatePath, 'utf-8');
+          this.logger.log(`Sending custom email to ${tenantEmail} (${emailAttachments.length} attachment(s))`);
 
-      //     // Replace template variables with actual values
-      //     emailHtml = emailHtml
-      //       .replace(/\$\{lease\.general\?\.firstName \|\| 'there'\}/g, lease.general?.firstName || 'there')
-      //       .replace(/\$\{propertyDisplay\}/g, propertyDisplay)
-      //       .replace(/\$\{envelopeResponse\.signingUrl\}/g, envelopeResponse.signingUrl)
-      //       .replace(/\$\{lease\.general\?\.businessName \|\| ''\}/g, lease.general?.businessName || '')
-      //       .replace(/\$\{lease\.general\?\.suite \|\| ''\}/g, lease.general?.suite || '')
-      //       .replace(/\$\{user\.name\}/g, user.name)
-      //       .replace(/\$\{user\.role\}/g, user.role);
+          // Send email with or without attachments
+          await this.mailService.send(EmailType.GENERAL, {
+            email: tenantEmail,
+            cc: ccEmails.length > 0 ? ccEmails : undefined,
+            subject: `LOI Agreement for Signature - ${propertyDisplay}`,
+            body: body,
+            firstName: lease.general?.firstName || '',
+            attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
+          });
 
-      //     // Prepare attachments if PDF is available
-      //     // const attachments = pdfBuffer ? [{
-      //     //   filename: `${tenantName} - Lease Agreement.pdf`,
-      //     //   content: pdfBuffer,
-      //     //   contentType: 'application/pdf',
-      //     // }] : [];
-
-      //     // // Send email
-      //     // // await this.mailService.send(EmailType.GENERAL, {
-      //     // //   email: tenantEmail,
-      //     // //   cc: dto.cc, // Support CC from request
-      //     // //   subject: `Lease Agreement - ${propertyDisplay}`,
-      //     // //   body: emailHtml,
-      //     // //   attachments,
-      //     // // });
-
-      //     this.logger.log(
-      //       `Custom signing email sent to ${tenantEmail} for lease ${leaseId}`,
-      //     );
-      //   } catch (emailError) {
-      //     // Log error but don't fail the request - envelope was created successfully
-      //     this.logger.error(
-      //       `Failed to send custom signing email for lease ${leaseId}`,
-      //       emailError.message,
-      //     );
-      //   }
-      // }
+          this.logger.log(
+            `Custom signing email sent to ${tenantEmail} for lease ${leaseId} (${emailAttachments.length} attachment(s))`,
+          );
+        } catch (emailError) {
+          // Log error but don't fail the request - envelope was created successfully
+          this.logger.error(
+            `Failed to send custom signing email for lease ${leaseId}`,
+            emailError.message,
+          );
+        }
+      }
 
       // Return envelope response with proper status code (Requirement 6.4)
       return envelopeResponse;

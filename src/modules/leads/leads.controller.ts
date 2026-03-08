@@ -238,6 +238,31 @@ export class LeadsController {
     return this.service.confirmDocumentUpload(id, key, fileName, documentType, user.name);
   }
 
+  // ==================== LOI Document Upload & Processing ====================
+
+  @Post(':id/loi/upload-url')
+  getLoiUploadUrl(@Param('id') id: string) {
+    return this.service.getLoiUploadUrl(id);
+  }
+
+  @Post(':id/loi/confirm')
+  confirmLoiUpload(
+    @Param('id') id: string,
+    @Body('key') key: string,
+    @Body('fileName') fileName: string,
+    @Body('fileSize') fileSize: number,
+    @UserId() user: {
+      userId: string;
+      email: string;
+      name: string;
+      role: string;
+    },
+  ) {
+    return this.service.confirmLoiUpload(id, key, fileName, fileSize, user.name);
+  }
+
+  // ==================== Public Tenant Form ====================
+
   @Public()
   @Post('public/tenant-form/submit')
   submitTenantForm(@Headers('authorization') auth: string, @Body() dto: SubmitTenantFormDto) {

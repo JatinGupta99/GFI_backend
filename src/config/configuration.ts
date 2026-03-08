@@ -23,10 +23,8 @@ export const configuration = () => ({
     redis: {
         host: process.env.REDIS_HOST || 'localhost',
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
-    },
-
-    cache: {
-        ttl: parseInt(process.env.CACHE_TTL || '900', 10), // 15 minutes in seconds
+        password: process.env.REDIS_PASSWORD || undefined,
+        db: parseInt(process.env.REDIS_DB || '0', 10),
     },
 
     mail: {
@@ -94,5 +92,12 @@ export const configuration = () => ({
         location: process.env.GOOGLE_DOCUMENT_AI_LOCATION || 'us',
         processorId: process.env.GOOGLE_DOCUMENT_AI_PROCESSOR_ID,
         credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    },
+
+    renewals: {
+        // Renewal window configuration (in months)
+        windowMonthsBefore: parseInt(process.env.RENEWAL_WINDOW_MONTHS_BEFORE || '36', 10), // Look ahead 36 months
+        windowMonthsAfter: parseInt(process.env.RENEWAL_WINDOW_MONTHS_AFTER || '6', 10),    // Look back 6 months
+        includeAllActive: process.env.RENEWAL_INCLUDE_ALL_ACTIVE === 'true',                // Include all active leases
     },
 });

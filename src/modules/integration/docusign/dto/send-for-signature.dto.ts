@@ -25,12 +25,16 @@ class SignaturePositionDto {
 export class SendForSignatureDto {
   @IsString()
   @IsNotEmpty()
-  leaseId: string;
+  leaseId: string; // Optional since it's in the URL path
 
   @IsEmail()
   @IsOptional()
   recipientEmail?: string;
 
+  @IsString()
+  @IsOptional()
+  body?:string;
+  
   @IsArray()
   @IsEmail({}, { each: true })
   @IsOptional()
@@ -44,9 +48,14 @@ export class SendForSignatureDto {
 
   @IsBoolean()
   @IsOptional()
-  isTesting?: boolean = true;
+  isTesting?: boolean = false;
 
   @IsString()
   @IsOptional()
-  Key?: string;
+  Key?: string; // Single PDF key/URL
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  fileKey?: string[]; // Array of PDF keys (alternative to Key)
 }
