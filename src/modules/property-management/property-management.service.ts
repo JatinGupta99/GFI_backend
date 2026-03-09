@@ -105,7 +105,7 @@ export class PropertyManagementService {
         const leadStatusMapping: Record<string, LeadStatus> = {
             [NoticeType.COURTESY]: LeadStatus.SEND_COURTESY_NOTICE,
             [NoticeType.THREE_DAY]: LeadStatus.SEND_THREE_DAY_NOTICE,
-            [NoticeType.ATTORNEY]: LeadStatus.SEND_TO_ATTORNEY,
+            [NoticeType.ATTORNEY]: LeadStatus.SEND_ATTORNEY_NOTICE,
         };
 
         const newStatus = statusMapping[type];

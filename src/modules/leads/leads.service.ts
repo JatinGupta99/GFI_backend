@@ -1,32 +1,28 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
-import { FilterQuery, Types } from 'mongoose';
-import { ActivityType, JOBNAME, LeadStatus, Role, SortOrder } from '../../common/enums/common-enums';
-import { CreateLeadDto } from './dto/create-lead.dto';
+import { InjectQueue } from '@nestjs/bullmq';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { InjectModel } from '@nestjs/mongoose';
+import { Queue } from 'bullmq';
+import { FilterQuery, Model, Types } from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { EmailType, FormStatus, JOBNAME, LeadStatus, Role, SortOrder } from '../../common/enums/common-enums';
 import { PaginationHelper } from '../../common/helpers/pagination.helper';
-import { UpdateLeadDto } from './dto/update-lead.dto';
-import { UpdateLeadPublicDto } from './dto/update-lead-public.dto';
-import { LeadsRepository } from './repository/lead.repository';
-import { Lead } from './schema/lead.schema';
+import { CompanyUserService } from '../company-user/company-user.service';
 import { MailService } from '../mail/mail.service';
 import { MediaService } from '../media/media.service';
-import { CompanyUserService } from '../company-user/company-user.service';
 import { ActivitiesService } from '../property-assets/activities.service';
-import { SendLoiEmailDto, SendAppEmailDto, SendApprovalEmailDto, SendRenewalLetterDto, SendTenantMagicLinkDto } from './dto/send-email.dto';
-import { EmailType } from '../../common/enums/common-enums';
-import { TasksService } from '../tasks/tasks.service';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
-import { v4 as uuidv4 } from 'uuid';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { TenantFormProgress, TenantFormProgressDocument } from './schema/tenant-form-progress.schema';
-import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
-import { FormStatus } from '../../common/enums/common-enums';
-import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
-import { SendGenericEmailDto } from './dto/send-generic-email.dto';
 import { RenewalRepository } from '../renewals/repositories/renewal.repository';
+import { TasksService } from '../tasks/tasks.service';
+import { CreateLeadDto } from './dto/create-lead.dto';
+import { SendAppEmailDto, SendApprovalEmailDto, SendLoiEmailDto, SendRenewalLetterDto, SendTenantMagicLinkDto } from './dto/send-email.dto';
+import { SendGenericEmailDto } from './dto/send-generic-email.dto';
+import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
+import { UpdateLeadPublicDto } from './dto/update-lead-public.dto';
+import { UpdateLeadDto } from './dto/update-lead.dto';
+import { LeadsRepository } from './repository/lead.repository';
+import { Lead } from './schema/lead.schema';
+import { TenantFormProgress, TenantFormProgressDocument } from './schema/tenant-form-progress.schema';
 
 export const COMPANY = {
   NAME: 'Global Fund Investments',
@@ -72,7 +68,7 @@ export class LeadsService {
     const STATUS_GROUPS = {
       LEAD_ALL: ['LOI_NEGOTIATION', 'QUALIFYING', 'OUT_FOR_EXECUTION','Prospect'],
       APPROVAL_ALL: ['IN_REVIEW', 'PENDING'],
-      TENANT_AR_ALL: ['SEND_TO_ATTORNEY', 'SEND_COURTESY_NOTICE', 'SEND_THREE_DAY_NOTICE'],
+      TENANT_AR_ALL: ['SEND_ATTORNEY_NOTICE', 'SEND_COURTESY_NOTICE', 'SEND_THREE_DAY_NOTICE'],
       LEASE_ALL: ['LEASE_NEGOTIATION', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE'],
     };
 
@@ -653,119 +649,27 @@ if (lead_status) {
   }
 
   async sendGenericEmail(dto: SendGenericEmailDto) {
-
-    const resolvedAttachments: any[] = [];
-
-
-    // Handle attachments if provided (array of S3 keys)
-    if (dto.attachments && dto.attachments.length > 0) {
-      for (const fileKey of dto.attachments) {
-        try {
-          // Download the file buffer from S3
-          const fileBuffer = await this.mediaService.getFileBuffer(fileKey);
-          const filename = this.extractFilenameFromKey(fileKey) || 'attachment';
-          
-          resolvedAttachments.push({
-            filename: filename,
-            content: fileBuffer,
-            contentType: 'application/octet-stream',
-          });
-        } catch (err) {
-          this.logger.error(`Failed to resolve attachment ${fileKey}:`, err);
-        }
-      }
-    }
-        if (dto.Key) {
-      try {
-        this.logger.log(`Processing PDF key attachment: ${dto.Key}`);
-        
-        // Validate the key format
-        if (!dto.Key.trim()) {
-          throw new Error('PDF key is empty');
-        }
-        
-        // Download the PDF buffer for email attachment
-        const pdfBuffer = await this.mediaService.getFileBuffer(dto.Key);
-        
-        if (!pdfBuffer || pdfBuffer.length === 0) {
-          throw new Error('PDF buffer is empty');
-        }
-        
-        // Extract filename from S3 key or use default
-        const filename = this.extractFilenameFromKey(dto.Key) || 'LOI-Document.pdf';
-        
-        // Add PDF as attachment with buffer (for direct email attachment)
-        resolvedAttachments.push({
-          filename: filename,
-          content: pdfBuffer,
-          contentType: 'application/pdf',
-        });
-
-        this.logger.log(`Successfully added PDF attachment: ${filename} (${pdfBuffer.length} bytes)`);
-        
-      } catch (err) {
-        this.logger.error(`Failed to process PDF key ${dto.Key}:`, {
-          error: err.message,
-          stack: err.stack,
-          key: dto.Key
-        });
-        // Continue without the PDF attachment rather than failing the entire email
-      }
-    }
+    // Validate and fetch record (Lead or Renewal)
+    const record = await this.validateAndFetchRecord(dto.leadId, dto.recordType);
+    
+    // Update status based on email type
+    await this.updateRecordStatusByEmailType(dto.leadId, dto.emailType, dto.recordType);
+    
+    // Resolve all attachments
+    const resolvedAttachments = await this.resolveEmailAttachments(dto.Key, dto.attachments);
+    
     // Send the email
     await this.mailService.send(EmailType.GENERAL as any, {
       email: dto.to,
       cc: dto.cc || [],
       subject: dto.subject,
       body: dto.body,
-      firstName: dto.firstName +" "+dto.lastName,
+      firstName: `${dto.firstName || ''} ${dto.lastName || ''}`.trim(),
       attachments: resolvedAttachments,
     });
 
-    // Create follow-up activity if requested and leadId is provided
-    let followUpActivityId: string | null = null;
-    if (dto.followUpDays && dto.followUpDays > 0 && dto.leadId) {
-      try {
-        this.logger.log(
-          `Creating follow-up activity for lead ${dto.leadId} in ${dto.followUpDays} days`,
-        );
-
-        const followUpDate = new Date();
-        followUpDate.setDate(followUpDate.getDate() + dto.followUpDays);
-
-        const followUpActivity = await this.activitiesService.create(
-          dto.leadId,
-          {
-            activityName: `Follow-up: ${dto.subject}`,
-            department: dto.followUpAutomatedDay
-              ? 'Automated Follow-up'
-              : 'Manual Follow-up',
-            followUpDate: followUpDate,
-            isAutomatedFollowUp: dto.followUpAutomatedDay,
-            followUpCompleted: false,
-            originalEmailSubject: dto.subject,
-            followUpType: 'email',
-          },
-          {
-            userId: 'system',
-            name: 'System',
-            email: 'system@company.com',
-            role: 'SYSTEM',
-          },
-        );
-
-        followUpActivityId = String(followUpActivity._id) || followUpActivity.id;
-
-        this.logger.log(
-          `Created follow-up activity ${followUpActivityId} for lead ${dto.leadId}, scheduled for ${followUpDate.toISOString()}`,
-        );
-      } catch (err) {
-        this.logger.error(
-          `Failed to create follow-up activity for lead ${dto.leadId}:`,
-          err,
-        );
-      }
-    }
+    // Create follow-up activity if requested
+    const followUpActivityId = await this.createFollowUpActivity(dto);
 
     return {
       success: true,
@@ -774,7 +678,199 @@ if (lead_status) {
       followUpActivityId: followUpActivityId,
       followUpDays: dto.followUpDays || null,
       emailType: dto.emailType || 'GENERAL',
+      recordType: dto.recordType || 'LEAD',
+      statusUpdated: !!dto.emailType,
     };
+  }
+
+  /**
+   * Validate and fetch record (Lead or Renewal)
+   */
+  private async validateAndFetchRecord(id: string, recordType?: string): Promise<any> {
+    if (!id) {
+      throw new BadRequestException('Record ID is required');
+    }
+
+    // Default to LEAD if not specified
+    const type = recordType || 'LEAD';
+
+    if (type === 'RENEWAL') {
+      // Check if renewal exists
+      const renewal = await this.renewalrepo.findOne(id);
+      if (!renewal) {
+        throw new NotFoundException(`Renewal with ID ${id} not found`);
+      }
+      return renewal;
+    } else {
+      // Check if lead exists (LEAD or LEASE)
+      const lead = await this.repo.findById(id);
+      if (!lead) {
+        throw new NotFoundException(`Lead with ID ${id} not found`);
+      }
+      return lead;
+    }
+  }
+
+  /**
+   * Update record status based on email type
+   */
+  private async updateRecordStatusByEmailType(
+    id: string,
+    emailType?: string,
+    recordType?: string,
+  ): Promise<void> {
+    if (!emailType) return;
+
+    const type = recordType || 'LEAD';
+    
+    // Map email types to status values
+    const emailTypeToStatusMap: Record<string, string> = {
+      COURTESY_NOTICE: 'SEND_COURTESY_NOTICE',
+      THREE_DAY_NOTICE: 'SEND_THREE_DAY_NOTICE',
+      ATTORNEY_NOTICE: 'SEND_TO_ATTORNEY',
+    };
+
+    const newStatus = emailTypeToStatusMap[emailType];
+    if (!newStatus) {
+      this.logger.debug(`No status mapping for email type: ${emailType}`);
+      return;
+    }
+
+    try {
+      if (type === 'RENEWAL') {
+        // Update renewal status
+        await this.renewalrepo.updateRenewal(id, { status: newStatus });
+        this.logger.log(`Updated renewal ${id} status to ${newStatus}`);
+      } else {
+        // Update lead status (LEAD or LEASE)
+        await this.repo.update(id, { lead_status: newStatus as LeadStatus });
+        this.logger.log(`Updated lead ${id} status to ${newStatus}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to update status for ${type} ${id}:`, error);
+      // Don't throw - email should still be sent even if status update fails
+    }
+  }
+
+  /**
+   * Resolve all email attachments (Key + attachments array)
+   */
+  private async resolveEmailAttachments(
+    mainKey?: string,
+    attachmentKeys?: string[],
+  ): Promise<any[]> {
+    const resolvedAttachments: any[] = [];
+
+    // Handle main PDF attachment (Key field)
+    if (mainKey) {
+      const mainAttachment = await this.resolveAttachment(mainKey, 'application/pdf');
+      if (mainAttachment) {
+        resolvedAttachments.push(mainAttachment);
+      }
+    }
+
+    // Handle additional attachments
+    if (attachmentKeys && attachmentKeys.length > 0) {
+      for (const fileKey of attachmentKeys) {
+        const attachment = await this.resolveAttachment(fileKey);
+        if (attachment) {
+          resolvedAttachments.push(attachment);
+        }
+      }
+    }
+
+    return resolvedAttachments;
+  }
+
+  /**
+   * Resolve a single attachment from S3
+   */
+  private async resolveAttachment(
+    fileKey: string,
+    contentType: string = 'application/octet-stream',
+  ): Promise<any | null> {
+    try {
+      if (!fileKey || !fileKey.trim()) {
+        throw new Error('File key is empty');
+      }
+
+      this.logger.debug(`Resolving attachment: ${fileKey}`);
+
+      const fileBuffer = await this.mediaService.getFileBuffer(fileKey);
+
+      if (!fileBuffer || fileBuffer.length === 0) {
+        throw new Error('File buffer is empty');
+      }
+
+      const filename = this.extractFilenameFromKey(fileKey) || 'attachment';
+
+      this.logger.debug(`Resolved attachment: ${filename} (${fileBuffer.length} bytes)`);
+
+      return {
+        filename,
+        content: fileBuffer,
+        contentType,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to resolve attachment ${fileKey}:`, {
+        error: error.message,
+        key: fileKey,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Create follow-up activity if requested
+   */
+  private async createFollowUpActivity(dto: SendGenericEmailDto): Promise<string | null> {
+    if (!dto.followUpDays || dto.followUpDays <= 0 || !dto.leadId) {
+      return null;
+    }
+
+    try {
+      this.logger.log(
+        `Creating follow-up activity for ${dto.recordType || 'LEAD'} ${dto.leadId} in ${dto.followUpDays} days`,
+      );
+
+      const followUpDate = new Date();
+      followUpDate.setDate(followUpDate.getDate() + dto.followUpDays);
+
+      const followUpActivity = await this.activitiesService.create(
+        dto.leadId,
+        {
+          activityName: `Follow-up: ${dto.subject}`,
+          department: dto.followUpAutomatedDay
+            ? 'Automated Follow-up'
+            : 'Manual Follow-up',
+          followUpDate: followUpDate,
+          isAutomatedFollowUp: dto.followUpAutomatedDay,
+          followUpCompleted: false,
+          originalEmailSubject: dto.subject,
+          followUpType: 'email',
+        },
+        {
+          userId: 'system',
+          name: 'System',
+          email: 'system@company.com',
+          role: 'SYSTEM',
+        },
+      );
+
+      const activityId = String(followUpActivity._id) || followUpActivity.id;
+
+      this.logger.log(
+        `Created follow-up activity ${activityId}, scheduled for ${followUpDate.toISOString()}`,
+      );
+
+      return activityId;
+    } catch (error) {
+      this.logger.error(
+        `Failed to create follow-up activity for ${dto.leadId}:`,
+        error,
+      );
+      return null;
+    }
   }
 
   async sendAppEmail(id: string, dto: SendAppEmailDto, userId: string) {
@@ -1444,6 +1540,110 @@ if (lead_status) {
     this.logger.log(`Lead ${leadId} updated with LOI extraction results (confidence: ${result.overallConfidence}, fields updated: ${hasUpdates})`);
   }
 
+  // ==================== Unified Document Upload (3-Day, Courtesy, Attorney, etc.) ====================
+
+  /**
+   * Get presigned S3 upload URL for any document type
+   * Supports both Leads and Renewals
+   * @param id - Lead or Renewal ID
+   * @param documentType - Type of document (3-day-notice, courtesy-notice, attorney-notice, loi, etc.)
+   * @param recordType - Type of record (LEAD, RENEWAL, LEASE)
+   */
+  async getDocumentUploadUrl(
+    id: string,
+    documentType: string,
+    recordType: string = 'LEAD',
+  ) {
+    // Validate record exists
+    await this.validateAndFetchRecord(id, recordType);
+
+    // Determine folder path based on record type
+    const basePath = recordType === 'RENEWAL' ? 'renewals' : 'leads';
+    const folderPath = `${basePath}/${id}/documents/${documentType}`;
+    const contentType = 'application/pdf';
+
+    const { key, url } = await this.mediaService.generateUploadUrl(folderPath, contentType);
+
+    this.logger.log(`Generated upload URL for ${recordType} ${id}, document type: ${documentType}`);
+
+    return {
+      statusCode: 200,
+      message: 'Document upload URL generated successfully',
+      data: {
+        key,
+        url,
+        contentType,
+        documentType,
+        recordType,
+      },
+    };
+  }
+
+  /**
+   * Confirm document upload and save metadata
+   * Supports both Leads and Renewals
+   * @param id - Lead or Renewal ID
+   * @param key - S3 key from upload
+   * @param fileName - Original filename
+   * @param fileSize - File size in bytes
+   * @param documentType - Type of document
+   * @param recordType - Type of record (LEAD, RENEWAL, LEASE)
+   * @param userName - User who uploaded
+   */
+  async confirmDocumentUploadUnified(
+    id: string,
+    key: string,
+    fileName: string,
+    fileSize: number,
+    documentType: string,
+    recordType: string = 'LEAD',
+    userName: string = 'System',
+  ) {
+    // Validate record exists
+    const record = await this.validateAndFetchRecord(id, recordType);
+
+    this.logger.log(`Confirming ${documentType} upload for ${recordType} ${id}: ${key}`);
+
+    // Create file metadata
+    const fileInfo = {
+      id: key,
+      key: key,
+      fileName,
+      fileSize,
+      fileType: 'application/pdf',
+      category: documentType,
+      uploadedBy: userName,
+      uploadedDate: new Date(),
+      updatedBy: userName,
+      updatedAt: new Date(),
+    };
+
+    // Save to appropriate record type
+    if (recordType === 'RENEWAL') {
+      // Update renewal with file
+      const files = record.files || [];
+      files.push(fileInfo as any);
+      await this.renewalrepo.updateRenewal(id, { files });
+      this.logger.log(`Saved ${documentType} to renewal ${id}`);
+    } else {
+      // Update lead with file
+      const files = record.files || [];
+      files.push(fileInfo as any);
+      await this.repo.update(id, { files });
+      this.logger.log(`Saved ${documentType} to lead ${id}`);
+    }
+
+    return {
+      statusCode: 200,
+      message: `${documentType} document uploaded successfully`,
+      data: {
+        ...fileInfo,
+        recordType,
+        uploadedAt: fileInfo.uploadedDate.toISOString(),
+      },
+    };
+  }
+
   async sendTenantMagicLink(leadId: string, dto: SendTenantMagicLinkDto) {
     const lead = await this.repo.findById(leadId);
     if (!lead) throw new NotFoundException('Lead not found');
@@ -1654,35 +1854,6 @@ if (lead_status) {
       success: true, 
       message: 'Application submitted successfully',
       submittedAt: updatePayload.general.applicationSubmittedAt?.toISOString() || new Date().toISOString(),
-    };
-  }
-
-  /**
-   * Generate upload URL for document with specific type
-   * The document type will be included in the S3 key path
-   */
-  async getDocumentUploadUrl(leadId: string, documentType: string, contentType: string) {
-    const lead = await this.repo.findById(leadId);
-    if (!lead) throw new NotFoundException('Lead not found');
-
-    // Validate content type is PDF
-    if (contentType !== 'application/pdf') {
-      throw new BadRequestException('Only PDF files are allowed');
-    }
-
-    // Create folder path with document type
-    const folderPath = `leads/${leadId}/documents/${documentType}`;
-
-    const { key, url } = await this.mediaService.generateUploadUrl(folderPath, contentType);
-
-    return {
-      statusCode: 200,
-      message: 'Upload URL generated successfully',
-      data: {
-        key,
-        url,
-        documentType,
-      },
     };
   }
 
@@ -2411,7 +2582,7 @@ if (lead_status) {
     const result = await this.repo.aggregate([
       {
         $match: {
-          lead_status: 'SEND_TO_ATTORNEY',
+          lead_status: 'SEND_ATTORNEY_NOTICE',
         },
       },
       {

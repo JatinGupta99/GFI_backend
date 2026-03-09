@@ -10,6 +10,7 @@ export enum RenewalStatus {
   EXPIRED = 'Expired',
   SEND_COURTESY_NOTICE="SEND_COURTESY_NOTICE",
   SEND_THREE_DAY_NOTICE = 'SEND_THREE_DAY_NOTICE',
+  SENT_TO_ATTORNEY = 'SENT_TO_ATTORNEY',
 }
 
 export class UpdateRenewalStatusDto {

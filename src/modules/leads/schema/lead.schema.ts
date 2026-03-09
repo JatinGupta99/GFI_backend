@@ -39,7 +39,7 @@ export class Lead {
     default: LeadStatus.QUALIFYING,
     index: true,
   })
-  lead_status: LeadStatus;
+  lead_status: string;
 
   @Prop({ 
     type: GeneralDetailsSchema, 

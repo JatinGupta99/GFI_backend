@@ -1,16 +1,24 @@
-import { IsString, IsEmail, IsArray, IsOptional, IsNumber, IsBoolean, IsEnum, IsNotEmpty } from 'class-validator';
+import { IsString, IsEmail, IsArray, IsOptional, IsNumber, IsEnum, IsNotEmpty } from 'class-validator';
 
 export enum EmailTemplateType {
   LOI = 'LOI',
   COURTESY_NOTICE = 'COURTESY_NOTICE',
   THREE_DAY_NOTICE = 'THREE_DAY_NOTICE',
+  ATTORNEY_NOTICE = 'ATTORNEY_NOTICE',
   RENEWAL_LETTER = 'RENEWAL_LETTER',
   GENERAL = 'GENERAL',
+}
+
+export enum RecordType {
+  LEAD = 'LEAD',
+  RENEWAL = 'RENEWAL',
+  LEASE = 'LEASE',
 }
 
 export class SendGenericEmailDto {
   @IsString()
   to: string;
+  
   @IsString()
   @IsOptional()
   Key?: string;
@@ -44,6 +52,7 @@ export class SendGenericEmailDto {
   followUpDays?: number;
 
   @IsOptional()
+  @IsNumber()
   followUpAutomatedDay?: number;
 
   @IsOptional()
@@ -52,5 +61,9 @@ export class SendGenericEmailDto {
 
   @IsNotEmpty()
   @IsString()
-  leadId: string; // Optional lead ID for creating follow-up activity
+  leadId: string; // Lead/Renewal/Lease ID
+
+  @IsOptional()
+  @IsEnum(RecordType)
+  recordType?: RecordType; // Type of record: LEAD, RENEWAL, or LEASE
 }

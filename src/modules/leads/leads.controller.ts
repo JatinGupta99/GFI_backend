@@ -219,31 +219,6 @@ export class LeadsController {
     return this.service.getSubmissionStatus(id);
   }
 
-  @Post(':id/documents/upload-url')
-  getDocumentUploadUrl(
-    @Param('id') id: string,
-    @Body('documentType') documentType: string,
-    @Body('contentType') contentType: string,
-  ) {
-    return this.service.getDocumentUploadUrl(id, documentType, contentType);
-  }
-
-  @Post(':id/documents/confirm')
-  confirmDocumentUpload(
-    @Param('id') id: string,
-    @Body('key') key: string,
-    @Body('fileName') fileName: string,
-    @Body('documentType') documentType: string,
-    @UserId() user: {
-      userId: string;
-      email: string;
-      name: string;
-      role: string;
-    },
-  ) {
-    return this.service.confirmDocumentUpload(id, key, fileName, documentType, user.name);
-  }
-
   // ==================== LOI Document Upload & Processing ====================
 
   @Post(':id/loi/upload-url')
@@ -265,6 +240,43 @@ export class LeadsController {
     },
   ) {
     return this.service.confirmLoiUpload(id, key, fileName, fileSize, user.name);
+  }
+
+  // ==================== Unified Document Upload (3-Day, Courtesy, Attorney, etc.) ====================
+
+  @Post(':id/documents/upload-url')
+  getDocumentUploadUrl(
+    @Param('id') id: string,
+    @Body('documentType') documentType: string,
+    @Body('recordType') recordType: string = 'LEAD',
+  ) {
+    return this.service.getDocumentUploadUrl(id, documentType, recordType || 'LEAD');
+  }
+
+  @Post(':id/documents/confirm')
+  confirmDocumentUploadUnified(
+    @Param('id') id: string,
+    @Body('key') key: string,
+    @Body('fileName') fileName: string,
+    @Body('fileSize') fileSize: number,
+    @Body('documentType') documentType: string,
+    @Body('recordType') recordType: string,
+    @UserId() user: {
+      userId: string;
+      email: string;
+      name: string;
+      role: string;
+    },
+  ) {
+    return this.service.confirmDocumentUploadUnified(
+      id,
+      key,
+      fileName,
+      fileSize,
+      documentType,
+      recordType,
+      user.name,
+    );
   }
 
   // ==================== Public Tenant Form ====================
