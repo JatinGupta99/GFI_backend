@@ -18,6 +18,7 @@ import { RenewalSyncService } from './services/renewal-sync.service';
 import { RenewalFilters } from './interfaces/renewal-provider.interface';
 import { PaginationHelper } from '../../common/helpers/pagination.helper';
 import { UpdateRenewalNotesDto } from './dto/update-renewal-notes.dto';
+import { UpdateRenewalStatusDto } from './dto/update-renewal-status.dto';
 import { RenewalDetailMapper } from './mappers/renewal-detail.mapper';
 
 @ApiTags('Renewals')
@@ -433,4 +434,96 @@ export class RenewalsController {
       data: result.data,
     };
   }
+
+  /**
+   * Update renewal status
+   */
+  @Patch(':id/status')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update status for a renewal' })
+  @ApiBody({ type: UpdateRenewalStatusDto })
+  @ApiResponse({ status: 200, description: 'Status updated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid status value' })
+  @ApiResponse({ status: 404, description: 'Renewal not found' })
+  async updateRenewalStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateRenewalStatusDto,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Renewal ID is required');
+    }
+
+    const result = await this.queryService.updateRenewalStatus(id, dto.status);
+
+    if (!result.success) {
+      throw new NotFoundException(`Renewal with ID ${id} not found`);
+    }
+
+    return {
+      success: true,
+      message: 'Status updated successfully',
+      data: result.data,
+    };
+  }
+
+
+  /**
+   * Get presigned S3 upload URL for renewal file
+   */
+  @Post(':id/files/upload-url')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get presigned S3 upload URL for renewal file' })
+  @ApiResponse({ status: 200, description: 'Upload URL generated successfully' })
+  @ApiResponse({ status: 404, description: 'Renewal not found' })
+  async getFileUploadUrl(
+    @Param('id') id: string,
+    @Body('contentType') contentType: string,
+    @Body('category') category: string,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Renewal ID is required');
+    }
+
+    if (!contentType) {
+      throw new BadRequestException('Content type is required');
+    }
+
+    return this.queryService.getFileUploadUrl(id, contentType, category);
+  }
+
+  /**
+   * Confirm file upload and save file metadata
+   */
+  @Post(':id/files/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirm file upload and save metadata' })
+  @ApiResponse({ status: 200, description: 'File uploaded successfully' })
+  @ApiResponse({ status: 404, description: 'Renewal not found' })
+  async confirmFileUpload(
+    @Param('id') id: string,
+    @Body('key') key: string,
+    @Body('fileName') fileName: string,
+    @Body('fileSize') fileSize: number,
+    @Body('fileType') fileType: string,
+    @Body('category') category: string,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Renewal ID is required');
+    }
+
+    if (!key || !fileName) {
+      throw new BadRequestException('File key and name are required');
+    }
+
+    return this.queryService.confirmFileUpload(
+      id,
+      key,
+      fileName,
+      fileSize,
+      fileType,
+      category,
+      'System', // TODO: Get user name from auth context
+    );
+  }
+
 }

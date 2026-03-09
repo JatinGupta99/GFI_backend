@@ -25,6 +25,8 @@ import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
 import { FormStatus } from '../../common/enums/common-enums';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
+import { SendGenericEmailDto } from './dto/send-generic-email.dto';
+import { RenewalRepository } from '../renewals/repositories/renewal.repository';
 
 export const COMPANY = {
   NAME: 'Global Fund Investments',
@@ -36,6 +38,7 @@ export class LeadsService {
 
   constructor(
     private readonly repo: LeadsRepository,
+    private readonly renewalrepo: RenewalRepository,
     private readonly mailService: MailService,
     private readonly mediaService: MediaService,
     private readonly companyUserService: CompanyUserService,
@@ -370,6 +373,44 @@ if (lead_status) {
 
     const normalizedData = this.normalizeLeadData(dto);
     
+    // Map budget_sheet to accounting if present
+    if ((dto as any).budget_sheet) {
+      const budgetSheet = (dto as any).budget_sheet;
+      
+      normalizedData.accounting = {
+        ...(normalizedData.accounting || {}),
+        // Map charges
+        baseRent: budgetSheet.charges?.baseRentMonth || 0,
+        cam: budgetSheet.charges?.camMonth || 0,
+        ins: budgetSheet.charges?.insMonth || 0,
+        tax: budgetSheet.charges?.taxMonth || 0,
+        totalDue: budgetSheet.charges?.totalDueMonth || 0,
+        balanceDue: budgetSheet.balanceDue || 0,
+        // Map lease terms
+        rentDueDate: budgetSheet.leaseTerms?.rentDueDate || '',
+        lateAfter: budgetSheet.leaseTerms?.lateAfter || '',
+        lateFee: budgetSheet.leaseTerms?.lateFee || 0,
+        // Map monthly payments to annualPMT
+        annualPMT: {
+          janPmt: budgetSheet.monthlyPayments?.jan || 0,
+          febPmt: budgetSheet.monthlyPayments?.feb || 0,
+          marPmt: budgetSheet.monthlyPayments?.mar || 0,
+          aprPmt: budgetSheet.monthlyPayments?.apr || 0,
+          mayPmt: budgetSheet.monthlyPayments?.may || 0,
+          junPmt: budgetSheet.monthlyPayments?.jun || 0,
+          julPmt: budgetSheet.monthlyPayments?.jul || 0,
+          augPmt: budgetSheet.monthlyPayments?.aug || 0,
+          septPmt: budgetSheet.monthlyPayments?.sept || 0,
+          octPmt: budgetSheet.monthlyPayments?.oct || 0,
+          novPmt: budgetSheet.monthlyPayments?.nov || 0,
+          decPmt: budgetSheet.monthlyPayments?.dec || 0,
+        },
+      };
+      
+      // Remove budget_sheet from normalized data so it doesn't get saved
+      delete (normalizedData as any).budget_sheet;
+    }
+    
     // Handle references conversion - support both array and object formats
     if (normalizedData.references) {
       if (Array.isArray(normalizedData.references)) {
@@ -608,6 +649,131 @@ if (lead_status) {
       message: `Email sent successfully with ${resolvedAttachments.length} attachment(s)`,
       followUpActivityId: followUpActivityId,
       followUpDays: dto.followUpDays || null,
+    };
+  }
+
+  async sendGenericEmail(dto: SendGenericEmailDto) {
+
+    const resolvedAttachments: any[] = [];
+
+
+    // Handle attachments if provided (array of S3 keys)
+    if (dto.attachments && dto.attachments.length > 0) {
+      for (const fileKey of dto.attachments) {
+        try {
+          // Download the file buffer from S3
+          const fileBuffer = await this.mediaService.getFileBuffer(fileKey);
+          const filename = this.extractFilenameFromKey(fileKey) || 'attachment';
+          
+          resolvedAttachments.push({
+            filename: filename,
+            content: fileBuffer,
+            contentType: 'application/octet-stream',
+          });
+        } catch (err) {
+          this.logger.error(`Failed to resolve attachment ${fileKey}:`, err);
+        }
+      }
+    }
+        if (dto.Key) {
+      try {
+        this.logger.log(`Processing PDF key attachment: ${dto.Key}`);
+        
+        // Validate the key format
+        if (!dto.Key.trim()) {
+          throw new Error('PDF key is empty');
+        }
+        
+        // Download the PDF buffer for email attachment
+        const pdfBuffer = await this.mediaService.getFileBuffer(dto.Key);
+        
+        if (!pdfBuffer || pdfBuffer.length === 0) {
+          throw new Error('PDF buffer is empty');
+        }
+        
+        // Extract filename from S3 key or use default
+        const filename = this.extractFilenameFromKey(dto.Key) || 'LOI-Document.pdf';
+        
+        // Add PDF as attachment with buffer (for direct email attachment)
+        resolvedAttachments.push({
+          filename: filename,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        });
+
+        this.logger.log(`Successfully added PDF attachment: ${filename} (${pdfBuffer.length} bytes)`);
+        
+      } catch (err) {
+        this.logger.error(`Failed to process PDF key ${dto.Key}:`, {
+          error: err.message,
+          stack: err.stack,
+          key: dto.Key
+        });
+        // Continue without the PDF attachment rather than failing the entire email
+      }
+    }
+    // Send the email
+    await this.mailService.send(EmailType.GENERAL as any, {
+      email: dto.to,
+      cc: dto.cc || [],
+      subject: dto.subject,
+      body: dto.body,
+      firstName: dto.firstName +" "+dto.lastName,
+      attachments: resolvedAttachments,
+    });
+
+    // Create follow-up activity if requested and leadId is provided
+    let followUpActivityId: string | null = null;
+    if (dto.followUpDays && dto.followUpDays > 0 && dto.leadId) {
+      try {
+        this.logger.log(
+          `Creating follow-up activity for lead ${dto.leadId} in ${dto.followUpDays} days`,
+        );
+
+        const followUpDate = new Date();
+        followUpDate.setDate(followUpDate.getDate() + dto.followUpDays);
+
+        const followUpActivity = await this.activitiesService.create(
+          dto.leadId,
+          {
+            activityName: `Follow-up: ${dto.subject}`,
+            department: dto.followUpAutomatedDay
+              ? 'Automated Follow-up'
+              : 'Manual Follow-up',
+            followUpDate: followUpDate,
+            isAutomatedFollowUp: dto.followUpAutomatedDay,
+            followUpCompleted: false,
+            originalEmailSubject: dto.subject,
+            followUpType: 'email',
+          },
+          {
+            userId: 'system',
+            name: 'System',
+            email: 'system@company.com',
+            role: 'SYSTEM',
+          },
+        );
+
+        followUpActivityId = String(followUpActivity._id) || followUpActivity.id;
+
+        this.logger.log(
+          `Created follow-up activity ${followUpActivityId} for lead ${dto.leadId}, scheduled for ${followUpDate.toISOString()}`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Failed to create follow-up activity for lead ${dto.leadId}:`,
+          err,
+        );
+      }
+    }
+
+    return {
+      success: true,
+      attachmentCount: resolvedAttachments.length,
+      message: `Email sent successfully with ${resolvedAttachments.length} attachment(s)`,
+      followUpActivityId: followUpActivityId,
+      followUpDays: dto.followUpDays || null,
+      emailType: dto.emailType || 'GENERAL',
     };
   }
 
@@ -857,8 +1023,8 @@ if (lead_status) {
   }
 
   async getFileUploadUrl(leadId: string, contentType: string, category: string = 'other') {
-    const lead = await this.repo.findById(leadId);
-    if (!lead) throw new NotFoundException('Lead not found');
+    // const lead = await this.repo.findById(leadId);
+    // if (!lead) throw new NotFoundException('Lead not found');
 
     // Pass only the folder path, media service will generate the key with UUID
     const folderPath = `leads/${leadId}/files`;
@@ -1426,7 +1592,8 @@ if (lead_status) {
         this.logger.log(`Application submitted for lead ${leadId} via token at ${new Date().toISOString()}`);
       }
     }
-
+    
+    // updatePayload.lead_status=LeadStatus.DRAFTING_LEASE
     if (Object.keys(updatePayload).length > 0) {
       await this.repo.update(leadId, updatePayload);
     }
@@ -1582,6 +1749,11 @@ if (lead_status) {
         // Log submission attempt for audit trail
         this.logger.log(`Application submitted for lead ${leadId} at ${new Date().toISOString()}`);
       }
+    }
+
+    // Handle lead_status if provided
+    if (formData.lead_status) {
+      updatePayload.lead_status = formData.lead_status;
     }
 
     if (Object.keys(updatePayload).length === 0) {

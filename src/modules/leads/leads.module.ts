@@ -14,6 +14,7 @@ import { PropertyAssetsModule } from '../property-assets/property-assets.module'
 import { BullModule } from '@nestjs/bullmq';
 import { DocumentAiModule } from '../document-ai/document-ai.module';
 import { JOBNAME } from '../../common/enums/common-enums';
+import { RenewalsModule } from '../renewals/renewals.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { JOBNAME } from '../../common/enums/common-enums';
       { name: TenantFormProgress.name, schema: TenantFormProgressSchema },
     ]),
     MailModule,
+    RenewalsModule,
     MediaModule,
     CompanyUserModule,
     TasksModule,

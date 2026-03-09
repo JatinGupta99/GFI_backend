@@ -1,5 +1,6 @@
 import { IsOptional, IsString, IsBoolean, IsNumber, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { LeadStatus } from '../../../common/enums/common-enums';
 
 // Business DTO
 export class PublicBusinessDto {
@@ -114,4 +115,8 @@ export class UpdateLeadPublicDto {
   @ValidateNested()
   @Type(() => PublicGeneralDto)
   general?: PublicGeneralDto;
+
+  @IsOptional()
+  @IsString()
+  lead_status?: LeadStatus;
 }

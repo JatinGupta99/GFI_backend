@@ -15,6 +15,7 @@ import {
 import { LeadStatus } from '../../common/enums/common-enums';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { SendAppEmailDto, SendApprovalEmailDto, SendLoiEmailDto, SendRenewalLetterDto, SendTenantMagicLinkDto } from './dto/send-email.dto';
+import { SendGenericEmailDto } from './dto/send-generic-email.dto';
 import { UpdateLeadPublicDto } from './dto/update-lead-public.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { LeadsService } from './leads.service';
@@ -95,6 +96,11 @@ export class LeadsController {
   @Post(':id/send')
   sendLoiEmail(@Param('id') id: string, @Body() dto: SendLoiEmailDto) {
     return this.service.sendLoiEmail(id, dto);
+  }
+
+  @Post('send/generic')
+  sendGenericEmail(@Body() dto: SendGenericEmailDto) {
+    return this.service.sendGenericEmail(dto);
   }
 
   @Post(':id/app/send')

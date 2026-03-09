@@ -24,6 +24,7 @@ import { DocuSignModule } from './modules/integration/docusign/docusign.module';
 import { CacheManagementModule } from './modules/cache/cache.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { RenewalsModule } from './modules/renewals/renewals.module';
+import { ForeSightPdfExtractorModule } from './modules/foresight-pdf-extractor/foresight-pdf-extractor.module';
 
 
 @Module({
@@ -48,6 +49,7 @@ import { RenewalsModule } from './modules/renewals/renewals.module';
     CacheManagementModule,
     DocumentsModule,
     RenewalsModule,
+    ForeSightPdfExtractorModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

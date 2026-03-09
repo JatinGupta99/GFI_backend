@@ -13,6 +13,11 @@ export class RenewalRepository implements RenewalReader {
     private readonly renewalModel: Model<RenewalDocument>,
   ) {}
 
+  async findOne(id: string) {
+    const renewal = await this.renewalModel.findById(id);
+    return renewal;
+  }
+
   async getRenewals(filters: RenewalFilters = {}): Promise<Renewal[]> {
     const query: any = {};
 
@@ -100,6 +105,16 @@ export class RenewalRepository implements RenewalReader {
       .findByIdAndUpdate(
         id,
         { notes, updatedAt: new Date() },
+        { new: true }
+      )
+      .exec();
+  }
+
+  async updateRenewal(id: string, updateData: Partial<Renewal>): Promise<Renewal | null> {
+    return this.renewalModel
+      .findByIdAndUpdate(
+        id,
+        { ...updateData, updatedAt: new Date() },
         { new: true }
       )
       .exec();

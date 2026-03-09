@@ -30,4 +30,18 @@ export class PropertyRepository {
   async delete(propertyId: string): Promise<Property | null> {
     return this.propertyModel.findOneAndDelete({ propertyId }).lean().exec();
   }
+
+  async upsert(
+    propertyId: string,
+    propertyData: Partial<Property>,
+  ): Promise<Property> {
+    return this.propertyModel
+      .findOneAndUpdate(
+        { propertyId },
+        { $set: { ...propertyData, propertyId } },
+        { upsert: true, new: true },
+      )
+      .lean()
+      .exec();
+  }
 }

@@ -74,6 +74,20 @@ export class Renewal {
 
   @Prop({ type: Object, required: false })
   mriData?: Record<string, any>; // Store raw MRI data for debugging
+
+  @Prop({ type: Array, required: false, default: [] })
+  files?: Array<{
+    id: string;
+    key: string;
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    category: string;
+    uploadedBy: string;
+    uploadedDate: Date;
+    updatedBy: string;
+    updatedAt: Date;
+  }>;
 }
 
 export const RenewalSchema = SchemaFactory.createForClass(Renewal);

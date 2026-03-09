@@ -58,5 +58,28 @@ export class PropertiesService {
 
     return vacantSuites;
   }
+
+  /**
+   * Save or update property from ForeSight extraction
+   */
+  async saveForeSightProperty(
+    propertyId: string,
+    propertyName: string,
+    region: string,
+  ): Promise<Property> {
+    this.logger.log(
+      `Saving ForeSight property: ${propertyId} - ${propertyName}`,
+    );
+
+    const result = await this.propertyRepository.upsert(propertyId, {
+      propertyName: propertyName as any, // Cast to PropertyName enum
+      region,
+    });
+
+    await this.cacheManager.del(this.PROPERTIES_CACHE_KEY);
+
+    this.logger.log(`Successfully saved property ${propertyId}`);
+    return result;
+  }
 }
 

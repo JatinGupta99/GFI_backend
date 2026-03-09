@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
 import { RenewalRepository } from '../repositories/renewal.repository';
 import { Renewal } from '../renewal.entity';
 import { RenewalFilters } from '../interfaces/renewal-provider.interface';
+import { MediaService } from '../../media/media.service';
 
 @Injectable()
 export class RenewalQueryService {
@@ -14,6 +15,7 @@ export class RenewalQueryService {
   constructor(
     private readonly renewalRepository: RenewalRepository,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    private readonly mediaService: MediaService,
   ) {}
 
   async getRenewals(filters: RenewalFilters = {}): Promise<{
@@ -306,6 +308,29 @@ export class RenewalQueryService {
     }
   }
 
+  async updateRenewalStatus(id: string, status: string): Promise<{
+    data: Renewal | null;
+    success: boolean;
+  }> {
+    try {
+      const updated = await this.renewalRepository.updateRenewal(id, { status });
+      
+      if (updated) {
+        // Clear cache since data changed
+        await this.clearCache();
+        this.logger.log(`Updated status for renewal ${id} to ${status}`);
+      }
+      
+      return {
+        data: updated,
+        success: !!updated,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to update renewal status: ${error.message}`);
+      throw error;
+    }
+  }
+
   async getRenewalById(id: string): Promise<{
     data: Renewal | null;
     cached: boolean;
@@ -368,5 +393,93 @@ private generateCacheKey(prefix: string, filters: RenewalFilters): string {
   private isCacheValid(timestamp: number): boolean {
     const age = Date.now() - timestamp;
     return age < this.CACHE_TTL * 1000;
+  }
+
+  /**
+   * Generate presigned S3 upload URL for renewal file
+   */
+  async getFileUploadUrl(
+    renewalId: string,
+    contentType: string,
+    category: string = 'notice',
+  ) {
+    // Check if renewal exists
+    const renewal = await this.renewalRepository.getRenewalById(renewalId);
+    if (!renewal) {
+      throw new NotFoundException(`Renewal with ID ${renewalId} not found`);
+    }
+
+    // Generate folder path for S3
+    const folderPath = `renewals/${renewalId}/files`;
+
+    // Generate upload URL using MediaService
+    const { key, url } = await this.mediaService.generateUploadUrl(
+      folderPath,
+      contentType,
+    );
+
+    return {
+      statusCode: 200,
+      message: 'Upload URL generated successfully',
+      data: {
+        key,
+        url,
+        category,
+      },
+    };
+  }
+
+  /**
+   * Confirm file upload and save file metadata to renewal
+   */
+  async confirmFileUpload(
+    renewalId: string,
+    key: string,
+    fileName: string,
+    fileSize: number,
+    fileType: string,
+    category: string = 'notice',
+    userName: string = 'System',
+  ) {
+    // Check if renewal exists
+    const renewal = await this.renewalRepository.getRenewalById(renewalId);
+    if (!renewal) {
+      throw new NotFoundException(`Renewal with ID ${renewalId} not found`);
+    }
+
+    // Create file info object
+    const fileInfo = {
+      id: key,
+      key: key,
+      fileName,
+      fileSize,
+      fileType,
+      category,
+      uploadedBy: userName,
+      uploadedDate: new Date(),
+      updatedBy: userName,
+      updatedAt: new Date(),
+    };
+
+    // Add file to renewal's files array
+    const files = renewal.files || [];
+    files.push(fileInfo as any);
+
+    // Update renewal with new file
+    await this.renewalRepository.updateRenewal(renewalId, { files });
+
+    // Clear cache for this renewal
+    await this.cacheManager.del(`renewals:id:${renewalId}`);
+    await this.clearCache();
+
+    this.logger.log(
+      `File ${fileName} uploaded successfully for renewal ${renewalId}`,
+    );
+
+    return {
+      statusCode: 200,
+      message: 'File uploaded successfully',
+      data: fileInfo,
+    };
   }
 }

@@ -28,6 +28,7 @@ import { RenewalSyncProcessor } from './processors/renewal-sync.processor';
 // External modules
 import { PropertiesModule } from '../properties/properties.module';
 import { RentRollModule } from '../rent-roll/rent-roll.module';
+import { MediaModule } from '../media/media.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { RentRollModule } from '../rent-roll/rent-roll.module';
     // External dependencies
     PropertiesModule,
     RentRollModule,
+    MediaModule,
   ],
 
   controllers: [
