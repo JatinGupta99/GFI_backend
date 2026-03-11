@@ -139,7 +139,7 @@ export class Lead {
       rentPerSf: 0,
       annInc: 0,
       freeMonths: 0,
-      term: '',
+      term: 0,
       tiPerSf: 0,
       rcd: '',
     })
@@ -150,12 +150,26 @@ export class Lead {
     type: DraftingDetailsSchema, 
     default: () => ({
       rentPerSf: 0,
-      annInc: 0,
+      annInc: 3,
       freeMonths: 0,
-      term: '',
+      term: 0,
       tiPerSf: 0,
       rcd: '',
-    })
+    }),
+    set: function(value: any) {
+      // Ensure defaults are applied even when data is provided
+      if (value && typeof value === 'object') {
+        return {
+          rentPerSf: value.rentPerSf ?? 0,
+          annInc: value.annInc ?? 3,  // Default to 3 if not provided
+          freeMonths: value.freeMonths ?? 0,  // Default to 0 if not provided
+          term: value.term ?? 0,
+          tiPerSf: value.tiPerSf ?? 0,
+          rcd: value.rcd ?? '',
+        };
+      }
+      return value;
+    }
   })
   budget_negotiation: DraftingDetails;
   

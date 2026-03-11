@@ -11,6 +11,9 @@ import { MriVacantSuitesService } from './mri/mri-vacant-suites.service';
 import { MriRenewalOffersService } from './mri/mri-renewal-offers.service';
 import { MriLeaseEmeaService } from './mri/mri-lease-emea.service';
 import { MriAnalysisService } from './mri/mri-analysis.service';
+import { MriOpenChargesService } from './mri/mri-open-charges.service';
+import { MriTenantLedgerService } from './mri/mri-tenant-ledger.service';
+import { MriCurrentDelinquenciesService } from './mri/mri-current-delinquencies.service';
 
 import { RentRollService } from './rent-roll.service';
 import { RentRollController } from './rent-roll.controller';
@@ -31,7 +34,10 @@ import { RentRollController } from './rent-roll.controller';
         MriVacantSuitesService,
         MriRenewalOffersService,
         MriLeaseEmeaService,
-        MriAnalysisService
+        MriAnalysisService,
+        MriOpenChargesService,
+        MriTenantLedgerService,
+        MriCurrentDelinquenciesService,
     ],
     controllers: [
         RentRollController,
@@ -49,6 +55,9 @@ import { RentRollController } from './rent-roll.controller';
         MriRenewalOffersService,
         MriLeaseEmeaService,
         MriAnalysisService,
+        MriOpenChargesService,
+        MriTenantLedgerService,
+        MriCurrentDelinquenciesService,
     ]
 })
 export class RentRollModule { }

@@ -11,11 +11,11 @@ export class DraftingDetails {
     @Prop({ default: 0 })
     freeMonths: number;
 
-    @Prop({ default: '' })
+    @Prop({ default: '0' })
     term: string;
 
-    @Prop({ default: 0 })
-    tiPerSf: number;
+    @Prop({ default: '0' })
+    tiPerSf: string;
 
     @Prop({ default: '' })
     rcd: string;

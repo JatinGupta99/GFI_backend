@@ -93,6 +93,22 @@ export class Suite {
   @Prop()
   budgetRCD: Date;
 
+  // New calculated fields from budget parsing
+  @Prop({ type: String, default: '0' })
+  tiPerSf: string;
+
+  @Prop({ type: String, default: '0' })
+  baseRentPerSf: string;
+
+  @Prop({ type: String, default: '0' })
+  camPerSf: string;
+
+  @Prop({ type: String, default: '0' })
+  insPerSf: string;
+
+  @Prop({ type: String, default: '0' })
+  taxPerSf: string;
+
   @Prop({ type: String, required: true, index: true })
   propertyId: string;
 

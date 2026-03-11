@@ -47,10 +47,10 @@ export class Renewal {
   @Prop({ required: false })
   budgetLCD?: string;
 
-  @Prop({ 
-    required: true, 
-    enum: ['Renewal Negotiation', 'Drafting Amendment', 'No Contact', 'Renewed', 'Out for Execution', 'Expired'],
-    index: true 
+  @Prop({
+    required: true,
+    enum: ['DRAFTING_AMENDMENT', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE','DEAD','NO_CONTACT','AMENDMENT_EXECUTED'],
+    index: true
   })
   status: string;
 
@@ -71,6 +71,40 @@ export class Renewal {
 
   @Prop({ required: true })
   mriLeaseId: string;
+
+  // MRI Report API Data
+  @Prop({ required: false })
+  monthlyRent?: number;
+
+  @Prop({ required: false })
+  cam?: number;
+
+  @Prop({ required: false })
+  ins?: number;
+
+  @Prop({ required: false })
+  tax?: number;
+
+  @Prop({ required: false })
+  totalDueMonthly?: number;
+
+  @Prop({ required: false })
+  balanceForward?: number;
+
+  @Prop({ required: false })
+  cashReceived?: number;
+
+  @Prop({ required: false })
+  balanceDue?: number;
+
+  @Prop({ required: false })
+  days0To30?: string;
+
+  @Prop({ required: false })
+  days31To60?: string;
+
+  @Prop({ required: false })
+  days61Plus?: string;
 
   @Prop({ type: Object, required: false })
   mriData?: Record<string, any>; // Store raw MRI data for debugging

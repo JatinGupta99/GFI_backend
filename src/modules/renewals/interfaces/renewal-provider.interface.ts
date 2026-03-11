@@ -22,6 +22,19 @@ export interface RenewalData {
   lcd?: string;
   mriLeaseId: string;
   mriData?: Record<string, any>;
+
+  // MRI Report API fields (populated from 3-API sync)
+  monthlyRent?: number;
+  cam?: number;
+  ins?: number;
+  tax?: number;
+  totalDueMonthly?: number;
+  balanceForward?: number;
+  cashReceived?: number;
+  balanceDue?: number;
+  days0To30?: string;
+  days31To60?: string;
+  days61Plus?: string;
 }
 
 export interface RenewalProvider {

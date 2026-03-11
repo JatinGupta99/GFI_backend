@@ -15,4 +15,17 @@ export interface UpcomingRenewal {
     budgetLcd: string;
     status: 'Renewal Negotiation' | 'Drafting Amendment' | 'No Contact' | 'Renewed' | 'Out for Execution' | string;
     note?: string;
+
+    // MRI Report API Data
+    monthlyRent?: number;
+    cam?: number;
+    ins?: number;
+    tax?: number;
+    totalDueMonthly?: number;
+    balanceForward?: number;
+    cashReceived?: number;
+    balanceDue?: number;
+    days0To30?: string;
+    days31To60?: string;
+    days61Plus?: string;
 }

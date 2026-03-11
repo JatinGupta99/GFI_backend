@@ -15,6 +15,7 @@ import { RenewalsController } from './renewals.controller';
 import { RenewalQueryService } from './services/renewal-query.service';
 import { RenewalSyncService } from './services/renewal-sync.service';
 import { RenewalSchedulerService } from './services/renewal-scheduler.service';
+import { FieldMappingService } from './services/field-mapping.service';
 
 // Repositories
 import { RenewalRepository } from './repositories/renewal.repository';
@@ -81,6 +82,7 @@ import { MediaModule } from '../media/media.module';
     RenewalQueryService,
     RenewalSyncService,
     RenewalSchedulerService,
+    FieldMappingService,
 
     // Repository
     RenewalRepository,

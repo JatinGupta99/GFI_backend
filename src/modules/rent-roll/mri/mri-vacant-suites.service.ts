@@ -30,7 +30,6 @@ export class MriVacantSuitesService {
             BuildingID: buildingId,
             AfterDate: afterDate || currentDate,
         });
-
         // // 2. Fetch building details to get SuiteNumber mapping
         // // The API returns an array, we expect one building entry since we filter by BLDGID
         // const buildingDetails = await this.mri.get<MriBuildingWithSuites[]>('MRI_S-PMCM_CommercialBuildingWithSuitesByBLDGID', {
@@ -52,7 +51,6 @@ export class MriVacantSuitesService {
             SuiteNumber: suite.SuiteID
         }));
 
-        console.log(JSON.stringify(result, null, 2), 'acs;mcs;am');
         return result;
     }
 }

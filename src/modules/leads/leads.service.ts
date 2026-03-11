@@ -66,10 +66,11 @@ export class LeadsService {
     // Status Group Definitions
     // -------------------------
     const STATUS_GROUPS = {
-      LEAD_ALL: ['LOI_NEGOTIATION', 'QUALIFYING', 'OUT_FOR_EXECUTION','Prospect'],
+      LEAD_ALL: ['LOI_NEGOTIATION', 'QUALIFYING','LEASE_NEGOTIATION','LEASE_EXECUTED', 'OUT_FOR_EXECUTION','DRAFTING_LEASE','DEAD'],
       APPROVAL_ALL: ['IN_REVIEW', 'PENDING'],
       TENANT_AR_ALL: ['SEND_ATTORNEY_NOTICE', 'SEND_COURTESY_NOTICE', 'SEND_THREE_DAY_NOTICE'],
       LEASE_ALL: ['LEASE_NEGOTIATION', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE'],
+      RENEWAL_ALL: ['DRAFTING_AMENDMENT', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE','DEAD','NO_CONTACT','AMENDMENT_EXECUTED'],
     };
 
     // -------------------------
@@ -359,6 +360,18 @@ if (lead_status) {
   async create(dto: CreateLeadDto, userId: string) {
     const normalizedData = this.normalizeLeadData(dto, userId);
 
+    // Handle budget_negotiation defaults during creation
+    if (normalizedData.budget_negotiation) {
+      normalizedData.budget_negotiation = {
+        rentPerSf: normalizedData.budget_negotiation.rentPerSf ?? 0,
+        annInc: normalizedData.budget_negotiation.annInc ?? 3,  // Default to 3
+        freeMonths: normalizedData.budget_negotiation.freeMonths ?? 0,  // Default to 0
+        term: normalizedData.budget_negotiation.term ?? 0,
+        tiPerSf: normalizedData.budget_negotiation.tiPerSf ?? 0,
+        rcd: normalizedData.budget_negotiation.rcd ?? '',
+      };
+    }
+
     return this.repo.create(normalizedData);
   }
 
@@ -368,6 +381,18 @@ if (lead_status) {
     }
 
     const normalizedData = this.normalizeLeadData(dto);
+    
+    // Handle budget_negotiation defaults
+    if (normalizedData.budget_negotiation) {
+      normalizedData.budget_negotiation = {
+        rentPerSf: normalizedData.budget_negotiation.rentPerSf ?? 0,
+        annInc: normalizedData.budget_negotiation.annInc ?? 3,  // Default to 3
+        freeMonths: normalizedData.budget_negotiation.freeMonths ?? 0,  // Default to 0
+        term: normalizedData.budget_negotiation.term ?? 0,
+        tiPerSf: normalizedData.budget_negotiation.tiPerSf ?? 0,
+        rcd: normalizedData.budget_negotiation.rcd ?? '',
+      };
+    }
     
     // Map budget_sheet to accounting if present
     if ((dto as any).budget_sheet) {
@@ -1507,7 +1532,7 @@ if (lead_status) {
     }
 
     if (tiPerSf !== null) {
-      lead.current_negotiation.tiPerSf = parseFloat(tiPerSf);
+      lead.current_negotiation.tiPerSf = (tiPerSf);
       hasUpdates = true;
       this.logger.debug(`Extracted tiPerSf: ${tiPerSf}`);
     }
@@ -1631,6 +1656,25 @@ if (lead_status) {
       files.push(fileInfo as any);
       await this.repo.update(id, { files });
       this.logger.log(`Saved ${documentType} to lead ${id}`);
+
+      // Special handling for LOI documents - trigger Document AI processing
+      if (documentType === 'loi' && recordType === 'LEAD') {
+        this.logger.log(`Triggering Document AI processing for LOI document: ${key}`);
+        
+        // Update lead with LOI document URL (for compatibility)
+        await this.repo.update(id, { loiDocumentUrl: key });
+        
+        // Queue for Document AI processing
+        await this.leadsQueue.add(JOBNAME.PROCESS_DOCUMENT, {
+          leadId: id,
+          fileId: key,
+          fileKey: key,
+          mimeType: 'application/pdf',
+          documentType: 'loi',
+        });
+
+        this.logger.log(`LOI document queued for Document AI processing: ${key}`);
+      }
     }
 
     return {
@@ -2460,7 +2504,7 @@ if (lead_status) {
     const result = await this.repo.aggregate([
       {
         $match: {
-          lead_status: { $in: ['LOI_NEGOTIATION', 'QUALIFYING', 'OUT_FOR_EXECUTION', 'Prospect'] },
+          lead_status: { $in: ['LOI_NEGOTIATION', 'QUALIFYING', 'OUT_FOR_EXECUTION','DRAFTING_LEASE',''] },
         },
       },
       {

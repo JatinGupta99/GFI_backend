@@ -4,6 +4,10 @@ import { RenewalProvider, RenewalData } from '../interfaces/renewal-provider.int
 import { MriLeasesService } from '../../rent-roll/mri/mri-leases.service';
 import { MriRenewalOffersService } from '../../rent-roll/mri/mri-renewal-offers.service';
 import { MriLeaseEmeaService } from '../../rent-roll/mri/mri-lease-emea.service';
+import { MriOpenChargesService } from '../../rent-roll/mri/mri-open-charges.service';
+import { MriTenantLedgerService } from '../../rent-roll/mri/mri-tenant-ledger.service';
+import { MriCurrentDelinquenciesService } from '../../rent-roll/mri/mri-current-delinquencies.service';
+import { FieldMappingService } from '../services/field-mapping.service';
 import { RateLimiterService } from '../services/rate-limiter.service';
 
 @Injectable()
@@ -18,6 +22,10 @@ export class MriRenewalProvider implements RenewalProvider {
     private readonly leasesService: MriLeasesService,
     private readonly renewalOffersService: MriRenewalOffersService,
     private readonly emeaService: MriLeaseEmeaService,
+    private readonly openChargesService: MriOpenChargesService,
+    private readonly tenantLedgerService: MriTenantLedgerService,
+    private readonly currentDelinquenciesService: MriCurrentDelinquenciesService,
+    private readonly fieldMappingService: FieldMappingService,
     private readonly configService: ConfigService,
   ) {
     // Configure rate limiter for MRI API limits
@@ -129,11 +137,17 @@ export class MriRenewalProvider implements RenewalProvider {
 
   private async fetchTenantRenewalData(lease: any, propertyId: string): Promise<RenewalData> {
     console.log(`\n🔍 Fetching renewal data for tenant ${lease.LeaseID} (${lease.OccupantName})`);
-    
-    // Fetch tenant-specific renewal data in parallel with rate limiting
-    // Note: Residential renewal offers may not be available for commercial properties
-    const [offers, emeaData] = await Promise.all([
-      this.rateLimiter.execute(() => 
+
+    // Build the date range for TenantLedger: 12 months back → today
+    const now = new Date();
+    const twelveMonthsAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+    const startDate = twelveMonthsAgo.toISOString().split('T')[0];
+    const endDate = now.toISOString().split('T')[0];
+
+    // Fetch all data in parallel with rate limiting
+    const [offers, emeaData, openCharges, tenantLedger, delinquencies] = await Promise.all([
+      // 1. Renewal offers (may not be available for commercial)
+      this.rateLimiter.execute(() =>
         this.renewalOffersService.fetch(propertyId)
           .then(offers => {
             const offer = offers.find(o => o.LeaseID === lease.LeaseID);
@@ -141,7 +155,6 @@ export class MriRenewalProvider implements RenewalProvider {
             return offer;
           })
           .catch(error => {
-            // Gracefully handle 400 errors for commercial properties
             if (error.message?.includes('400') || error.message?.includes('Bad Request')) {
               console.log(`  ⚠️  Renewal offers not available for property ${propertyId} (likely commercial)`);
               return undefined;
@@ -150,7 +163,9 @@ export class MriRenewalProvider implements RenewalProvider {
             throw error;
           })
       ),
-      this.rateLimiter.execute(() => 
+
+      // 2. EMEA / budget data
+      this.rateLimiter.execute(() =>
         this.emeaService.fetch(propertyId)
           .then(emea => {
             const emeaRecord = emea.find(e => e.LeaseId === lease.LeaseID);
@@ -162,11 +177,48 @@ export class MriRenewalProvider implements RenewalProvider {
             return undefined;
           })
       ),
+
+      // 3. OpenCharges (charges & balance)
+      this.rateLimiter.execute(() =>
+        this.openChargesService.fetch(propertyId, lease.LeaseID)
+          .catch(error => {
+            console.log(`  ⚠️  OpenCharges not available for ${lease.LeaseID}: ${error.message}`);
+            return [];
+          })
+      ),
+
+      // 4. TenantLedger (payments & transaction history - current + prior month)
+      this.rateLimiter.execute(() =>
+        this.tenantLedgerService.fetch(propertyId, lease.LeaseID, startDate, endDate)
+          .catch(error => {
+            console.log(`  ⚠️  TenantLedger not available for ${lease.LeaseID}: ${error.message}`);
+            return [];
+          })
+      ),
+
+      // 5. CurrentDelinquencies (aging buckets)
+      this.rateLimiter.execute(() =>
+        this.currentDelinquenciesService.fetch(propertyId, lease.LeaseID)
+          .catch(error => {
+            console.log(`  ⚠️  CurrentDelinquencies not available for ${lease.LeaseID}: ${error.message}`);
+            return [];
+          })
+      ),
     ]);
 
-    const renewalData = this.transformToRenewalData(lease, offers, emeaData, propertyId);
+    // Map the raw API data into the unified report fields
+    const mriReportFields = this.fieldMappingService.map(
+      openCharges,
+      tenantLedger,
+      delinquencies,
+      lease.LeaseID,
+    );
+
+    console.log(`  📊 MRI report fields for ${lease.LeaseID}:`, JSON.stringify(mriReportFields));
+
+    const renewalData = this.transformToRenewalData(lease, offers, emeaData, propertyId, mriReportFields);
     console.log(`  ✅ Transformed renewal data for ${lease.LeaseID}: tenantId=${renewalData.tenantId}, propertyId=${renewalData.propertyId}`);
-    
+
     return renewalData;
   }
 
@@ -242,11 +294,12 @@ export class MriRenewalProvider implements RenewalProvider {
     offer: any,
     emeaData: any,
     propertyId: string,
+    mriReportFields: Partial<RenewalData> = {},
   ): RenewalData {
     const sf = lease.OrigSqFt || 0;
     const currentRent = lease.CurrentRent || 0;
     const rentPerSf = sf > 0 ? (currentRent * 12) / sf : 0;
-    
+
     // MRI uses 'ExpirationDate' field
     const expirationDate = lease.ExpirationDate || lease.LeaseExpirationDate;
 
@@ -276,6 +329,8 @@ export class MriRenewalProvider implements RenewalProvider {
         offer,
         emea: emeaData,
       },
+      // Spread the mapped MRI report fields (monthlyRent, cam, ins, tax, etc.)
+      ...mriReportFields,
     };
   }
 

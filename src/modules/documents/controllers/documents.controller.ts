@@ -1,29 +1,27 @@
 import {
-  Controller,
-  Post,
-  Get,
-  Delete,
-  Put,
   Body,
-  Query,
+  Controller,
+  Delete,
+  Get,
   Param,
-  BadRequestException,
-  NotFoundException,
+  Post,
+  Put,
+  Query
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { DocumentManagerService } from '../services/document-manager.service';
+import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Public } from '../../../common/decorators/public.decorator';
 import {
-  DocumentUploadUrlDto,
+  DocumentConfirmUploadDto,
   DocumentDownloadOptionsDto,
-  DocumentUploadUrlResult,
   DocumentDownloadUrlResult,
   DocumentInfoResult,
-  DocumentListResult,
   DocumentListQueryDto,
-  DocumentConfirmUploadDto,
+  DocumentListResult,
   DocumentUpdateDto,
+  DocumentUploadUrlDto,
+  DocumentUploadUrlResult,
 } from '../dto/document.dto';
-import { Public } from '../../../common/decorators/public.decorator';
+import { DocumentManagerService } from '../services/document-manager.service';
 
 @ApiTags('Documents')
 @Public()

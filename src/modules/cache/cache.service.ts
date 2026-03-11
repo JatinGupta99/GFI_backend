@@ -10,9 +10,32 @@ export class CacheService {
 
   async clearAll(): Promise<void> {
     try {
-      // @ts-ignore - reset method exists but not in type definition
-      await this.cacheManager.reset();
-      this.logger.log('All cache cleared successfully');
+      // For Redis cache manager, we need to use the store's flushAll method
+      const store = (this.cacheManager as any).store;
+      if (store && typeof store.flushAll === 'function') {
+        await store.flushAll();
+        this.logger.log('All cache cleared successfully using flushAll');
+      } else if (store && typeof store.reset === 'function') {
+        await store.reset();
+        this.logger.log('All cache cleared successfully using reset');
+      } else if (typeof (this.cacheManager as any).reset === 'function') {
+        await (this.cacheManager as any).reset();
+        this.logger.log('All cache cleared successfully using cacheManager.reset');
+      } else {
+        // Fallback: try to clear by getting all keys and deleting them
+        this.logger.warn('No direct clear all method found, attempting fallback');
+        if (store && typeof store.keys === 'function') {
+          const keys = await store.keys('*');
+          if (keys && keys.length > 0) {
+            await Promise.all(keys.map((key: string) => this.cacheManager.del(key)));
+            this.logger.log(`Cleared ${keys.length} cache keys`);
+          } else {
+            this.logger.log('No cache keys found to clear');
+          }
+        } else {
+          throw new Error('Cache manager does not support clearing all cache');
+        }
+      }
     } catch (error) {
       this.logger.error('Failed to clear cache', error);
       throw error;

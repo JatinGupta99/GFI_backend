@@ -52,7 +52,6 @@ export enum LeadStatus {
   FAILED = 'FAILED',
   NO_CONTACT = 'No Contact',
   RENEWAL_NEGOTIATION = 'Renewal Negotiation',
-  DRAFTING_AMENDMENT = 'Drafting Amendment',
   LOST = 'Lost',
   NEW = 'new',
   CONTACTED = 'contacted',
@@ -75,6 +74,7 @@ export enum LeadStatus {
   APPROVED = 'APPROVED',
   DEAD = 'DEAD',
   DRAFTING_LEASE = 'DRAFTING_LEASE',
+  DRAFTING_AMENDMENT = 'DRAFTING_AMENDMENT',
 }
 
 export enum JOBNAME {

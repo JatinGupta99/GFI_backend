@@ -6,13 +6,24 @@ import {
   Patch,
   Param,
   Delete,
-  Query,
   NotFoundException,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { 
+  ApiTags, 
+  ApiOperation, 
+  ApiResponse, 
+  ApiParam,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { SuitesService } from './suites.service';
 import { CreateSuiteDto } from './dto/create-suite.dto';
 import { UpdateSuiteDto } from './dto/update-suite.dto';
+import { BudgetUploadDto, BudgetUploadResponseDto } from './dto/budget-upload.dto';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('suites')
@@ -20,6 +31,81 @@ import { Public } from '../../common/decorators/public.decorator';
 @Public()
 export class SuitesController {
   constructor(private readonly suitesService: SuitesService) {}
+
+  @Post('upload-budget')
+  @ApiOperation({
+    summary: 'Upload budget file (PDF/Excel) to extract and update suite data',
+    description: 'Processes budget files to calculate TI/SF, Base Rent/SF, and update suite financial data',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Budget file (.pdf, .xlsx, .xls)',
+        },
+        propertyId: {
+          type: 'string',
+          description: 'Optional property ID (will be extracted from file if not provided)',
+          example: '006564',
+        },
+        notes: {
+          type: 'string',
+          description: 'Optional notes about the upload',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Budget file processed successfully',
+    type: BudgetUploadResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid file format or processing error',
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadBudgetFile(
+    @UploadedFile() file: any,
+    @Body() uploadDto: BudgetUploadDto,
+  ): Promise<BudgetUploadResponseDto> {
+    // Validate file exists
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    // Validate file type
+    const validMimeTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+    ];
+
+    if (!validMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Invalid file format. Expected PDF or Excel file (.pdf, .xlsx, .xls)',
+      );
+    }
+
+    try {
+      // Process the budget file
+      const result = await this.suitesService.processBudgetFile(
+        file.buffer,
+        file.originalname,
+        uploadDto.propertyId,
+      );
+
+      return result;
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to process budget file: ${error.message}`,
+      );
+    }
+  }
 
   @Post()
   create(@Body() createSuiteDto: CreateSuiteDto) {

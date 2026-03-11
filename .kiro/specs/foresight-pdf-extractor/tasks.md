@@ -255,7 +255,7 @@ This implementation plan breaks down the ForeSight PDF Extractor feature into di
     - Verify createdAt and updatedAt are valid ISO 8601 strings
     - **Validates: Requirements 11.3**
 
-- [~] 9. Checkpoint - Ensure service tests pass
+- [ ] 9. Checkpoint - Ensure service tests pass
   - Run all service unit tests
   - Run all property-based tests for service methods
   - Verify extraction logic works with sample PDF text
@@ -342,7 +342,7 @@ This implementation plan breaks down the ForeSight PDF Extractor feature into di
     - Verify error message
     - _Requirements: 14.3_
 
-- [~] 13. Final checkpoint - Ensure all tests pass
+- [ ] 13. Final checkpoint - Ensure all tests pass
   - Run all unit tests: `npm test`
   - Run all property-based tests
   - Run all integration tests: `npm run test:e2e`
