@@ -41,16 +41,26 @@ export class LeasingController {
 
     /**
      * Trigger background sync job for all properties
-     * Returns job ID for tracking
+     * Returns batch ID for tracking
      */
     @Post('renewals/sync')
     async syncAllRenewals() {
-        const { jobId } = await this.service.queueRenewalsSync();
+        const result = await this.service.queueRenewalsSync();
         return {
-            message: 'Renewals sync job queued successfully. Cache cleared.',
-            jobId,
-            statusUrl: `/leasing/renewals/sync/${jobId}`,
+            message: 'Renewals sync jobs queued successfully. Cache cleared.',
+            batchId: result.batchId,
+            totalProperties: result.totalProperties,
+            jobIds: result.jobIds,
+            statusUrl: `/leasing/renewals/sync/batch/${result.batchId}`,
         };
+    }
+
+    /**
+     * Get batch status
+     */
+    @Get('renewals/sync/batch/:batchId')
+    async getBatchStatus(@Param('batchId') batchId: string) {
+        return this.service.getBatchStatus(batchId);
     }
 
     /**

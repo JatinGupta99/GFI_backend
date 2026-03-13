@@ -2,208 +2,179 @@ import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { LeasingService } from './leasing.service';
-import { UpcomingRenewal } from './dto/upcoming-renewal.dto';
 
+// Single property sync job
 export interface RenewalsSyncJob {
-  propertyIds: string[];
-  batchSize: number;
-  delayBetweenBatches: number;
+  propertyId: string;
+  batchId?: string; // Optional: to group related jobs
+  propertyIndex?: number; // Optional: for tracking progress
+  totalProperties?: number; // Optional: for tracking progress
 }
 
 export interface RenewalsSyncResult {
   success: boolean;
-  totalRenewals: number;
-  propertiesProcessed: number;
+  propertyId: string;
+  renewalsCount: number;
+  renewalsSaved: number;
   errors: string[];
   duration: number;
 }
 
 @Processor('renewals-sync', {
-  concurrency: 1, 
+  concurrency: 1, // Process 1 property at a time to avoid rate limits
 })
 export class RenewalsProcessor extends WorkerHost {
   private readonly logger = new Logger(RenewalsProcessor.name);
 
-  constructor(private readonly leasingService: LeasingService) {
+  constructor(
+    private readonly leasingService: LeasingService,
+  ) {
     super();
   }
 
   async process(job: Job<RenewalsSyncJob>): Promise<RenewalsSyncResult> {
-    const startTime = Date.now();
-    const { propertyIds, batchSize, delayBetweenBatches } = job.data;
-
-    this.logger.log(
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    );
-    this.logger.log(
-      `🚀 Starting renewals sync job ${job.id}`,
-    );
-    this.logger.log(
-      `📊 Total properties: ${propertyIds.length}`,
-    );
-    this.logger.log(
-      `📦 Batch size: ${batchSize} properties per batch`,
-    );
-    this.logger.log(
-      `⏱️  Delay between batches: ${delayBetweenBatches / 1000}s`,
-    );
-    this.logger.log(
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    );
-
-    const allRenewals: UpcomingRenewal[] = [];
-    const errors: string[] = [];
-    let propertiesProcessed = 0;
-    const totalBatches = Math.ceil(propertyIds.length / batchSize);
-
-    // Process properties in batches
-    for (let i = 0; i < propertyIds.length; i += batchSize) {
-      const batch = propertyIds.slice(i, i + batchSize);
-      const batchNumber = Math.floor(i / batchSize) + 1;
-      const batchStartTime = Date.now();
-
-      await job.updateProgress({
-        current: i,
-        total: propertyIds.length,
-        batch: batchNumber,
-        totalBatches,
-        status: `Processing batch ${batchNumber}/${totalBatches}`,
-      });
+      const startTime = Date.now();
+      const { propertyId, batchId, propertyIndex, totalProperties } = job.data;
 
       this.logger.log(
-        `\n┌─────────────────────────────────────────────────────────────┐`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
       );
       this.logger.log(
-        `│ 📦 BATCH ${batchNumber}/${totalBatches} - Processing ${batch.length} properties`,
+        `🚀 Starting renewal sync for property ${propertyId} (Job ${job.id})`,
       );
-      this.logger.log(
-        `│ Properties: ${batch.join(', ')}`,
-      );
-      this.logger.log(
-        `└─────────────────────────────────────────────────────────────┘`,
-      );
-
-      let batchRenewalsCount = 0;
-
-      // Process properties SEQUENTIALLY within the batch to avoid rate limits
-      for (let propIndex = 0; propIndex < batch.length; propIndex++) {
-        const propertyId = batch[propIndex];
-        const propStartTime = Date.now();
-
-        try {
-          this.logger.log(
-            `  ├─ [${propIndex + 1}/${batch.length}] Processing property ${propertyId}...`,
-          );
-
-          const renewals = await this.leasingService.getUpcomingRenewals(
-            propertyId,
-          );
-          allRenewals.push(...renewals);
-          propertiesProcessed++;
-          batchRenewalsCount += renewals.length;
-
-          const propDuration = Date.now() - propStartTime;
-          this.logger.log(
-            `  │  ✓ Success: ${renewals.length} renewals found (${propDuration}ms)`,
-          );
-
-          // Small delay between properties within the batch
-          if (propIndex < batch.length - 1) {
-            this.logger.log(`  │  ⏳ Waiting 2s before next property...`);
-            await this.delay(2000); // 2 seconds between properties
-          }
-        } catch (error) {
-          const propDuration = Date.now() - propStartTime;
-          const errorMsg = `Property ${propertyId}: ${error.message}`;
-          this.logger.error(
-            `  │  ✗ Failed: ${error.message} (${propDuration}ms)`,
-          );
-          errors.push(errorMsg);
-        }
+      if (batchId) {
+        this.logger.log(`📦 Batch ID: ${batchId}`);
       }
-
-      const batchDuration = Date.now() - batchStartTime;
+      if (propertyIndex && totalProperties) {
+        this.logger.log(`📊 Progress: ${propertyIndex}/${totalProperties}`);
+      }
       this.logger.log(
-        `  └─ Batch ${batchNumber} complete: ${batchRenewalsCount} renewals in ${(batchDuration / 1000).toFixed(1)}s`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
       );
 
-      // Summary after each batch
-      this.logger.log(
-        `\n📈 Progress: ${propertiesProcessed}/${propertyIds.length} properties | ${allRenewals.length} total renewals | ${errors.length} errors`,
-      );
+      const errors: string[] = [];
+      let renewalsCount = 0;
+      let renewalsSaved = 0;
 
-      // Delay between batches (except for the last batch)
-      if (i + batchSize < propertyIds.length) {
+      try {
+        // Update progress
+        await job.updateProgress({
+          status: 'fetching',
+          propertyId,
+          step: 'Fetching and syncing renewals from MRI in batches',
+        });
+
+        this.logger.log(`🔄 Fetching and syncing renewals from MRI for property ${propertyId}...`);
+
+        // Fetch and sync renewals in batches (saves to DB after each batch)
+        const result = await this.leasingService.fetchAndSyncRenewalsFromMRI(propertyId, job.id!);
+
+        renewalsCount = result.processedLeases;
+        renewalsSaved = result.savedRenewals;
+
+        this.logger.log(`✅ Processed ${result.processedLeases}/${result.totalLeases} leases, saved ${result.savedRenewals} renewals`);
+
+        if (result.failedLeases > 0) {
+          this.logger.warn(`⚠️  ${result.failedLeases} leases failed to process`);
+        }
+
+        // Update progress
+        await job.updateProgress({
+          status: 'completed',
+          propertyId,
+          renewalsCount,
+          renewalsSaved,
+          step: 'Completed',
+        });
+
+        const duration = Date.now() - startTime;
+
         this.logger.log(
-          `\n⏸️  Waiting ${delayBetweenBatches / 1000}s before batch ${batchNumber + 1}/${totalBatches} to respect rate limits...`,
+          `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
         );
-        this.logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-        await this.delay(delayBetweenBatches);
+        this.logger.log(
+          `✅ Property ${propertyId} sync COMPLETED`,
+        );
+        this.logger.log(
+          `📊 Results:`,
+        );
+        this.logger.log(
+          `   • Total leases: ${result.totalLeases}`,
+        );
+        this.logger.log(
+          `   • Processed leases: ${result.processedLeases}`,
+        );
+        this.logger.log(
+          `   • Renewals saved: ${result.savedRenewals}`,
+        );
+        this.logger.log(
+          `   • Failed leases: ${result.failedLeases}`,
+        );
+        this.logger.log(
+          `   • Duration: ${(duration / 1000).toFixed(1)}s`,
+        );
+        this.logger.log(
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+        );
+
+        return {
+          success: true,
+          propertyId,
+          renewalsCount,
+          renewalsSaved,
+          errors,
+          duration,
+        };
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        const errorMsg = `Property ${propertyId}: ${error.message}`;
+
+        this.logger.error(
+          `❌ Property ${propertyId} sync FAILED: ${error.message}`,
+          error.stack,
+        );
+
+        errors.push(errorMsg);
+
+        // Update progress with error
+        await job.updateProgress({
+          status: 'failed',
+          propertyId,
+          error: error.message,
+          step: 'Failed',
+        });
+
+        // Even if failed, return what was saved
+        this.logger.log(
+          `📊 Partial results before failure: ${renewalsSaved} renewals saved`,
+        );
+
+        return {
+          success: false,
+          propertyId,
+          renewalsCount,
+          renewalsSaved,
+          errors,
+          duration,
+        };
       }
     }
 
-    const duration = Date.now() - startTime;
-
-    await job.updateProgress({
-      current: propertyIds.length,
-      total: propertyIds.length,
-      status: 'Completed',
-    });
-
-    this.logger.log(
-      `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    );
-    this.logger.log(
-      `✅ Renewals sync job ${job.id} COMPLETED`,
-    );
-    this.logger.log(
-      `📊 Results:`,
-    );
-    this.logger.log(
-      `   • Total renewals: ${allRenewals.length}`,
-    );
-    this.logger.log(
-      `   • Properties processed: ${propertiesProcessed}/${propertyIds.length}`,
-    );
-    this.logger.log(
-      `   • Errors: ${errors.length}`,
-    );
-    this.logger.log(
-      `   • Duration: ${(duration / 1000).toFixed(1)}s (${(duration / 60000).toFixed(1)} minutes)`,
-    );
-    this.logger.log(
-      `   • Success rate: ${((propertiesProcessed / propertyIds.length) * 100).toFixed(1)}%`,
-    );
-    this.logger.log(
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    );
-
-    return {
-      success: errors.length === 0,
-      totalRenewals: allRenewals.length,
-      propertiesProcessed,
-      errors,
-      duration,
-    };
-  }
 
   @OnWorkerEvent('completed')
   onCompleted(job: Job<RenewalsSyncJob, RenewalsSyncResult>) {
-    const { totalRenewals, propertiesProcessed, duration } = job.returnvalue;
+    const { propertyId, renewalsCount, renewalsSaved, duration } = job.returnvalue;
     this.logger.log(
-      `Job ${job.id} completed: ${totalRenewals} renewals from ${propertiesProcessed} properties in ${duration}ms`,
+      `Job ${job.id} completed: Property ${propertyId} - ${renewalsCount} renewals fetched, ${renewalsSaved} saved in ${duration}ms`,
     );
   }
 
   @OnWorkerEvent('failed')
   onFailed(job: Job<RenewalsSyncJob>, error: Error) {
+    const { propertyId } = job.data;
     this.logger.error(
-      `Job ${job.id} failed: ${error.message}`,
+      `Job ${job.id} failed for property ${propertyId}: ${error.message}`,
       error.stack,
     );
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

@@ -390,7 +390,7 @@ export class VirusScanningValidatorService implements IDocumentValidator {
 
 ## Testing
 
-### Unit Tests
+### suite Tests
 
 ```typescript
 describe('DocumentManagerService', () => {

@@ -20,12 +20,11 @@ export class RenewalsCronService {
     this.logger.log('Starting scheduled renewals sync');
 
     try {
-      const { jobId } = await this.leasingService.queueRenewalsSync({
-        batchSize: 5,
-        delayBetweenBatches: 60000, // 60 seconds
+      const { batchId, jobIds, totalProperties } = await this.leasingService.queueRenewalsSync({
+        delayBetweenJobs: 5000, // 5 seconds between jobs
       });
 
-      this.logger.log(`Scheduled renewals sync queued: ${jobId}`);
+      this.logger.log(`Scheduled renewals sync queued: Batch ${batchId} with ${jobIds.length} jobs for ${totalProperties} properties`);
     } catch (error) {
       this.logger.error(
         `Failed to queue scheduled renewals sync: ${error.message}`,
@@ -45,12 +44,11 @@ export class RenewalsCronService {
     this.logger.log('Starting morning renewals sync');
 
     try {
-      const { jobId } = await this.leasingService.queueRenewalsSync({
-        batchSize: 5,
-        delayBetweenBatches: 60000,
+      const { batchId, jobIds, totalProperties } = await this.leasingService.queueRenewalsSync({
+        delayBetweenJobs: 5000, // 5 seconds between jobs
       });
 
-      this.logger.log(`Morning renewals sync queued: ${jobId}`);
+      this.logger.log(`Morning renewals sync queued: Batch ${batchId} with ${jobIds.length} jobs for ${totalProperties} properties`);
     } catch (error) {
       this.logger.error(
         `Failed to queue morning renewals sync: ${error.message}`,

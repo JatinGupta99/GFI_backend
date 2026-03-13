@@ -69,12 +69,12 @@ export class AuthService {
     const match = expiresIn.match(/(\d+)([smhd])/);
     if (!match) return 3600;
     const value = parseInt(match[1], 10);
-    const unit = match[2];
-    return unit === 's'
+    const suite = match[2];
+    return suite === 's'
       ? value
-      : unit === 'm'
+      : suite === 'm'
         ? value * 60
-        : unit === 'h'
+        : suite === 'h'
           ? value * 3600
           : value * 86400;
   }

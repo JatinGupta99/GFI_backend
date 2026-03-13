@@ -16,6 +16,11 @@ import { RenewalQueryService } from './services/renewal-query.service';
 import { RenewalSyncService } from './services/renewal-sync.service';
 import { RenewalSchedulerService } from './services/renewal-scheduler.service';
 import { FieldMappingService } from './services/field-mapping.service';
+import { MriChargesService } from './services/mri-charges.service';
+import { MriFinancialService } from './services/mri-financial.service';
+import { MriDataAggregatorService } from './services/mri-data-aggregator.service';
+import { MriCacheStrategyService } from './services/mri-cache-strategy.service';
+import { MriBatchOptimizerService } from './services/mri-batch-optimizer.service';
 
 // Repositories
 import { RenewalRepository } from './repositories/renewal.repository';
@@ -30,6 +35,7 @@ import { RenewalSyncProcessor } from './processors/renewal-sync.processor';
 import { PropertiesModule } from '../properties/properties.module';
 import { RentRollModule } from '../rent-roll/rent-roll.module';
 import { MediaModule } from '../media/media.module';
+import { LeasingModule } from '../leasing/leasing.module';
 
 @Module({
   imports: [
@@ -71,6 +77,7 @@ import { MediaModule } from '../media/media.module';
     PropertiesModule,
     RentRollModule,
     MediaModule,
+    LeasingModule,
   ],
 
   controllers: [
@@ -83,6 +90,13 @@ import { MediaModule } from '../media/media.module';
     RenewalSyncService,
     RenewalSchedulerService,
     FieldMappingService,
+
+    // MRI services
+    MriChargesService,
+    MriFinancialService,
+    MriDataAggregatorService,
+    MriCacheStrategyService,
+    MriBatchOptimizerService,
 
     // Repository
     RenewalRepository,

@@ -270,7 +270,7 @@ describe('ForeSightPdfExtractorService', () => {
       const text = `
         Suite: 123456-001
         Property: 123456-002
-        Unit: 123456-003
+        suite: 123456-003
       `;
       const logs: string[] = [];
       

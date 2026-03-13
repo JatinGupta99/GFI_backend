@@ -5,11 +5,11 @@ export interface RenewalData {
   propertyId: string;
   propertyName: string;
   tenantName: string;
-  unit: string;
+  suite: string;
   sf: number;
   leaseEnd: Date;
   renewalOffer?: string;
-  currentRent: number;
+  currentMonthRent: number;
   rentPerSf: number;
   budgetRent?: number;
   budgetRentPerSf?: number;
@@ -19,7 +19,6 @@ export interface RenewalData {
   notes?: string;
   option: 'Yes' | 'No' | 'N/A';
   optionTerm?: string;
-  lcd?: string;
   mriLeaseId: string;
   mriData?: Record<string, any>;
 

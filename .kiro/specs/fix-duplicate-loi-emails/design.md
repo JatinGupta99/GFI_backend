@@ -246,9 +246,9 @@ class DuplicateEmailDetectedError extends Error {
 
 ### Dual Testing Approach
 
-The testing strategy combines unit tests for specific scenarios and property-based tests for comprehensive coverage:
+The testing strategy combines suite tests for specific scenarios and property-based tests for comprehensive coverage:
 
-**Unit Tests Focus:**
+**suite Tests Focus:**
 - Specific duplicate email scenarios with known inputs
 - Error handling edge cases (network failures, invalid data)
 - Integration points between email workflows and validation services

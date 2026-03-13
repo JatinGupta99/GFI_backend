@@ -248,12 +248,12 @@ mongo $MONGO_URI --eval "db.runCommand({ping: 1})"
 
 ## Testing Issues
 
-### Symptom: Unit tests failing
+### Symptom: suite tests failing
 
 - [ ] Test database is configured
 - [ ] Mock services are properly configured
 - [ ] Test environment variables are set
-- [ ] No external dependencies in unit tests
+- [ ] No external dependencies in suite tests
 
 **Quick Fix**:
 ```bash

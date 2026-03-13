@@ -334,7 +334,7 @@ The system implements comprehensive error handling at multiple levels:
 
 ## Testing Strategy
 
-The renewal-data-storage feature will use a dual testing approach combining unit tests and property-based tests for comprehensive coverage.
+The renewal-data-storage feature will use a dual testing approach combining suite tests and property-based tests for comprehensive coverage.
 
 ### Property-Based Testing
 
@@ -353,11 +353,11 @@ Property-based tests will validate the universal properties identified above usi
 - Query functionality with random filter combinations
 - Error handling with simulated failure scenarios
 
-### Unit Testing
+### suite Testing
 
-Unit tests will focus on specific examples, edge cases, and integration points:
+suite tests will focus on specific examples, edge cases, and integration points:
 
-**Core Unit Test Areas:**
+**Core suite Test Areas:**
 - Specific field mapping examples for each income category
 - Edge cases for date processing and temporal logic
 - Error scenarios with specific API failure modes
@@ -382,4 +382,4 @@ Unit tests will focus on specific examples, edge cases, and integration points:
 - Implement database seeding for consistent test environments
 - Clean up test data between test runs
 
-The testing strategy ensures both comprehensive input coverage through property-based testing and specific scenario validation through unit tests, providing confidence in system correctness and reliability.
+The testing strategy ensures both comprehensive input coverage through property-based testing and specific scenario validation through suite tests, providing confidence in system correctness and reliability.

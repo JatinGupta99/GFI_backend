@@ -4,7 +4,7 @@ import { plainToInstance } from 'class-transformer';
 import { SendForSignatureDto } from './send-for-signature.dto';
 
 describe('SendForSignatureDto', () => {
-  describe('Unit Tests: DTO Validation', () => {
+  describe('suite Tests: DTO Validation', () => {
     it('should pass validation with valid leaseId', async () => {
       const dto = plainToInstance(SendForSignatureDto, {
         leaseId: 'lease-123',

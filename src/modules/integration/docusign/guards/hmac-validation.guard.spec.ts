@@ -218,8 +218,8 @@ describe('HmacValidationGuard', () => {
     });
   });
 
-  // Unit tests for edge cases (Requirements 3.3, 5.5)
-  describe('Unit Tests: Edge Cases', () => {
+  // suite tests for edge cases (Requirements 3.3, 5.5)
+  describe('suite Tests: Edge Cases', () => {
     it('should reject webhook with missing signature header', () => {
       // Arrange
       const mockRequest = {

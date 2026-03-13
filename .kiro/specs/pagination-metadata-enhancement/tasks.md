@@ -9,7 +9,7 @@
   - [x] 1.1.5 Implement `buildMetaFromPage` convenience method
   - [x] 1.1.6 Add JSDoc comments for all methods
 
-## 2. Create Unit Tests for Pagination Helper
+## 2. Create suite Tests for Pagination Helper
 - [x] 2.1 Create `src/common/helpers/pagination.helper.spec.ts`
   - [x] 2.1.1 Test first page scenario (hasMore=true, hasPrev=false)
   - [x] 2.1.2 Test middle page scenario (hasMore=true, hasPrev=true)
@@ -55,7 +55,7 @@
   - [ ] 6.1.4 Update Swagger/OpenAPI annotations if applicable
 
 ## 7. Verification
-- [x] 7.1 Run all unit tests
+- [x] 7.1 Run all suite tests
 - [ ] 7.2 Run all integration tests
 - [ ] 7.3 Manual testing of both endpoints
 - [ ] 7.4 Verify no breaking changes

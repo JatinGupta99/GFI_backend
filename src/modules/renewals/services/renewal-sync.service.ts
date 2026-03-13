@@ -1,17 +1,31 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { Renewal, RenewalDocument } from '../renewal.entity';
+import { MriDataAggregatorService } from './mri-data-aggregator.service';
 import { RenewalSyncer, SyncResult } from '../interfaces/renewal-provider.interface';
-import { RenewalRepository } from '../repositories/renewal.repository';
-import { MriRenewalProvider } from '../providers/mri-renewal.provider';
-import { PropertiesService } from '../../properties/properties.service';
 
 export interface RenewalSyncJob {
-  type: 'full' | 'incremental' | 'property';
-  propertyIds?: string[];
+  type: string;
+  propertyIds: string[];
   since?: Date;
   batchSize?: number;
   delayBetweenBatches?: number;
+}
+
+interface BatchSyncResult {
+  renewalsCreated: number;
+  renewalsUpdated: number;
+  propertiesProcessed: number;
+  errors: string[];
+}
+
+interface BatchSyncResult {
+  renewalsCreated: number;
+  renewalsUpdated: number;
+  propertiesProcessed: number;
+  errors: string[];
 }
 
 @Injectable()
@@ -19,254 +33,334 @@ export class RenewalSyncService implements RenewalSyncer {
   private readonly logger = new Logger(RenewalSyncService.name);
 
   constructor(
-    @InjectQueue('renewal-sync')
-    private readonly syncQueue: Queue<RenewalSyncJob>,
-    private readonly renewalRepository: RenewalRepository,
-    private readonly mriProvider: MriRenewalProvider,
-    private readonly propertiesService: PropertiesService,
+    @InjectModel(Renewal.name) private renewalModel: Model<RenewalDocument>,
+    private readonly dataAggregator: MriDataAggregatorService,
   ) {}
 
-  async syncAllProperties(): Promise<SyncResult> {
+  /**
+   * Sync all renewals - runs at 2 AM daily
+   */
+  @Cron('0 2 * * *', {
+    name: 'renewal-sync-all',
+    timeZone: 'America/New_York',
+  })
+  async syncAllRenewals(): Promise<void> {
     const startTime = Date.now();
-    
-    try {
-      const properties = await this.propertiesService.findAll();
-      const propertyIds = properties.map(p => p.propertyId);
+    this.logger.log('🔄 Starting scheduled sync of all renewals');
 
-      // Queue background job for better performance
-      const job = await this.syncQueue.add('full-sync', {
-        type: 'full',
-        propertyIds,
-        batchSize: 5,
-        delayBetweenBatches: 2000, // 2 seconds between batches
+    try {
+      const renewals = await this.renewalModel.find({}).exec();
+      this.logger.log(`📋 Found ${renewals.length} renewals to sync`);
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Process in batches to avoid overwhelming MRI APIs
+      const batchSize = 10;
+      for (let i = 0; i < renewals.length; i += batchSize) {
+        const batch = renewals.slice(i, i + batchSize);
+        
+        const batchPromises = batch.map(async (renewal) => {
+          try {
+            await this.syncSingleRenewal(renewal);
+            successCount++;
+          } catch (error) {
+            this.logger.error(`Failed to sync renewal ${renewal._id}: ${error.message}`);
+            errorCount++;
+          }
+        });
+
+        await Promise.allSettled(batchPromises);
+        
+        // Small delay between batches to respect rate limits
+        if (i + batchSize < renewals.length) {
+          await this.delay(1000);
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      this.logger.log(`✅ Renewal sync complete: ${successCount} success, ${errorCount} errors in ${duration}ms`);
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.logger.error(`❌ Renewal sync failed after ${duration}ms: ${error.message}`);
+    }
+  }
+
+  /**
+   * Sync renewals for a specific property
+   */
+  async syncPropertyRenewals(propertyId: string): Promise<{ success: number; errors: number }> {
+    const startTime = Date.now();
+    this.logger.log(`🔄 Starting sync for property ${propertyId}`);
+
+    try {
+      const renewals = await this.renewalModel.find({ propertyId }).exec();
+      this.logger.log(`📋 Found ${renewals.length} renewals for property ${propertyId}`);
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      const syncPromises = renewals.map(async (renewal) => {
+        try {
+          await this.syncSingleRenewal(renewal);
+          successCount++;
+        } catch (error) {
+          this.logger.error(`Failed to sync renewal ${renewal._id}: ${error.message}`);
+          errorCount++;
+        }
       });
 
-      this.logger.log(`Queued full sync job ${job.id} for ${propertyIds.length} properties`);
+      await Promise.allSettled(syncPromises);
 
-      return {
-        success: true,
-        propertiesProcessed: 0, // Will be updated by job
-        renewalsUpdated: 0,
-        renewalsCreated: 0,
-        errors: [],
-        duration: Date.now() - startTime,
-        timestamp: new Date(),
-      };
+      const duration = Date.now() - startTime;
+      this.logger.log(`✅ Property ${propertyId} sync complete: ${successCount} success, ${errorCount} errors in ${duration}ms`);
+
+      return { success: successCount, errors: errorCount };
+
     } catch (error) {
-      this.logger.error(`Failed to queue sync job: ${error.message}`);
+      const duration = Date.now() - startTime;
+      this.logger.error(`❌ Property ${propertyId} sync failed after ${duration}ms: ${error.message}`);
       throw error;
     }
   }
 
-  async syncProperty(propertyId: string): Promise<SyncResult> {
-    const startTime = Date.now();
-    const syncTime = new Date();
-
+  /**
+   * Sync a single renewal
+   */
+  async syncSingleRenewal(renewal: RenewalDocument): Promise<void> {
     try {
-      this.logger.log(`Starting sync for property ${propertyId}`);
+      this.logger.log(`🔄 Syncing renewal ${renewal.tenantId} (${renewal.mriLeaseId})`);
 
-      // Fetch renewals from MRI
-      const renewalData = await this.mriProvider.fetchRenewals(propertyId);
-      
-      console.log(`\n📦 Renewal data fetched: ${renewalData.length} records`);
-      if (renewalData.length > 0) {
-        console.log(`  Sample record:`, JSON.stringify(renewalData[0], null, 2));
-      }
-
-      // Bulk upsert to database
-      console.log(`\n💾 Calling bulkUpsert with ${renewalData.length} records...`);
-      const { created, updated } = await this.renewalRepository.bulkUpsert(renewalData);
-      console.log(`  ✅ BulkUpsert result: ${created} created, ${updated} updated`);
-
-      // Clean up stale records
-      const deleted = await this.renewalRepository.deleteStaleRenewals(propertyId, syncTime);
-
-      const duration = Date.now() - startTime;
-      
-      this.logger.log(
-        `Sync completed for property ${propertyId}: ${created} created, ${updated} updated, ${deleted} deleted in ${duration}ms`
+      // Aggregate MRI data
+      const mriData = await this.dataAggregator.aggregateLeaseData(
+        renewal.propertyId,
+        renewal.mriLeaseId
       );
 
+      // Update the renewal document
+      await this.renewalModel.updateOne(
+        { _id: renewal._id },
+        {
+          $set: {
+            // Financial data
+            monthlyRent: mriData.monthlyRent,
+            cam: mriData.cam,
+            ins: mriData.ins,
+            tax: mriData.tax,
+            totalDueMonthly: mriData.totalDueMonthly,
+            balanceForward: mriData.balanceForward,
+            cashReceived: mriData.cashReceived,
+            balanceDue: mriData.balanceDue,
+            totalArBalance: mriData.totalArBalance,
+            
+            // Aging buckets
+            days0To30: mriData.days0To30,
+            days31To60: mriData.days31To60,
+            days61Plus: mriData.days61Plus,
+            
+            // Escalations
+            rentEscalations: mriData.rentEscalations,
+            
+            // Raw data for debugging
+            mriData: mriData.rawData,
+            
+            // Update sync timestamp
+            lastSyncAt: new Date(),
+          }
+        }
+      );
+
+      this.logger.log(`✅ Successfully synced renewal ${renewal.tenantId}`);
+
+    } catch (error) {
+      this.logger.error(`❌ Failed to sync renewal ${renewal.tenantId}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Sync all properties - implements RenewalSyncer interface
+   */
+  async syncAllProperties(): Promise<SyncResult> {
+    const startTime = Date.now();
+    this.logger.log('🔄 Starting sync of all properties');
+
+    try {
+      // Get all unique property IDs from renewals
+      const propertyIds = await this.renewalModel.distinct('propertyId').exec();
+      this.logger.log(`📋 Found ${propertyIds.length} unique properties to sync`);
+
+      if (propertyIds.length === 0) {
+        return {
+          success: true,
+          propertiesProcessed: 0,
+          renewalsCreated: 0,
+          renewalsUpdated: 0,
+          errors: [],
+          duration: Date.now() - startTime,
+          timestamp: new Date(),
+        };
+      }
+
+      // Use batch processing to sync all properties
+      const batchResult = await this.syncPropertiesBatch(propertyIds);
+      
+      const duration = Date.now() - startTime;
+      const success = batchResult.errors.length === 0;
+
+      this.logger.log(`✅ All properties sync complete: ${batchResult.propertiesProcessed} properties, ${batchResult.renewalsCreated} renewals, ${batchResult.errors.length} errors in ${duration}ms`);
+
       return {
-        success: true,
-        propertiesProcessed: 1,
-        renewalsUpdated: updated,
-        renewalsCreated: created,
-        errors: [],
+        success,
+        propertiesProcessed: batchResult.propertiesProcessed,
+        renewalsCreated: batchResult.renewalsCreated,
+        renewalsUpdated: batchResult.renewalsUpdated,
+        errors: batchResult.errors,
         duration,
-        timestamp: syncTime,
+        timestamp: new Date(),
       };
+
     } catch (error) {
       const duration = Date.now() - startTime;
-      this.logger.error(`Sync failed for property ${propertyId}: ${error.message}`);
-
+      this.logger.error(`❌ All properties sync failed after ${duration}ms: ${error.message}`);
+      
       return {
         success: false,
         propertiesProcessed: 0,
-        renewalsUpdated: 0,
         renewalsCreated: 0,
+        renewalsUpdated: 0,
         errors: [error.message],
         duration,
-        timestamp: syncTime,
+        timestamp: new Date(),
       };
     }
   }
 
-  async syncIncremental(since?: Date): Promise<SyncResult> {
+  /**
+   * Sync properties in batch - used by BullMQ processor
+   */
+  async syncPropertiesBatch(propertyIds: string[]): Promise<BatchSyncResult> {
     const startTime = Date.now();
-    const syncSince = since || await this.getLastSyncTime();
+    this.logger.log(`🔄 Starting batch sync for ${propertyIds.length} properties`);
 
-    if (!syncSince) {
-      this.logger.warn('No previous sync time found, performing full sync');
-      return this.syncAllProperties();
+    let totalCreated = 0;
+    let totalUpdated = 0;
+    let propertiesProcessed = 0;
+    const errors: string[] = [];
+
+    // Process each property in the batch
+    for (const propertyId of propertyIds) {
+      try {
+        const result = await this.syncPropertyRenewals(propertyId);
+        totalCreated += result.success; // Assuming success count represents renewals processed
+        propertiesProcessed++;
+        
+        this.logger.log(`✅ Property ${propertyId} synced: ${result.success} renewals processed`);
+      } catch (error) {
+        const errorMsg = `Property ${propertyId} sync failed: ${error.message}`;
+        this.logger.error(errorMsg);
+        errors.push(errorMsg);
+      }
     }
 
-    try {
-      const properties = await this.propertiesService.findAll();
-      const propertyIds = properties.map(p => p.propertyId);
+    const duration = Date.now() - startTime;
+    this.logger.log(`📊 Batch sync complete: ${propertiesProcessed}/${propertyIds.length} properties, ${totalCreated} renewals, ${errors.length} errors in ${duration}ms`);
 
-      // Queue incremental sync job
-      const job = await this.syncQueue.add('incremental-sync', {
-        type: 'incremental',
-        propertyIds,
-        since: syncSince,
-        batchSize: 5,
-        delayBetweenBatches: 5000, // 5 second for incremental
-      });
+    return {
+      renewalsCreated: totalCreated,
+      renewalsUpdated: 0, // Current implementation doesn't distinguish created vs updated
+      propertiesProcessed,
+      errors,
+    };
+  }
 
-      this.logger.log(`Queued incremental sync job ${job.id} since ${syncSince.toISOString()}`);
+  /**
+   * Manual sync trigger for API endpoint
+   */
+  async triggerManualSync(propertyId?: string): Promise<{ message: string; stats: any }> {
+    this.logger.log(`🔄 Manual sync triggered${propertyId ? ` for property ${propertyId}` : ' for all properties'}`);
 
+    if (propertyId) {
+      const stats = await this.syncPropertyRenewals(propertyId);
       return {
-        success: true,
-        propertiesProcessed: 0,
-        renewalsUpdated: 0,
-        renewalsCreated: 0,
-        errors: [],
-        duration: Date.now() - startTime,
+        message: `Property ${propertyId} sync completed`,
+        stats
+      };
+    } else {
+      await this.syncAllRenewals();
+      return {
+        message: 'Full sync completed',
+        stats: { message: 'Check logs for detailed stats' }
+      };
+    }
+  }
+
+  /**
+   * Sync a specific property - implements RenewalSyncer interface
+   */
+  async syncProperty(propertyId: string): Promise<SyncResult> {
+    const startTime = Date.now();
+    
+    try {
+      const result = await this.syncPropertyRenewals(propertyId);
+      const duration = Date.now() - startTime;
+      
+      return {
+        success: result.errors === 0,
+        propertiesProcessed: 1,
+        renewalsCreated: result.success,
+        renewalsUpdated: 0, // Current implementation doesn't distinguish
+        errors: result.errors > 0 ? [`Property ${propertyId} had ${result.errors} errors`] : [],
+        duration,
         timestamp: new Date(),
       };
     } catch (error) {
-      this.logger.error(`Failed to queue incremental sync: ${error.message}`);
-      throw error;
+      const duration = Date.now() - startTime;
+      return {
+        success: false,
+        propertiesProcessed: 0,
+        renewalsCreated: 0,
+        renewalsUpdated: 0,
+        errors: [error.message],
+        duration,
+        timestamp: new Date(),
+      };
     }
   }
 
-  async syncPropertiesBatch(propertyIds: string[]): Promise<SyncResult> {
+  /**
+   * Sync incremental changes - implements RenewalSyncer interface
+   */
+  async syncIncremental(since?: Date): Promise<SyncResult> {
     const startTime = Date.now();
-    const syncTime = new Date();
-    let totalCreated = 0;
-    let totalUpdated = 0;
-    const errors: string[] = [];
+    this.logger.log(`🔄 Starting incremental sync${since ? ` since ${since.toISOString()}` : ''}`);
 
-    this.logger.log(`🚀 Starting optimized batch sync for ${propertyIds.length} properties`);
-
-    // Process properties in parallel with controlled concurrency
-    // Each property will internally handle tenant-level parallelization
-    const PROPERTY_CONCURRENCY = 1; // Process 3 properties at once
-    const results = await this.processWithConcurrency(
-      propertyIds,
-      async (propertyId) => {
-        try {
-          const result = await this.syncProperty(propertyId);
-          return result;
-        } catch (error) {
-          errors.push(`Property ${propertyId}: ${error.message}`);
-          return null;
-        }
-      },
-      PROPERTY_CONCURRENCY
-    );
-
-    // Aggregate results
-    results.forEach(result => {
-      if (result) {
-        totalCreated += result.renewalsCreated;
-        totalUpdated += result.renewalsUpdated;
-      }
-    });
-
-    const duration = Date.now() - startTime;
-    const successCount = results.filter(r => r?.success).length;
-
-    this.logger.log(
-      `✅ Optimized batch sync completed: ${successCount}/${propertyIds.length} properties, ${totalCreated} created, ${totalUpdated} updated in ${(duration/1000).toFixed(1)}s`
-    );
-
-    return {
-      success: errors.length === 0,
-      propertiesProcessed: successCount,
-      renewalsUpdated: totalUpdated,
-      renewalsCreated: totalCreated,
-      errors,
-      duration,
-      timestamp: syncTime,
-    };
-  }
-
-  private async processWithConcurrency<T, R>(
-    items: T[],
-    processor: (item: T) => Promise<R>,
-    concurrency: number
-  ): Promise<R[]> {
-    const results: R[] = [];
-    
-    // Process in smaller batches to avoid overwhelming the system
-    for (let i = 0; i < items.length; i += concurrency) {
-      const batch = items.slice(i, i + concurrency);
-      const batchResults = await Promise.allSettled(
-        batch.map(item => processor(item))
-      );
+    try {
+      // For now, delegate to syncAllProperties as we don't have incremental logic
+      // In a real implementation, this would filter renewals by lastSyncAt or similar
+      const result = await this.syncAllProperties();
       
-      batchResults.forEach(result => {
-        if (result.status === 'fulfilled') {
-          results.push(result.value);
-        }
-      });
-
-      // No delay needed here - the MRI provider handles rate limiting internally
-      // Each property sync will use the rate limiter for tenant-level requests
+      this.logger.log(`✅ Incremental sync delegated to full sync`);
+      return result;
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.logger.error(`❌ Incremental sync failed: ${error.message}`);
+      
+      return {
+        success: false,
+        propertiesProcessed: 0,
+        renewalsCreated: 0,
+        renewalsUpdated: 0,
+        errors: [error.message],
+        duration,
+        timestamp: new Date(),
+      };
     }
-
-    return results;
   }
 
-  private async getLastSyncTime(): Promise<Date | null> {
-    return this.renewalRepository.getLastSyncTime();
-  }
-
-  async getJobStatus(jobId: string) {
-    const job = await this.syncQueue.getJob(jobId);
-    
-    if (!job) {
-      return { status: 'not_found' };
-    }
-
-    return {
-      id: job.id,
-      status: await job.getState(),
-      progress: job.progress,
-      data: job.data,
-      result: job.returnvalue,
-      failedReason: job.failedReason,
-      processedOn: job.processedOn,
-      finishedOn: job.finishedOn,
-    };
-  }
-
-  async clearQueue(): Promise<{ cleared: number }> {
-    const waiting = await this.syncQueue.getWaiting();
-    const active = await this.syncQueue.getActive();
-    
-    await this.syncQueue.clean(0, 1000, 'completed');
-    await this.syncQueue.clean(0, 1000, 'failed');
-    
-    for (const job of [...waiting, ...active]) {
-      await job.remove();
-    }
-
-    const cleared = waiting.length + active.length;
-    this.logger.log(`Cleared ${cleared} jobs from renewal sync queue`);
-    
-    return { cleared };
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

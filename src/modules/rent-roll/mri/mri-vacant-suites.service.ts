@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { MriCoreService } from './mri-core.service';
 
 export interface MriVacantSuiteRaw {
-    BaseUnitOfMeasure: string | null;
+    BasesuiteOfMeasure: string | null;
     BuildingID: string;
     SuiteID: string;
     SuiteSquareFeet: string;

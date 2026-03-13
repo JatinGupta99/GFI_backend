@@ -9,7 +9,7 @@ This document specifies the requirements for an Excel Upload API that accepts pr
 - **API**: The Excel Upload API endpoint
 - **Excel_File**: An uploaded file in .xlsx or .xls format containing financial data
 - **Property**: A real estate property entity stored in the MongoDB Property collection
-- **Suite**: A rentable unit within a property, stored in the property's suites array
+- **Suite**: A rentable suite within a property, stored in the property's suites array
 - **Financial_Data**: Monthly budget/proforma data including rental income and recovery categories
 - **Category**: A type of financial data (rental income, CAM recovery, insurance recovery, etc.)
 - **Monthly_Data**: Financial values organized by month (Jan-26, Feb-26, etc.)

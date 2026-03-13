@@ -126,8 +126,8 @@ This implementation plan extends the existing ForeSight PDF extractor module to 
     - **Property 16: End-to-End Processing**
     - **Validates: Requirements 16.2, 16.3, 16.4**
 
-- [ ] 11. Add comprehensive unit tests for edge cases
-  - [x] 11.1 Create unit tests for specific scenarios
+- [ ] 11. Add comprehensive suite tests for edge cases
+  - [x] 11.1 Create suite tests for specific scenarios
     - Test with actual Excel file structures matching ForeSight format
     - Test edge cases: empty files, single tenant, maximum tenants
     - Test error scenarios: corrupted files, missing sections, invalid data
@@ -150,6 +150,6 @@ This implementation plan extends the existing ForeSight PDF extractor module to 
 - Tasks marked with `*` are optional and can be skipped for faster MVP
 - Each task references specific requirements for traceability
 - Property tests validate universal correctness properties using fast-check library
-- Unit tests validate specific examples, edge cases, and integration points
+- suite tests validate specific examples, edge cases, and integration points
 - The implementation leverages existing infrastructure in the foresight-pdf-extractor module
 - Integration with suites system uses existing patterns and data structures

@@ -9,11 +9,11 @@ export interface Renewal {
   propertyId: string;
   propertyName: string;
   tenantName: string;
-  unit: string;
+  suite: string;
   sf: number;
   leaseEnd: string; // ISO date string
   renewalOffer?: string;
-  currentRent: number;
+  currentMonthRent: number;
   rentPerSf: number;
   budgetRent?: number;
   budgetRentPerSf?: number;
@@ -23,7 +23,6 @@ export interface Renewal {
   notes?: string;
   option: RenewalOption;
   optionTerm?: string;
-  lcd?: string; // ISO date string
   lastSyncAt: string; // ISO date string
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
@@ -239,7 +238,7 @@ export interface RenewalSummary {
   id: string;
   tenantName: string;
   propertyName: string;
-  unit: string;
+  suite: string;
   leaseEnd: string;
   status: RenewalStatus;
   daysUntilExpiry: number;
@@ -360,7 +359,7 @@ export function RenewalsPage() {
         <div>
           {renewals.map(renewal => (
             <div key={renewal.id}>
-              {renewal.tenantName} - {renewal.unit}
+              {renewal.tenantName} - {renewal.suite}
             </div>
           ))}
         </div>

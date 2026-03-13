@@ -173,7 +173,7 @@ ngrok by @inconshreveable
 Session Status                online
 Account                       your-account (Plan: Free)
 Version                       2.3.40
-Region                        United States (us)
+Region                        suiteed States (us)
 Web Interface                 http://127.0.0.1:4040
 Forwarding                    https://abc123def456.ngrok.io -> http://localhost:4010
 ```
@@ -293,9 +293,9 @@ Receives webhook notifications from DocuSign when envelope status changes.
 
 ## Testing
 
-### Unit Tests
+### suite Tests
 
-Run unit tests for the DocuSign module:
+Run suite tests for the DocuSign module:
 
 ```bash
 # Run all tests

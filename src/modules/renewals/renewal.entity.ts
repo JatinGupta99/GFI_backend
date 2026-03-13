@@ -1,8 +1,40 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { RenewalStatus } from '../../common/enums/common-enums';
 
+@Schema({ _id: false })
+export class BudgetNegotiation {
+
+  @Prop({ type: Number, default: 0 })
+  tiPerSf?: number;
+
+  @Prop({ type: String, default: '' })
+  rcd?: string;
+
+  @Prop({ type: Number, default: 0 })
+  rentPerSf?: number;
+
+  @Prop({type:Boolean,default:false})
+  budgetRenew:boolean;
+}
+
+export const BudgetNegotiationSchema = SchemaFactory.createForClass(BudgetNegotiation);
+
+@Schema({ _id: false })
+export class RentEscalations {
+  @Prop({type:Number,default:0})
+  year1?: number=0;
+  
+  @Prop({type:Number,default:0})
+  year2?: number=0;
+  
+  @Prop({type:Number,default:0})
+  year3?: number=0;
+  
+  @Prop({type:Number,default:0})
+  year4?: number=0;
+}
 export type RenewalDocument = Renewal & Document;
-
 @Schema({ timestamps: true })
 export class Renewal {
   @Prop({ required: true, index: true })
@@ -11,6 +43,9 @@ export class Renewal {
   @Prop({ required: true, index: true })
   propertyId: string;
 
+  @Prop({ required: false,default:''  })
+  address: string;
+
   @Prop({ required: true })
   propertyName: string;
 
@@ -18,7 +53,7 @@ export class Renewal {
   tenantName: string;
 
   @Prop({ required: true })
-  unit: string;
+  suite: string;
 
   @Prop({ required: true })
   sf: number;
@@ -30,29 +65,28 @@ export class Renewal {
   renewalOffer?: string;
 
   @Prop({ required: true })
-  currentRent: number;
+  currentMonthRent: number;
 
-  @Prop({ required: true })
-  rentPerSf: number;
+  @Prop({ required: false, default: 0 })
+  currentRentPerSf?: number;
 
-  @Prop({ required: false })
-  budgetRent?: number;
-
-  @Prop({ required: false })
-  budgetRentPerSf?: number;
-
-  @Prop({ required: false })
-  budgetTI?: number;
-
-  @Prop({ required: false })
-  budgetLCD?: string;
+  @Prop({ 
+    type: BudgetNegotiationSchema, 
+    default: () => ({
+      tiPerSf: 0,
+      rentPerSf: 0,
+      rcd: '',
+      budgetRenew: false,
+    })
+  })
+  budget_negotiation: BudgetNegotiation;
 
   @Prop({
     required: true,
-    enum: ['DRAFTING_AMENDMENT', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE','DEAD','NO_CONTACT','AMENDMENT_EXECUTED'],
+    enum: Object.values(RenewalStatus),
     index: true
   })
-  status: string;
+  status: RenewalStatus;
 
   @Prop({ required: false })
   notes?: string;
@@ -62,9 +96,6 @@ export class Renewal {
 
   @Prop({ required: false })
   optionTerm?: string;
-
-  @Prop({ required: false })
-  lcd?: string;
 
   @Prop({ required: true, index: true })
   lastSyncAt: Date;
@@ -97,14 +128,20 @@ export class Renewal {
   @Prop({ required: false })
   balanceDue?: number;
 
-  @Prop({ required: false })
-  days0To30?: string;
+  @Prop()
+  days0To30?: number;
 
-  @Prop({ required: false })
-  days31To60?: string;
+  @Prop()
+  days31To60?: number;
 
-  @Prop({ required: false })
-  days61Plus?: string;
+  @Prop()
+  days61Plus?: number;
+
+  @Prop()
+  totalArBalance?: number;
+
+  @Prop({ type: RentEscalations })
+  rentEscalations?: RentEscalations;
 
   @Prop({ type: Object, required: false })
   mriData?: Record<string, any>; // Store raw MRI data for debugging

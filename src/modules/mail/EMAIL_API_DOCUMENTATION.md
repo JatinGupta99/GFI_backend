@@ -300,7 +300,7 @@ AWS_SECRET_ACCESS_KEY=your-secret-key
 
 ## Testing
 
-### Unit Tests
+### suite Tests
 
 ```bash
 npm run test -- --testPathPattern=mail

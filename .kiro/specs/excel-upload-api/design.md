@@ -788,15 +788,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
 ### Dual Testing Approach
 
-The testing strategy employs both unit tests and property-based tests to ensure comprehensive coverage:
+The testing strategy employs both suite tests and property-based tests to ensure comprehensive coverage:
 
-- **Unit tests**: Verify specific examples, edge cases, and error conditions
+- **suite tests**: Verify specific examples, edge cases, and error conditions
 - **Property tests**: Verify universal properties across all inputs
 - Both approaches are complementary and necessary for complete validation
 
-### Unit Testing
+### suite Testing
 
-Unit tests focus on:
+suite tests focus on:
 - Specific examples of category recognition (e.g., "Total Rental Income" → rentalIncome)
 - Specific account code mappings (e.g., 500005 → rentalIncome)
 - Specific error status codes (404 for not found, 400 for bad request, 500 for server error)
@@ -804,7 +804,7 @@ Unit tests focus on:
 - Edge cases like empty Excel files, single-month files, missing tenant names
 - Error conditions like database connection failures, invalid file formats
 
-Example unit tests:
+Example suite tests:
 ```typescript
 describe('ExcelUploadService', () => {
   it('should reject files with unsupported extensions', async () => {
@@ -920,7 +920,7 @@ describe('ExcelUploadService - Property Tests', () => {
 
 ### Test Coverage Goals
 
-- Unit test coverage: >80% of lines
+- suite test coverage: >80% of lines
 - Property test coverage: All 28 correctness properties
 - Integration test coverage: End-to-end API flows
 - Error path coverage: All error conditions tested

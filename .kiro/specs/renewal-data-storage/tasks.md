@@ -143,7 +143,7 @@ This implementation plan converts the renewal-data-storage feature design into d
     - Handle job failures and retries
     - _Requirements: 6.4, 7.1_
 
-  - [ ]* 11.2 Write unit tests for job processing
+  - [ ]* 11.2 Write suite tests for job processing
     - Test job scheduling and execution
     - Test failure handling and retry logic
     - _Requirements: 6.4, 7.1_
@@ -168,7 +168,7 @@ This implementation plan converts the renewal-data-storage feature design into d
 - Tasks marked with `*` are optional and can be skipped for faster MVP
 - Each task references specific requirements for traceability
 - Property tests validate universal correctness properties with minimum 100 iterations
-- Unit tests validate specific examples and integration points
+- suite tests validate specific examples and integration points
 - The implementation follows existing NestJS patterns and integrates with current architecture
 - Background processing uses existing BullMQ infrastructure
 - All API endpoints follow existing authentication and response format patterns

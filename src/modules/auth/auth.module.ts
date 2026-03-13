@@ -18,8 +18,8 @@ import { AuthSharedModule } from './auth-shared.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: config.get<string>('JWT_EXPIRES_IN') },
+        secret: config.get<string>('jwt.secret'),  // Changed from 'JWT_SECRET' to 'jwt.secret'
+        signOptions: { expiresIn: config.get<string>('jwt.expiresIn') },  // Changed from 'JWT_EXPIRES_IN' to 'jwt.expiresIn'
       }),
     }),
   ],

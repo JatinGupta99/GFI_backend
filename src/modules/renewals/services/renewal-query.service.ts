@@ -6,6 +6,7 @@ import { RenewalRepository } from '../repositories/renewal.repository';
 import { Renewal } from '../renewal.entity';
 import { RenewalFilters } from '../interfaces/renewal-provider.interface';
 import { MediaService } from '../../media/media.service';
+import { RenewalStatus } from '../../../common/enums/common-enums';
 
 @Injectable()
 export class RenewalQueryService {
@@ -209,7 +210,7 @@ export class RenewalQueryService {
         };
       }
 
-      // Perform text search on tenant name, property name, and unit
+      // Perform text search on tenant name, property name, and suite
       const data = await this.renewalRepository.getRenewals({
         limit,
       });
@@ -218,7 +219,7 @@ export class RenewalQueryService {
       const filteredData = data.filter(renewal =>
         renewal.tenantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         renewal.propertyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        renewal.unit.toLowerCase().includes(searchTerm.toLowerCase())
+        renewal.suite.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
       const result = {
@@ -308,7 +309,7 @@ export class RenewalQueryService {
     }
   }
 
-  async updateRenewalStatus(id: string, status: string): Promise<{
+  async updateRenewalStatus(id: string, status: RenewalStatus): Promise<{
     data: Renewal | null;
     success: boolean;
   }> {

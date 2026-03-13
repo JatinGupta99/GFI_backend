@@ -336,7 +336,7 @@ describe('DocuSignService', () => {
     });
   });
 
-  describe('Unit Tests: Authentication Edge Cases', () => {
+  describe('suite Tests: Authentication Edge Cases', () => {
     it('should handle invalid private key format', async () => {
       const invalidPrivateKey = 'invalid-key-format';
 
@@ -763,7 +763,7 @@ describe('DocuSignService', () => {
     });
   });
 
-  describe('Unit Tests: Envelope Creation Scenarios', () => {
+  describe('suite Tests: Envelope Creation Scenarios', () => {
     it('should throw error when lease PDF buffer is invalid', async () => {
       const { privateKey } = crypto.generateKeyPairSync('rsa', {
         modulusLength: 2048,
@@ -1091,7 +1091,7 @@ describe('DocuSignService', () => {
     });
   });
 
-  describe('Unit Tests: Webhook Processing Logic', () => {
+  describe('suite Tests: Webhook Processing Logic', () => {
     it('should parse envelope status and filter for completed events', async () => {
       const mockPayload = {
         event: 'envelope-completed',

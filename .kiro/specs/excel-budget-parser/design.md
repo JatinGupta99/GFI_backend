@@ -254,7 +254,7 @@ The Excel Budget Parser implements comprehensive error handling at multiple leve
 
 ## Testing Strategy
 
-The Excel Budget Parser uses a dual testing approach combining unit tests and property-based tests for comprehensive coverage.
+The Excel Budget Parser uses a dual testing approach combining suite tests and property-based tests for comprehensive coverage.
 
 ### Property-Based Testing
 Property-based tests validate universal correctness properties across randomized inputs:
@@ -264,8 +264,8 @@ Property-based tests validate universal correctness properties across randomized
 - **Coverage**: Each correctness property implemented as a separate property-based test
 - **Tagging**: Each test tagged with format: **Feature: excel-budget-parser, Property {number}: {property_text}**
 
-### Unit Testing
-Unit tests focus on specific examples, edge cases, and integration points:
+### suite Testing
+suite tests focus on specific examples, edge cases, and integration points:
 
 - **Excel File Parsing**: Test with known Excel file structures
 - **Section Processing**: Verify extraction from each Excel section type
@@ -285,4 +285,4 @@ Unit tests focus on specific examples, edge cases, and integration points:
 - **API Response Validation**: Test HTTP responses and error codes
 - **File Format Support**: Test various Excel formats (.xlsx, .xls)
 
-The testing strategy ensures both correctness (property tests) and reliability (unit tests) while maintaining compatibility with the existing suites system infrastructure.
+The testing strategy ensures both correctness (property tests) and reliability (suite tests) while maintaining compatibility with the existing suites system infrastructure.

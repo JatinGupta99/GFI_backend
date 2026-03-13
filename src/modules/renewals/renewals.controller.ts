@@ -11,15 +11,20 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { Public } from '../../common/decorators/public.decorator';
 import { RenewalQueryService } from './services/renewal-query.service';
 import { RenewalSyncService } from './services/renewal-sync.service';
+import { LeasingService } from '../leasing/leasing.service';
 import { RenewalFilters } from './interfaces/renewal-provider.interface';
 import { PaginationHelper } from '../../common/helpers/pagination.helper';
 import { UpdateRenewalNotesDto } from './dto/update-renewal-notes.dto';
 import { UpdateRenewalStatusDto } from './dto/update-renewal-status.dto';
 import { RenewalDetailMapper } from './mappers/renewal-detail.mapper';
+import { RenewalStatus } from '../../common/enums/common-enums';
 
 @ApiTags('Renewals')
 @Controller('renewals')
@@ -29,6 +34,8 @@ export class RenewalsController {
   constructor(
     private readonly queryService: RenewalQueryService,
     private readonly syncService: RenewalSyncService,
+    @Inject(forwardRef(() => LeasingService))
+    private readonly leasingService: LeasingService,
   ) {}
 
   /**
@@ -38,26 +45,62 @@ export class RenewalsController {
   @Get()
   @ApiOperation({ summary: 'Get renewals with optional filters' })
   @ApiQuery({ name: 'propertyIds', required: false, type: [String] })
+  @ApiQuery({ name: 'property', required: false, type: String, description: 'Single property ID (alternative to propertyIds)' })
   @ApiQuery({ name: 'status', required: false, type: [String] })
+  @ApiQuery({ name: 'renewal_status', required: false, enum: RenewalStatus, description: 'Filter by renewal status' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (1-indexed)' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
   @ApiResponse({ status: 200, description: 'Renewals retrieved successfully' })
   async getRenewals(
     @Query('propertyIds') propertyIds?: string | string[],
+    @Query('property') property?: string,
     @Query('status') status?: string | string[],
+    @Query('renewal_status') renewalStatus?: RenewalStatus | string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ) {
     const filters: RenewalFilters = {};
 
+    // Handle both propertyIds and property parameters for backward compatibility
     if (propertyIds) {
       filters.propertyIds = Array.isArray(propertyIds) ? propertyIds : [propertyIds];
+    } else if (property) {
+      filters.propertyIds = [property];
     }
 
+    // Define status groups
+    const STATUS_GROUPS = {
+      ALL_NOTICES: [
+        RenewalStatus.SEND_ATTORNEY_NOTICE,
+        RenewalStatus.SEND_COURTESY_NOTICE,
+        RenewalStatus.SEND_THREE_DAY_NOTICE,
+      ],
+    };
+
+    // Handle status filtering with groups
     if (status) {
-      filters.status = Array.isArray(status) ? status : [status];
+      const statusArray = Array.isArray(status) ? status : [status];
+      
+      // Check if any status is a group
+      let expandedStatuses: string[] = [];
+      for (const s of statusArray) {
+        if (s === 'ALL_NOTICES' && STATUS_GROUPS.ALL_NOTICES) {
+          expandedStatuses.push(...STATUS_GROUPS.ALL_NOTICES);
+        } else {
+          expandedStatuses.push(s);
+        }
+      }
+      
+      filters.status = expandedStatuses;
+    } else if (renewalStatus) {
+      // Handle renewal_status parameter
+      if (renewalStatus === 'ALL_NOTICES') {
+        filters.status = STATUS_GROUPS.ALL_NOTICES;
+      } else {
+        filters.status = [renewalStatus];
+      }
     }
 
     // Default values
@@ -107,14 +150,19 @@ export class RenewalsController {
   @Get('ar-balances/by-property')
   @ApiOperation({ summary: 'Get AR balances by property' })
   @ApiQuery({ name: 'propertyIds', required: false, type: [String] })
+  @ApiQuery({ name: 'property', required: false, type: String, description: 'Single property ID (alternative to propertyIds)' })
   @ApiResponse({ status: 200, description: 'AR balances retrieved successfully' })
   async getARBalancesByProperty(
     @Query('propertyIds') propertyIds?: string | string[],
+    @Query('property') property?: string,
   ) {
     const filters: RenewalFilters = {};
 
+    // Handle both propertyIds and property parameters for backward compatibility
     if (propertyIds) {
       filters.propertyIds = Array.isArray(propertyIds) ? propertyIds : [propertyIds];
+    } else if (property) {
+      filters.propertyIds = [property];
     }
 
     const renewals = await this.queryService.getRenewals(filters);
@@ -134,16 +182,16 @@ export class RenewalsController {
       }
 
       // Calculate balance (this is a placeholder - adjust based on your actual AR calculation)
-      const balance = renewal.currentRent || 0;
+      const balance = renewal.currentMonthRent || 0;
       
       acc[propertyId].totalBalance += balance;
       acc[propertyId].tenantCount += 1;
       acc[propertyId].tenants.push({
         tenantId: renewal.tenantId,
         tenantName: renewal.tenantName,
-        unit: renewal.unit,
+        suite: renewal.suite,
         balance: balance,
-        currentRent: renewal.currentRent,
+        currentMonthRent: renewal.currentMonthRent,
         status: renewal.status,
       });
 
@@ -161,6 +209,60 @@ export class RenewalsController {
         cached: renewals.cached,
       },
       timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Get AR Balances Summary by Property
+   * Returns simplified AR balances grouped by property with total AR balance from renewal schema
+   */
+  @Get('ar-balances/summary')
+  @ApiOperation({ summary: 'Get AR balances summary by property' })
+  @ApiQuery({ name: 'propertyIds', required: false, type: [String], description: 'Array of property IDs to filter' })
+  @ApiResponse({ status: 200, description: 'AR balances summary retrieved successfully' })
+  async getARBalancesSummary(
+    @Query('propertyIds') propertyIds?: string | string[],
+  ) {
+    const filters: RenewalFilters = {};
+
+    // Handle propertyIds parameter
+    if (propertyIds) {
+      filters.propertyIds = Array.isArray(propertyIds) ? propertyIds : [propertyIds];
+    }
+
+    const renewals = await this.queryService.getRenewals(filters);
+
+    // Group renewals by property and calculate total AR balances
+    const arBalancesByProperty = renewals.data.reduce((acc, renewal: any) => {
+      const propertyId = renewal.propertyId;
+      const propertyName = renewal.propertyName;
+      
+      if (!acc[propertyId]) {
+        acc[propertyId] = {
+          propertyName: propertyName,
+          totalArBalance: 0,
+        };
+      }
+
+      // Calculate AR balance from renewal schema fields
+      const arBalance = (renewal.totalArBalance || 0);
+      
+      acc[propertyId].totalArBalance += arBalance;
+
+      return acc;
+    }, {});
+
+    // Convert to array format as requested: [{propertyName:"", totalArBalance:""}]
+    const result = Object.values(arBalancesByProperty);
+
+    return {
+      success: true,
+      data: result,
+      meta: {
+        totalProperties: result.length,
+        cached: renewals.cached,
+        timestamp: new Date().toISOString(),
+      },
     };
   }
 
@@ -265,7 +367,7 @@ export class RenewalsController {
   }
 
   /**
-   * Search renewals by tenant name, property name, or unit
+   * Search renewals by tenant name, property name, or suite
    * Fast endpoint - returns from database/cache
    */
   @Get('search')
@@ -298,20 +400,35 @@ export class RenewalsController {
   }
 
   /**
-   * Trigger full sync of all properties
-   * Background job - returns immediately with job ID
+   * Trigger manual sync for all renewals or specific property
+   * Synchronous - returns when complete
    */
+  @Public()
   @Post('sync')
-  @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Trigger full renewal sync for all properties' })
-  @ApiResponse({ status: 202, description: 'Sync job queued successfully' })
-  async syncAllRenewals() {
-    const result = await this.syncService.syncAllProperties();
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Trigger manual renewal sync' })
+  @ApiQuery({ name: 'propertyId', required: false, type: String, description: 'Optional property ID to sync specific property' })
+  @ApiResponse({ status: 200, description: 'Sync completed successfully' })
+  async triggerManualSync(@Query('propertyId') propertyId?: string) {
+    // Use leasing service for sync to fetch fresh data from MRI
+    const result = await this.leasingService.queueRenewalsSync({
+      propertyIds: propertyId ? [propertyId] : undefined,
+      delayBetweenJobs: 300000, // 2 seconds between jobs
+      clearCache: true,
+    });
 
     return {
       success: true,
-      message: 'Full renewal sync job queued successfully',
-      data: result,
+      message: propertyId 
+        ? `Sync queued for property ${propertyId}` 
+        : 'Sync queued for all properties',
+      data: {
+        batchId: result.batchId,
+        jobIds: result.jobIds,
+        totalProperties: result.totalProperties,
+        statusUrl: `/leasing/renewals/batch/${result.batchId}`,
+      },
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -328,67 +445,25 @@ export class RenewalsController {
       throw new BadRequestException('Property ID is required');
     }
 
-    const result = await this.syncService.syncProperty(propertyId);
-
-    return {
-      success: result.success,
-      message: result.success 
-        ? 'Property sync completed successfully' 
-        : 'Property sync completed with errors',
-      data: result,
-    };
-  }
-
-  /**
-   * Trigger incremental sync (only changed data since last sync)
-   * Background job - returns immediately with job ID
-   */
-  @Post('sync/incremental')
-  @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Trigger incremental renewal sync' })
-  @ApiResponse({ status: 202, description: 'Incremental sync job queued successfully' })
-  async syncIncremental() {
-    const result = await this.syncService.syncIncremental();
+    // Use leasing service for sync to fetch fresh data from MRI
+    const result = await this.leasingService.queueRenewalsSync({
+      propertyIds: [propertyId],
+      delayBetweenJobs: 0, // No delay for single property
+      clearCache: true,
+    });
 
     return {
       success: true,
-      message: 'Incremental renewal sync job queued successfully',
-      data: result,
+      message: `Sync queued for property ${propertyId}`,
+      data: {
+        batchId: result.batchId,
+        jobIds: result.jobIds,
+        totalProperties: result.totalProperties,
+        statusUrl: `/leasing/renewals/batch/${result.batchId}`,
+      },
+      timestamp: new Date().toISOString(),
     };
   }
-
-  /**
-   * Get sync job status
-   */
-  @Get('sync/status/:jobId')
-  @ApiOperation({ summary: 'Get sync job status' })
-  @ApiResponse({ status: 200, description: 'Job status retrieved successfully' })
-  async getSyncStatus(@Param('jobId') jobId: string) {
-    const status = await this.syncService.getJobStatus(jobId);
-
-    return {
-      success: true,
-      data: status,
-    };
-  }
-
-  /**
-   * Clear sync queue
-   */
-  @Post('sync/clear')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Clear all pending sync jobs' })
-  @ApiResponse({ status: 200, description: 'Sync queue cleared successfully' })
-  async clearSyncQueue() {
-    const result = await this.syncService.clearQueue();
-
-    return {
-      success: true,
-      message: 'Sync queue cleared successfully',
-      data: result,
-    };
-  }
-
   /**
    * Clear renewal cache
    */

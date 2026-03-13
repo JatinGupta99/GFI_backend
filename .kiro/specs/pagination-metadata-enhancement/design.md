@@ -339,7 +339,7 @@ No breaking changes - only additions.
 
 ## Testing Strategy
 
-### Unit Tests for PaginationHelper
+### suite Tests for PaginationHelper
 
 ```typescript
 describe('PaginationHelper', () => {
@@ -439,7 +439,7 @@ describe('GET /api/renewals', () => {
 1. **NEW**: `src/common/helpers/pagination.helper.ts` - Pagination utility
 2. **UPDATE**: `src/modules/leads/leads.service.ts` - Use pagination helper
 3. **UPDATE**: `src/modules/renewals/renewals.controller.ts` - Use pagination helper
-4. **NEW**: `src/common/helpers/pagination.helper.spec.ts` - Unit tests
+4. **NEW**: `src/common/helpers/pagination.helper.spec.ts` - suite tests
 
 ## Benefits
 
@@ -448,14 +448,14 @@ describe('GET /api/renewals', () => {
 3. **Reusability**: Single helper function for all pagination needs
 4. **Type Safety**: TypeScript interfaces ensure correct usage
 5. **Backward Compatible**: No breaking changes to existing APIs
-6. **Testable**: Easy to unit test pagination logic
+6. **Testable**: Easy to suite test pagination logic
 
 ## Migration Path
 
 1. Create `PaginationHelper` utility
 2. Update leads service to use helper
 3. Update renewals controller to use helper
-4. Add unit tests for helper
+4. Add suite tests for helper
 5. Add integration tests for updated endpoints
 6. Deploy and verify
 7. Update API documentation

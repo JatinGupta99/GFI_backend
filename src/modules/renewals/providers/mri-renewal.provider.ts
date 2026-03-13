@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { RenewalProvider, RenewalData } from '../interfaces/renewal-provider.interface';
-import { MriLeasesService } from '../../rent-roll/mri/mri-leases.service';
-import { MriRenewalOffersService } from '../../rent-roll/mri/mri-renewal-offers.service';
-import { MriLeaseEmeaService } from '../../rent-roll/mri/mri-lease-emea.service';
-import { MriOpenChargesService } from '../../rent-roll/mri/mri-open-charges.service';
-import { MriTenantLedgerService } from '../../rent-roll/mri/mri-tenant-ledger.service';
 import { MriCurrentDelinquenciesService } from '../../rent-roll/mri/mri-current-delinquencies.service';
+import { MriLeaseEmeaService } from '../../rent-roll/mri/mri-lease-emea.service';
+import { MriLeasesService } from '../../rent-roll/mri/mri-leases.service';
+import { MriOpenChargesService } from '../../rent-roll/mri/mri-open-charges.service';
+import { MriRenewalOffersService } from '../../rent-roll/mri/mri-renewal-offers.service';
+import { MriTenantLedgerService } from '../../rent-roll/mri/mri-tenant-ledger.service';
+import { RenewalData, RenewalProvider } from '../interfaces/renewal-provider.interface';
 import { FieldMappingService } from '../services/field-mapping.service';
 import { RateLimiterService } from '../services/rate-limiter.service';
 
@@ -297,8 +297,8 @@ export class MriRenewalProvider implements RenewalProvider {
     mriReportFields: Partial<RenewalData> = {},
   ): RenewalData {
     const sf = lease.OrigSqFt || 0;
-    const currentRent = lease.CurrentRent || 0;
-    const rentPerSf = sf > 0 ? (currentRent * 12) / sf : 0;
+    const currentMonthRent = lease.CurrentRent || 0;
+    const rentPerSf = sf > 0 ? (currentMonthRent * 12) / sf : 0;
 
     // MRI uses 'ExpirationDate' field
     const expirationDate = lease.ExpirationDate || lease.LeaseExpirationDate;
@@ -308,11 +308,11 @@ export class MriRenewalProvider implements RenewalProvider {
       propertyId,
       propertyName: lease.BuildingName || 'Unknown',
       tenantName: lease.OccupantName || 'Unknown Tenant',
-      unit: lease.SuiteID || 'Unknown Unit',
+      suite: lease.SuiteID || 'Unknown suite',
       sf,
       leaseEnd: new Date(expirationDate),
       renewalOffer: offer?.RenewalAmount ? `$${offer.RenewalAmount}` : undefined,
-      currentRent,
+      currentMonthRent,
       rentPerSf: Number(rentPerSf.toFixed(2)),
       budgetRent: emeaData?.BudgetRent || undefined,
       budgetRentPerSf: emeaData?.BudgetRentPerSF || undefined,
@@ -322,7 +322,6 @@ export class MriRenewalProvider implements RenewalProvider {
       notes: lease.Notes || undefined,
       option: this.hasRenewalOption(lease, offer),
       optionTerm: offer?.LeaseTerm || undefined,
-      lcd: lease.LeaseCommencementDate || undefined,
       mriLeaseId: lease.LeaseID,
       mriData: {
         lease,

@@ -30,7 +30,7 @@ Content-Type: application/json
     "_id": "69aa8486b69d84d68499b07b",
     "tenantName": "Apex Capital Realty",
     "propertyName": "Lake Cay",
-    "unit": "C210",
+    "suite": "C210",
     "notes": "Tenant requested 5-year lease extension with 3% annual increase",
     "leaseEnd": "2026-03-31T04:00:00.000Z",
     ...

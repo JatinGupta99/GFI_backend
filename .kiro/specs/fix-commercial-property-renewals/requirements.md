@@ -101,7 +101,7 @@ The code appears correct:
 
 ### Data Fields
 Required fields (always available from lease data):
-- `tenantId`, `propertyId`, `tenantName`, `unit`, `leaseEnd`, `mriLeaseId`
+- `tenantId`, `propertyId`, `tenantName`, `suite`, `leaseEnd`, `mriLeaseId`
 
 Optional fields (may be unavailable for commercial):
 - `renewalOffer`, `optionTerm`, `budgetRent`, `budgetRentPerSf`, `budgetTI`, `budgetLCD`

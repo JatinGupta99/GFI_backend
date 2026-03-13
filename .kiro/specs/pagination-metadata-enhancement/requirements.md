@@ -175,7 +175,7 @@ const hasPrev = page > 1;
 - None - this is a pure enhancement to existing APIs
 
 ## Testing Strategy
-1. **Unit Tests**: Test pagination metadata builder with various scenarios
+1. **suite Tests**: Test pagination metadata builder with various scenarios
 2. **Integration Tests**: Verify all paginated endpoints return correct metadata
 3. **Edge Case Tests**: First page, last page, single page, empty results
 4. **Backward Compatibility**: Ensure existing fields remain unchanged

@@ -177,7 +177,7 @@ export class RenewalDetailMapper {
         hasCoApplicant: false,
         driversLicenseUploaded: false,
         property: renewal.propertyName || '',
-        suite: renewal.unit || '',
+        suite: renewal.suite || '',
         use: '',
         sf: renewal.sf?.toString() || '0',
         notes: renewal.notes || '',
@@ -231,11 +231,11 @@ export class RenewalDetailMapper {
       },
       current_negotiation: {
         rentPerSf: renewal.rentPerSf || 0,
-        annInc: renewal.currentRent ? renewal.currentRent * 12 : 0,
+        annInc: renewal.currentMonthRent ? renewal.currentMonthRent * 12 : 0,
         freeMonths: 0,
         term: renewal.optionTerm || '',
         tiPerSf: 0,
-        rcd: renewal.lcd || '',
+        rcd: renewal.rcd || '',
       },
       budget_negotiation: {
         rentPerSf: renewal.budgetRentPerSf || 0,
@@ -247,7 +247,7 @@ export class RenewalDetailMapper {
       },
       references: [],
       accounting: {
-        baseRent: renewal.currentRent || 0,
+        baseRent: renewal.currentMonthRent || 0,
         cam: 0,
         lateFee: 0,
         ins: 0,

@@ -11,7 +11,7 @@
 - Added TypeScript interfaces for type safety
 - Added comprehensive JSDoc comments
 
-### 2. Unit Tests
+### 2. suite Tests
 - Created `src/common/helpers/pagination.helper.spec.ts`
 - 17 test cases covering all scenarios:
   - First page, middle page, last page
@@ -67,12 +67,12 @@
 1. **Simplified Frontend Logic**: No need to calculate `hasMore` or `hasPrev`
 2. **Consistent API**: Both endpoints now return the same metadata structure
 3. **Type Safe**: Full TypeScript support with interfaces
-4. **Well Tested**: 17 unit tests covering all scenarios
+4. **Well Tested**: 17 suite tests covering all scenarios
 5. **Backward Compatible**: No breaking changes
 
 ## 🧪 Testing
 
-### Unit Tests
+### suite Tests
 ```bash
 npm test -- pagination.helper.spec.ts
 ```

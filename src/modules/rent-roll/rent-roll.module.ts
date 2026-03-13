@@ -14,6 +14,7 @@ import { MriAnalysisService } from './mri/mri-analysis.service';
 import { MriOpenChargesService } from './mri/mri-open-charges.service';
 import { MriTenantLedgerService } from './mri/mri-tenant-ledger.service';
 import { MriCurrentDelinquenciesService } from './mri/mri-current-delinquencies.service';
+import { MriCommercialLeasesCmreccService } from './mri/mri-commercial-leases-cmrecc.service';
 
 import { RentRollService } from './rent-roll.service';
 import { RentRollController } from './rent-roll.controller';
@@ -38,6 +39,7 @@ import { RentRollController } from './rent-roll.controller';
         MriOpenChargesService,
         MriTenantLedgerService,
         MriCurrentDelinquenciesService,
+        MriCommercialLeasesCmreccService,
     ],
     controllers: [
         RentRollController,
@@ -58,6 +60,7 @@ import { RentRollController } from './rent-roll.controller';
         MriOpenChargesService,
         MriTenantLedgerService,
         MriCurrentDelinquenciesService,
+        MriCommercialLeasesCmreccService,
     ]
 })
 export class RentRollModule { }

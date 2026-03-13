@@ -17,7 +17,7 @@ export class RenewalResponseDto {
   tenantName: string;
 
   @ApiProperty()
-  unit: string;
+  suite: string;
 
   @ApiProperty()
   sf: number;
@@ -29,7 +29,7 @@ export class RenewalResponseDto {
   renewalOffer?: string;
 
   @ApiProperty()
-  currentRent: number;
+  currentMonthRent: number;
 
   @ApiProperty()
   rentPerSf: number;
@@ -57,9 +57,6 @@ export class RenewalResponseDto {
 
   @ApiProperty({ required: false })
   optionTerm?: string;
-
-  @ApiProperty({ required: false })
-  lcd?: string;
 
   @ApiProperty()
   lastSyncAt: Date;

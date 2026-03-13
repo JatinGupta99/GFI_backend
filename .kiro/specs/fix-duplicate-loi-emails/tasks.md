@@ -30,7 +30,7 @@ This implementation plan addresses the duplicate email issue where both LOI and 
     - Add request tracking to prevent simultaneous workflow execution
     - _Requirements: 2.1, 2.2, 3.3_
 
-  - [ ]* 2.4 Write unit tests for EmailWorkflowIsolationService
+  - [ ]* 2.4 Write suite tests for EmailWorkflowIsolationService
     - Test workflow validation with valid and invalid contexts
     - Test duplicate prevention logic
     - Test error handling for validation failures
@@ -120,7 +120,7 @@ This implementation plan addresses the duplicate email issue where both LOI and 
     - Handle service failures with 500 Internal Server Error and detailed logging
     - _Requirements: 5.4_
 
-  - [ ]* 8.3 Write unit tests for error handling
+  - [ ]* 8.3 Write suite tests for error handling
     - Test validation error scenarios
     - Test duplicate detection error scenarios
     - Test service failure scenarios
@@ -191,5 +191,5 @@ This implementation plan addresses the duplicate email issue where both LOI and 
 - Each task references specific requirements for traceability
 - Checkpoints ensure incremental validation and catch issues early
 - Property tests validate universal correctness properties with minimum 100 iterations
-- Unit tests validate specific examples and edge cases
+- suite tests validate specific examples and edge cases
 - Integration tests ensure end-to-end functionality works correctly

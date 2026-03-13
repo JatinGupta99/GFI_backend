@@ -6,7 +6,7 @@ import { Queue } from 'bullmq';
 import { FilterQuery, Model, Types } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
-import { EmailType, FormStatus, JOBNAME, LeadStatus, Role, SortOrder } from '../../common/enums/common-enums';
+import { EmailType, FormStatus, JOBNAME, LeadStatus, Role, SortOrder, RenewalStatus } from '../../common/enums/common-enums';
 import { PaginationHelper } from '../../common/helpers/pagination.helper';
 import { CompanyUserService } from '../company-user/company-user.service';
 import { MailService } from '../mail/mail.service';
@@ -752,7 +752,7 @@ if (lead_status) {
     const emailTypeToStatusMap: Record<string, string> = {
       COURTESY_NOTICE: 'SEND_COURTESY_NOTICE',
       THREE_DAY_NOTICE: 'SEND_THREE_DAY_NOTICE',
-      ATTORNEY_NOTICE: 'SEND_TO_ATTORNEY',
+      ATTORNEY_NOTICE: 'SEND_ATTORNEY_NOTICE',
     };
 
     const newStatus = emailTypeToStatusMap[emailType];
@@ -763,8 +763,8 @@ if (lead_status) {
 
     try {
       if (type === 'RENEWAL') {
-        // Update renewal status
-        await this.renewalrepo.updateRenewal(id, { status: newStatus });
+        // Update renewal status - cast string to RenewalStatus enum
+        await this.renewalrepo.updateRenewal(id, { status: newStatus as RenewalStatus });
         this.logger.log(`Updated renewal ${id} status to ${newStatus}`);
       } else {
         // Update lead status (LEAD or LEASE)
@@ -1490,62 +1490,233 @@ if (lead_status) {
       return null;
     };
 
-    // Initialize current_negotiation if it doesn't exist
-    if (!lead.current_negotiation) lead.current_negotiation = {} as any;
+    // Helper for TI values with lower confidence threshold (TI extraction is often less accurate)
+    const getTIValue = (field: any) => {
+      const TI_CONFIDENCE_THRESHOLD = 0.5; // Lower threshold for TI values
+      if (field && field.value && field.confidence >= TI_CONFIDENCE_THRESHOLD) {
+        const value = field.value;
+        // Skip empty strings, null, undefined, or 0
+        if (value === '' || value === null || value === undefined || value === 0) {
+          return null;
+        }
+        return value;
+      }
+      return null;
+    };
 
-    // Extract and update ONLY current_negotiation fields from LOI
+    // Helper for RCD values with lower confidence threshold (RCD extraction is often less accurate due to complex text)
+    const getRCDValue = (field: any) => {
+      const RCD_CONFIDENCE_THRESHOLD = 0.6; // Lower threshold for RCD values
+      if (field && field.value && field.confidence >= RCD_CONFIDENCE_THRESHOLD) {
+        const value = field.value;
+        // Skip empty strings, null, undefined, or 0
+        if (value === '' || value === null || value === undefined || value === 0) {
+          return null;
+        }
+        return value;
+      }
+      return null;
+    };
+
+    // Helper for Annual Increase values with slightly lower confidence threshold (percentage extraction can be tricky)
+    const getAnnIncValue = (field: any) => {
+      const ANN_INC_CONFIDENCE_THRESHOLD = 0.8; // Lower threshold for annual increase values
+      if (field && field.value && field.confidence >= ANN_INC_CONFIDENCE_THRESHOLD) {
+        const value = field.value;
+        // Skip empty strings, null, undefined, or 0
+        if (value === '' || value === null || value === undefined || value === 0) {
+          return null;
+        }
+        return value;
+      }
+      return null;
+    };
+
+    // Helper to convert date to YY/MM/DD format
+    const convertDateToYYMMDD = (dateString: string): string => {
+      try {
+        // First, try to parse as a regular date
+        let date = new Date(dateString);
+        
+        // If it's not a valid date, check if it contains day count text
+        if (isNaN(date.getTime())) {
+          let daysToAdd: number | null = null;
+          
+          // Look for ANY number in the text (most flexible approach)
+          // This will catch 120, 121, 122, etc. anywhere in the text
+          const anyNumberMatch = dateString.match(/\b(\d{1,4})\b/);
+          if (anyNumberMatch) {
+            const foundNumber = parseInt(anyNumberMatch[1]);
+            // Only use numbers that make sense as days (1-3650, roughly 10 years max)
+            if (foundNumber >= 1 && foundNumber <= 3650) {
+              daysToAdd = foundNumber;
+              this.logger.debug(`Found number ${foundNumber} in text, treating as days to add`);
+            }
+          }
+          
+          // If no reasonable number found, try specific patterns
+          if (!daysToAdd) {
+            const dayPatterns = [
+              /(\d+)\s*days?\s*after/i,                    // "120 days after"
+              /\((\d+)\)\s*days?\s*after/i,               // "(120) days after"
+              /one hundred twenty\s*\((\d+)\)/i,          // "one hundred twenty (120)"
+              /ninety\s*\((\d+)\)/i,                      // "ninety (90)"
+              /sixty\s*\((\d+)\)/i,                       // "sixty (60)"
+              /thirty\s*\((\d+)\)/i,                      // "thirty (30)"
+              /\((\d+)\)/,                                // Any number in parentheses
+            ];
+            
+            // Try each pattern to extract the number of days
+            for (const pattern of dayPatterns) {
+              const match = dateString.match(pattern);
+              if (match) {
+                const foundNumber = parseInt(match[1]);
+                if (foundNumber >= 1 && foundNumber <= 3650) {
+                  daysToAdd = foundNumber;
+                  this.logger.debug(`Found number ${foundNumber} using pattern matching`);
+                  break;
+                }
+              }
+            }
+          }
+          
+          // If still no number found, try written numbers without parentheses
+          if (!daysToAdd) {
+            const writtenNumbers: Record<string, number> = {
+              'thirty': 30,
+              'sixty': 60,
+              'ninety': 90,
+              'one hundred': 100,
+              'one hundred twenty': 120,
+              'two hundred': 200,
+            };
+            
+            for (const [written, number] of Object.entries(writtenNumbers)) {
+              if (dateString.toLowerCase().includes(written)) {
+                daysToAdd = number;
+                this.logger.debug(`Found written number "${written}" -> ${number} days`);
+                break;
+              }
+            }
+          }
+          
+          // If we found a day count, calculate future date from today
+          if (daysToAdd && !isNaN(daysToAdd)) {
+            date = new Date();
+            date.setDate(date.getDate() + daysToAdd);
+            this.logger.debug(`Parsed "${dateString}" as ${daysToAdd} days from today -> ${date.toISOString()}`);
+          } else {
+            this.logger.warn(`Could not parse date or day count from: ${dateString}`);
+            return dateString; // Return original if can't parse
+          }
+        }
+        
+        // Convert to YY/MM/DD format
+        const year = date.getFullYear().toString().slice(-2); // Last 2 digits of year
+        const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Month with leading zero
+        const day = date.getDate().toString().padStart(2, '0'); // Day with leading zero
+        
+        return `${year}/${month}/${day}`;
+      } catch (error) {
+        this.logger.warn(`Error converting date ${dateString}:`, error);
+        return dateString; // Return original if error
+      }
+    };
+
+    // Initialize both negotiation objects if they don't exist
+    if (!lead.current_negotiation) lead.current_negotiation = {} as any;
+    if (!lead.budget_negotiation) lead.budget_negotiation = {} as any;
+
+    // Extract and update BOTH current_negotiation AND budget_negotiation fields from LOI
     const updatePayload: any = {};
     let hasUpdates = false;
 
-    // Extract current_negotiation fields with EXACT Document AI field names
+    // Extract negotiation fields with EXACT Document AI field names
     // Document AI returns: rent_psf, annual_increase, tenant_improvement_psf, rent_commencement_date, free_rent_months, term
     const rentPerSf = getValue(data.rent_psf) || getValue(data.rent_per_sf) || getValue(data.base_rent_per_sf);
-    const annInc = getValue(data.annual_increase) || getValue(data.ann_inc) || getValue(data.rent_increase);
+    const annInc = getAnnIncValue(data.annual_increase) || getAnnIncValue(data.ann_inc) || getAnnIncValue(data.rent_increase);
     const freeMonths = getValue(data.free_rent_months) || getValue(data.free_months);
     const term = getValue(data.term) || getValue(data.lease_term);
-    const tiPerSf = getValue(data.tenant_improvement_psf) || getValue(data.ti_per_sf) || getValue(data.tenant_improvement_per_sf);
-    const rcd = getValue(data.rent_commencement_date) || getValue(data.rcd);
+    // Use special TI helper with lower confidence threshold
+    const tiPerSf = getTIValue(data.tenant_improvement_psf) || getTIValue(data.ti_per_sf) || getTIValue(data.tenant_improvement_per_sf);
+    // Use special RCD helper with lower confidence threshold
+    const rcd = getRCDValue(data.rent_commencement_date) || getRCDValue(data.rcd);
 
-    // Only update fields that have non-empty values
+    // Update current_negotiation and budget_negotiation fields
     if (rentPerSf !== null) {
-      lead.current_negotiation.rentPerSf = parseFloat(rentPerSf);
+      const numericRentPerSf = parseFloat(rentPerSf);
+      lead.current_negotiation.rentPerSf = numericRentPerSf;
+      // lead.budget_negotiation.rentPerSf = numericRentPerSf;
       hasUpdates = true;
-      this.logger.debug(`Extracted rentPerSf: ${rentPerSf}`);
+      this.logger.debug(`Extracted rentPerSf: ${rentPerSf} -> ${numericRentPerSf} (updated both objects)`);
     }
 
     if (annInc !== null) {
-      lead.current_negotiation.annInc = parseFloat(annInc);
+      // Handle percentage values like "15%" - extract numeric value
+      const numericAnnInc = typeof annInc === 'string' && annInc.includes('%') 
+        ? parseFloat(annInc.replace('%', '')) 
+        : parseFloat(annInc);
+      
+      lead.current_negotiation.annInc = numericAnnInc;
+      // lead.budget_negotiation.annInc = numericAnnInc;
       hasUpdates = true;
-      this.logger.debug(`Extracted annInc: ${annInc}`);
+      this.logger.debug(`Extracted annInc: ${annInc} -> ${numericAnnInc} (updated both objects)`);
     }
 
     if (freeMonths !== null) {
-      lead.current_negotiation.freeMonths = parseFloat(freeMonths);
+      const numericFreeMonths = parseFloat(freeMonths);
+      lead.current_negotiation.freeMonths = numericFreeMonths;
+      // lead.budget_negotiation.freeMonths = numericFreeMonths;
       hasUpdates = true;
-      this.logger.debug(`Extracted freeMonths: ${freeMonths}`);
+      this.logger.debug(`Extracted freeMonths: ${freeMonths} -> ${numericFreeMonths} (updated both objects)`);
     }
 
     if (term !== null) {
       lead.current_negotiation.term = term;
+      lead.budget_negotiation.term = term;
       hasUpdates = true;
-      this.logger.debug(`Extracted term: ${term}`);
+      this.logger.debug(`Extracted term: ${term} (updated both objects)`);
     }
 
     if (tiPerSf !== null) {
-      lead.current_negotiation.tiPerSf = (tiPerSf);
+      // Handle text values like "twenty dollars per square foot ($20.00 psf)" - extract numeric value
+      let numericTiPerSf = tiPerSf;
+      if (typeof tiPerSf === 'string') {
+        // Try to extract number from parentheses like ($20.00 psf)
+        const match = tiPerSf.match(/\$(\d+\.?\d*)/);
+        if (match) {
+          numericTiPerSf = parseFloat(match[1]);
+        } else {
+          // Try to parse as float directly
+          numericTiPerSf = parseFloat(tiPerSf) || 0;
+        }
+      }
+      
+      // Convert to string as per schema requirement (tiPerSf is string type)
+      const tiPerSfString = numericTiPerSf.toString();
+      lead.current_negotiation.tiPerSf = tiPerSfString;
+      // lead.budget_negotiation.tiPerSf = tiPerSfString;
       hasUpdates = true;
-      this.logger.debug(`Extracted tiPerSf: ${tiPerSf}`);
+      this.logger.debug(`Extracted tiPerSf: ${tiPerSf} -> ${numericTiPerSf} -> "${tiPerSfString}" (updated both objects) [confidence: ${data.tenant_improvement_psf?.confidence?.toFixed(2)}]`);
+    } else {
+      this.logger.debug(`tiPerSf not extracted - confidence too low: ${data.tenant_improvement_psf?.confidence?.toFixed(2)} (threshold: 0.5)`);
     }
 
     if (rcd !== null) {
-      lead.current_negotiation.rcd = rcd;
+      // Convert date to YY/MM/DD format
+      const formattedRcd = convertDateToYYMMDD(rcd);
+      lead.current_negotiation.rcd = formattedRcd;
+      lead.budget_negotiation.rcd = formattedRcd;
       hasUpdates = true;
-      this.logger.debug(`Extracted rcd: ${rcd}`);
+      this.logger.debug(`Extracted rcd: ${rcd} -> ${formattedRcd} (updated both objects) [confidence: ${data.rent_commencement_date?.confidence?.toFixed(2)}]`);
+    } else {
+      this.logger.debug(`rcd not extracted - confidence too low: ${data.rent_commencement_date?.confidence?.toFixed(2)} (threshold: 0.6)`);
     }
 
-    // Only include current_negotiation in update if we have changes
+    // Include both negotiation objects in update if we have changes
     if (hasUpdates) {
       updatePayload.current_negotiation = lead.current_negotiation;
+      updatePayload.budget_negotiation = lead.budget_negotiation;
     }
 
     // Store extraction metadata
@@ -1563,6 +1734,7 @@ if (lead_status) {
     await this.repo.update(leadId, updatePayload);
 
     this.logger.log(`Lead ${leadId} updated with LOI extraction results (confidence: ${result.overallConfidence}, fields updated: ${hasUpdates})`);
+    this.logger.log(`Updated both current_negotiation and budget_negotiation with extracted values`);
   }
 
   // ==================== Unified Document Upload (3-Day, Courtesy, Attorney, etc.) ====================

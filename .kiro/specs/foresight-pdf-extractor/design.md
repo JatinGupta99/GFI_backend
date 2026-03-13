@@ -603,9 +603,9 @@ END CLASS
 
 ## Testing Strategy
 
-### Unit Testing
+### suite Testing
 
-Unit tests will focus on specific examples, edge cases, and error conditions:
+suite tests will focus on specific examples, edge cases, and error conditions:
 
 **Controller Tests**:
 - Test file upload with valid PDF
