@@ -97,7 +97,7 @@ export class Renewal {
   @Prop({ required: false })
   optionTerm?: string;
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   lastSyncAt: Date;
 
   @Prop({ required: true })

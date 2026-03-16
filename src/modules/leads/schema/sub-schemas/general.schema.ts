@@ -57,7 +57,7 @@ export class GeneralDetails {
     @Prop({ default: false })
     driversLicenseUploaded: boolean;
 
-    @Prop({ type: String, ref: Property.name, required: true })
+    @Prop({ type: String, default: '' })
     property: string;
 
     @Prop({ default: '' })

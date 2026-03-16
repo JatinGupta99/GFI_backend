@@ -18,6 +18,33 @@ export class PropertyRepository {
     return this.propertyModel.findOne({ propertyId }).lean().exec();
   }
 
+  async findByName(propertyName: string): Promise<Property | null> {
+    return this.propertyModel.findOne({ propertyName }).lean().exec();
+  }
+
+  async findByNameFuzzy(propertyName: string): Promise<Property | null> {
+    // First try exact match
+    const exact = await this.propertyModel.findOne({ propertyName }).lean().exec();
+    if (exact) return exact;
+
+    // Then try case-insensitive partial match — check if stored name appears in extracted text or vice versa
+    const escaped = propertyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const partial = await this.propertyModel
+      .findOne({ propertyName: { $regex: escaped, $options: 'i' } })
+      .lean()
+      .exec();
+    if (partial) return partial;
+
+    // Finally, check if any stored name is a substring of the extracted text
+    const all = await this.propertyModel.find().lean().exec();
+    const lower = propertyName.toLowerCase();
+    return all.find(p => lower.includes(p.propertyName.toLowerCase())) ?? null;
+  }
+
+  async findByMongoId(id: string): Promise<Property | null> {
+    return this.propertyModel.findById(id).lean().exec();
+  }
+
   async create(createPropertyDto: CreatePropertyDto): Promise<Property> {
     const newProperty = new this.propertyModel(createPropertyDto);
     return newProperty.save();

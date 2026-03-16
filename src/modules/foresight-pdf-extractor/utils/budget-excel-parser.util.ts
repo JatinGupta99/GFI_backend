@@ -14,6 +14,7 @@ export interface ExcelSuiteData {
   taxMonth: number;
   totalDueMonth: number;
   tiPerSf: number;
+  rcd: string | null;
   monthlyPayments: {
     jan: number;
     feb: number;
@@ -676,39 +677,31 @@ export class BudgetExcelParserUtil {
     status: 'Vacant' | 'Occupied' | 'Unknown';
     tenantName: string;
   } | null {
-    // Pattern 1: "SSSS - Proposed (BRR) PPPPPP-SSSS" or "SSSS - [Tenant Name] (BRR) PPPPPP-SSSS"
-    const tenantPattern = /(\d{4})\s*-\s*([^(]+)\s*\([^)]*\)\s*(\d{6})-(\d{4})/;
-    const match = cellValue.match(tenantPattern);
-    
+    // Pattern 1: "- SSSS - [Tenant Name] (BRR) PPPPPP-SSSS" (leading dash optional)
+    // Handles: "- 2111 - Proposed (BRR) 006564-2111"
+    //          "- Proposed #18 (BRR) 008312-18"
+    //          "- 98 Flowers (BRR) 006564-2131"
+    const tenantPattern = /^-?\s*(.+?)\s*\([^)]+\)\s*(\d{5,6})-(\w{2,})\s*$/;
+    const match = cellValue.trim().match(tenantPattern);
+
     if (match) {
-      const suiteId = match[1];
-      const tenantName = match[2].trim();
-      const propertyId = match[3];
-      const suiteIdConfirm = match[4];
-      
-      // Validate that both suite IDs match
-      if (suiteId !== suiteIdConfirm) {
-        return null; // Invalid format
-      }
-      
+      const rawLabel = match[1].trim();   // e.g. "2111 - Proposed" or "98 Flowers"
+      const propertyId = match[2];        // e.g. "006564"
+      const suiteId = match[3];           // e.g. "2111" or "18"
+
       // Determine status based on tenant name
       let status: 'Vacant' | 'Occupied' | 'Unknown';
-      if (tenantName.toLowerCase().includes('proposed')) {
+      if (rawLabel.toLowerCase().includes('proposed')) {
         status = 'Vacant';
-      } else if (tenantName.trim().length > 0) {
+      } else if (rawLabel.trim().length > 0) {
         status = 'Occupied';
       } else {
         status = 'Unknown';
       }
-      
-      return {
-        suiteId,
-        propertyId,
-        status,
-        tenantName
-      };
+
+      return { suiteId, propertyId, status, tenantName: rawLabel };
     }
-    
+
     // Pattern 2: "SSSS - Proposed (TI)" for Tenant Improvements
     const tiPattern = /(\d{4})\s*-\s*([^(]+)\s*\(TI\)/;
     const tiMatch = cellValue.match(tiPattern);
@@ -728,13 +721,13 @@ export class BudgetExcelParserUtil {
       
       return {
         suiteId,
-        propertyId: 'UNKNOWN', // Will be filled from other tenant rows
+        propertyId: 'UNKNOWN',
         status,
         tenantName
       };
     }
     
-    // Pattern 3: "Leasing Commission for SSSS - Proposed" for Leasing Commission
+    // Pattern 3: "Leasing Commission for SSSS - Proposed"
     const commissionPattern = /Leasing Commission for (\d+) - ([^"]+)/;
     const commissionMatch = cellValue.match(commissionPattern);
     
@@ -753,7 +746,7 @@ export class BudgetExcelParserUtil {
       
       return {
         suiteId,
-        propertyId: 'UNKNOWN', // Will be filled from other tenant rows
+        propertyId: 'UNKNOWN',
         status,
         tenantName
       };
@@ -765,9 +758,19 @@ export class BudgetExcelParserUtil {
   /**
    * Extract data from Rental Income section
    */
-  private static extractFromRentalIncomeSection(worksheet: any, tenantInfo: TenantRowInfo[]): Map<string, { baseRentMonth: number; squareFootage: number }> {
+  private static extractFromRentalIncomeSection(worksheet: any, tenantInfo: TenantRowInfo[]): Map<string, { baseRentMonth: number; squareFootage: number; rcd: string | null }> {
     const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-    const results = new Map<string, { baseRentMonth: number; squareFootage: number }>();
+    const results = new Map<string, { baseRentMonth: number; squareFootage: number; rcd: string | null }>();
+
+    // Read month header labels from the sheet (row where cols 2–13 look like "MM/YY")
+    let headerLabels: string[] | undefined;
+    for (const row of data) {
+      const candidates = (row as any[]).slice(2, 14).map(c => String(c ?? ''));
+      if (candidates.filter(c => /^\d{2}\/\d{2}$/.test(c)).length >= 12) {
+        headerLabels = candidates;
+        break;
+      }
+    }
     
     for (const tenant of tenantInfo) {
       if (!tenant.section.includes('RENTAL INCOME') && !tenant.section.includes('Rental Income')) continue;
@@ -775,12 +778,13 @@ export class BudgetExcelParserUtil {
       const row = data[tenant.rowIndex];
       if (!row) continue;
       
-      // Extract base rent (look for monthly values in columns 7-13)
+      // Extract base rent — first non-zero value in columns 2–13
       let baseRentMonth = 0;
-      for (let i = 7; i <= 13; i++) {
+      for (let i = 2; i <= 13; i++) {
         const cell = row[i];
-        if (cell && typeof cell === 'number' && cell > 0) {
-          baseRentMonth = cell;
+        const val = typeof cell === 'number' ? cell : parseFloat(String(cell ?? '').replace(/,/g, ''));
+        if (!isNaN(val) && val > 0) {
+          baseRentMonth = val;
           break;
         }
       }
@@ -794,8 +798,11 @@ export class BudgetExcelParserUtil {
           squareFootage = parseInt(match[1]);
         }
       }
+
+      // RCD — first month column (2–13) where value > 0, using actual header labels
+      const rcd = this.extractRcdFromRow(row as any[], headerLabels);
       
-      results.set(tenant.suiteId, { baseRentMonth, squareFootage });
+      results.set(tenant.suiteId, { baseRentMonth, squareFootage, rcd });
     }
     
     return results;
@@ -1038,6 +1045,32 @@ export class BudgetExcelParserUtil {
   }
 
   /**
+   * Determine RCD (Rent Commencement Date) from a Proposed (BRR) row.
+   * Scans columns 2–13 and returns the first month where value > 0,
+   * formatted as MM/YY (e.g. "06/26") matching the sheet header labels.
+   * Falls back to null if all values are zero.
+   */
+  private static extractRcdFromRow(row: any[], headerLabels?: string[]): string | null {
+    // Default month labels for 2026 budget — overridden by actual header if provided
+    const defaultLabels = [
+      '01/26', '02/26', '03/26', '04/26', '05/26', '06/26',
+      '07/26', '08/26', '09/26', '10/26', '11/26', '12/26',
+    ];
+    const labels = headerLabels && headerLabels.length === 12 ? headerLabels : defaultLabels;
+
+    for (let i = 0; i < 12; i++) {
+      const cell = row[i + 2]; // columns 2–13
+      const val = typeof cell === 'number'
+        ? cell
+        : parseFloat(String(cell ?? '').replace(/,/g, ''));
+      if (!isNaN(val) && val > 0) {
+        return labels[i]; // e.g. "06/26"
+      }
+    }
+    return null;
+  }
+
+  /**
    * Enhanced extraction method that returns ExcelSuiteData format
    */
   static extractEnhancedBudgetData(buffer: Buffer): ExcelExtractionResult {
@@ -1103,7 +1136,7 @@ export class BudgetExcelParserUtil {
         
         if (!suiteMap.has(suiteId)) {
           // Get base data
-          const rentalData = rentalIncomeData.get(suiteId) || { baseRentMonth: 0, squareFootage: 0 };
+          const rentalData = rentalIncomeData.get(suiteId) || { baseRentMonth: 0, squareFootage: 0, rcd: null };
           const camMonth = camData.get(suiteId) || 0;
           const insMonth = insData.get(suiteId) || 0;
           const taxMonth = retData.get(suiteId) || 0;
@@ -1130,6 +1163,7 @@ export class BudgetExcelParserUtil {
             taxMonth,
             totalDueMonth,
             tiPerSf,
+            rcd: rentalData.rcd ?? null,
             monthlyPayments
           };
 

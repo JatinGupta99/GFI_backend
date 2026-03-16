@@ -681,15 +681,25 @@ export class LeasingService {
         let failedLeases = 0;
 
         try {
-            // Fetch property details to get property name
+            // Fetch property details to get property name and MRI building ID
             const property = await this.propertiesService.findOne(propertyId);
             const propertyName = property?.propertyName || propertyId;
-            
-            this.logger.log(`📍 Property: ${propertyName} (${propertyId})`);
 
-            // Fetch all leases for the property
+            // Resolve the 6-digit MRI building ID (buildingId takes priority over propertyId)
+            const mriId: string = (property as any)?.buildingId || propertyId;
+            const isSixDigit = /^\d{6}$/.test(mriId);
+            if (!isSixDigit) {
+                this.logger.warn(
+                    `⚠️  Property ${propertyId} has no valid 6-digit buildingId (got "${mriId}"). Skipping MRI sync.`,
+                );
+                return { totalLeases: 0, processedLeases: 0, savedRenewals: 0, failedLeases: 0 };
+            }
+
+            this.logger.log(`📍 Property: ${propertyName} (internal: ${propertyId}, MRI buildingId: ${mriId})`);
+
+            // Fetch all leases for the property using the MRI building ID
             const leases = await this.safeFetch(
-                () => this.leasesService.fetch(propertyId, 1000, 0),
+                () => this.leasesService.fetch(mriId, 1000, 0),
                 [],
             );
 
@@ -701,8 +711,32 @@ export class LeasingService {
             totalLeases = leases.length;
             this.logger.log(`📋 Found ${totalLeases} leases in MRI for property ${propertyId}`);
 
-            // Fetch property metadata (offers and EMEA)
-            const [offers, emea] = await this.getPropertyMetadata(propertyId);
+            // ── Upcoming-only filter ──────────────────────────────────────────
+            // Keep only leases expiring between today and 24 months from now.
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const cutoff = new Date(today);
+            cutoff.setMonth(cutoff.getMonth() + 24);
+
+            const upcomingLeases = leases.filter(lease => {
+                const raw = lease.LeaseExpirationDate;
+                if (!raw || raw === 'N/A') return false;
+                const exp = new Date(raw);
+                return !isNaN(exp.getTime()) && exp >= today && exp <= cutoff;
+            });
+
+            this.logger.log(
+                `📅 Upcoming filter (today → +24 months): ${upcomingLeases.length}/${totalLeases} leases qualify`,
+            );
+
+            if (!upcomingLeases.length) {
+                this.logger.warn(`No upcoming renewals (within 24 months) for property ${propertyId}`);
+                return { totalLeases, processedLeases: 0, savedRenewals: 0, failedLeases: 0 };
+            }
+            // ─────────────────────────────────────────────────────────────────
+
+            // Fetch property metadata (offers and EMEA) using MRI building ID
+            const [offers, emea] = await this.getPropertyMetadata(mriId);
 
             // Create lookup maps
             const offersMap = new Map(offers.map(o => [o.LeaseID, o]));
@@ -713,23 +747,23 @@ export class LeasingService {
             // Process leases in batches to respect rate limits
             const BATCH_SIZE = 5; // 5 leases per batch
             const BATCH_DELAY = 2000; // 2 seconds between batches
-            const totalBatches = Math.ceil(leases.length / BATCH_SIZE);
+            const totalBatches = Math.ceil(upcomingLeases.length / BATCH_SIZE);
 
-            this.logger.log(`🔄 Processing ${leases.length} leases in ${totalBatches} batches (${BATCH_SIZE} leases per batch)`);
+            this.logger.log(`🔄 Processing ${upcomingLeases.length} upcoming leases in ${totalBatches} batches (${BATCH_SIZE} leases per batch)`);
 
             for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
                 const start = batchIndex * BATCH_SIZE;
-                const end = Math.min(start + BATCH_SIZE, leases.length);
-                const batch = leases.slice(start, end);
+                const end = Math.min(start + BATCH_SIZE, upcomingLeases.length);
+                const batch = upcomingLeases.slice(start, end);
 
                 this.logger.log(`📦 Processing batch ${batchIndex + 1}/${totalBatches} (leases ${start + 1}-${end})`);
 
-                // Process all leases in current batch
+                // Process all leases in current batch using MRI building ID for sub-calls
                 const batchRenewals: UpcomingRenewal[] = [];
                 for (const lease of batch) {
                     try {
                         const renewal = await this.processLease(
-                            propertyId,
+                            mriId,
                             lease,
                             offersMap,
                             emeaMap,

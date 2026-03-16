@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LeadsService } from './leads.service';
 import { LeadsController } from './leads.controller';
@@ -9,6 +9,7 @@ import { LeadsProcessor } from './leads.processor';
 import { MailModule } from '../mail/mail.module';
 import { MediaModule } from '../media/media.module';
 import { CompanyUserModule } from '../company-user/company-user.module';
+import { PropertiesModule } from '../properties/properties.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { PropertyAssetsModule } from '../property-assets/property-assets.module';
 import { BullModule } from '@nestjs/bullmq';
@@ -26,6 +27,7 @@ import { RenewalsModule } from '../renewals/renewals.module';
     RenewalsModule,
     MediaModule,
     CompanyUserModule,
+    forwardRef(() => PropertiesModule),
     TasksModule,
     PropertyAssetsModule,
     DocumentAiModule,

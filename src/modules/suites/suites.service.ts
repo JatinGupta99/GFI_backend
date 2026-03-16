@@ -120,6 +120,7 @@ export class SuitesService {
       camPerSf: this.formatDecimalToString(budgetSuite.camPerSf),
       insPerSf: this.formatDecimalToString(budgetSuite.insPerSf),
       taxPerSf: this.formatDecimalToString(budgetSuite.taxPerSf),
+      rcd: null,
       charges: {
         baseRentMonth: budgetSuite.proposedValues.baseRent,
         camMonth: budgetSuite.proposedValues.cam,
@@ -189,6 +190,7 @@ export class SuitesService {
       camPerSf: this.formatDecimalToString(suite.squareFootage > 0 ? (suite.camMonth * 12) / suite.squareFootage : 0),
       insPerSf: this.formatDecimalToString(suite.squareFootage > 0 ? (suite.insMonth * 12) / suite.squareFootage : 0),
       taxPerSf: this.formatDecimalToString(suite.squareFootage > 0 ? (suite.taxMonth * 12) / suite.squareFootage : 0),
+      rcd: suite.rcd ?? null,
       charges: {
         baseRentMonth: suite.baseRentMonth,
         camMonth: suite.camMonth,
@@ -230,6 +232,7 @@ export class SuitesService {
       camPerSf: this.formatDecimalToString(camMonth > 0 ? (camMonth * 12) / squareFootage : 0),
       insPerSf: this.formatDecimalToString(insMonth > 0 ? (insMonth * 12) / squareFootage : 0),
       taxPerSf: this.formatDecimalToString(taxMonth > 0 ? (taxMonth * 12) / squareFootage : 0),
+      rcd: null,
       charges: {
         baseRentMonth,
         camMonth,
@@ -270,6 +273,7 @@ export class SuitesService {
           camPerSf: suiteUpdate.camPerSf,
           insPerSf: suiteUpdate.insPerSf,
           taxPerSf: suiteUpdate.taxPerSf,
+          rcd: suiteUpdate.rcd,
           charges: suiteUpdate.charges,
           balanceDue: suiteUpdate.balanceDue,
           leaseTerms: suiteUpdate.leaseTerms,

@@ -56,7 +56,7 @@ export class DocumentEntity {
 export const DocumentSchema = SchemaFactory.createForClass(DocumentEntity);
 
 // Index for efficient queries
-DocumentSchema.index({ key: 1 });
+// Note: key field already has unique index from @Prop({ unique: true })
 DocumentSchema.index({ uploadedBy: 1 });
 DocumentSchema.index({ category: 1 });
 DocumentSchema.index({ status: 1 });

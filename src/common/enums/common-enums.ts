@@ -51,7 +51,7 @@ export enum LeadStatus {
   REVIEW_REQUIRED = 'REVIEW_REQUIRED',
   FAILED = 'FAILED',
   NO_CONTACT = 'No Contact',
-  RENEWAL_NEGOTIATION = 'Renewal Negotiation',
+  RENEWAL_NEGOTIATION = 'RENEWAL_NEGOTIATION',
   LOST = 'Lost',
   NEW = 'new',
   CONTACTED = 'contacted',

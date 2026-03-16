@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsBoolean,
   IsArray,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -27,6 +28,8 @@ export class SendForSignatureDto {
   @IsNotEmpty()
   leaseId: string; // Optional since it's in the URL path
 
+  // Only validate as email if value is a non-empty string
+  @ValidateIf((o) => o.recipientEmail != null && o.recipientEmail !== '')
   @IsEmail()
   @IsOptional()
   recipientEmail?: string;
@@ -36,6 +39,7 @@ export class SendForSignatureDto {
   body?:string;
   
   @IsArray()
+  @ValidateIf((o) => Array.isArray(o.cc) && o.cc.length > 0)
   @IsEmail({}, { each: true })
   @IsOptional()
   cc?: string[];

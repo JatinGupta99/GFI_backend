@@ -21,7 +21,7 @@ import { RenewalRepository } from './repository/renewal.repository';
 @Module({
     imports: [
         RentRollModule,
-        PropertiesModule,
+        forwardRef(() => PropertiesModule),
         forwardRef(() => LeadsModule),
         MailModule,
         MediaModule,

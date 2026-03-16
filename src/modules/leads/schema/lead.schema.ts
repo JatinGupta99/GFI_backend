@@ -41,6 +41,9 @@ export class Lead {
   })
   lead_status: string;
 
+  @Prop({ type: String })
+  propertyId: string;
+
   @Prop({ 
     type: GeneralDetailsSchema, 
     default: () => ({
@@ -266,7 +269,6 @@ export class Lead {
     type: String,
     enum: Object.values(SignatureStatus),
     default: SignatureStatus.DRAFT,
-    index: true,
   })
   signatureStatus?: SignatureStatus;
 
@@ -310,3 +312,4 @@ LeadSchema.index({ 'lease.approval_status': 1 });
 LeadSchema.index({ signatureStatus: 1 });
 LeadSchema.index({ createdAt: -1 });
 LeadSchema.index({ 'general.property': 1 });
+LeadSchema.index({ propertyId: 1 });

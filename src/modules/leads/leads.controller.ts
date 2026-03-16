@@ -222,8 +222,11 @@ export class LeadsController {
   // ==================== LOI Document Upload & Processing ====================
 
   @Post(':id/loi/upload-url')
-  getLoiUploadUrl(@Param('id') id: string) {
-    return this.service.getLoiUploadUrl(id);
+  getLoiUploadUrl(
+    @Param('id') id: string,
+    @Body('contentType') contentType: string,
+  ) {
+    return this.service.getLoiUploadUrl(id, contentType);
   }
 
   @Post(':id/loi/confirm')
@@ -232,6 +235,7 @@ export class LeadsController {
     @Body('key') key: string,
     @Body('fileName') fileName: string,
     @Body('fileSize') fileSize: number,
+    @Body('mimeType') mimeType: string,
     @UserId() user: {
       userId: string;
       email: string;
@@ -239,7 +243,7 @@ export class LeadsController {
       role: string;
     },
   ) {
-    return this.service.confirmLoiUpload(id, key, fileName, fileSize, user.name);
+    return this.service.confirmLoiUpload(id, key, fileName, fileSize, user.name, mimeType);
   }
 
   // ==================== Unified Document Upload (3-Day, Courtesy, Attorney, etc.) ====================
@@ -249,8 +253,9 @@ export class LeadsController {
     @Param('id') id: string,
     @Body('documentType') documentType: string,
     @Body('recordType') recordType: string = 'LEAD',
+    @Body('contentType') contentType: string,
   ) {
-    return this.service.getDocumentUploadUrl(id, documentType, recordType || 'LEAD');
+    return this.service.getDocumentUploadUrl(id, documentType, recordType || 'LEAD', contentType);
   }
 
   @Post(':id/documents/confirm')
@@ -261,6 +266,7 @@ export class LeadsController {
     @Body('fileSize') fileSize: number,
     @Body('documentType') documentType: string,
     @Body('recordType') recordType: string,
+    @Body('mimeType') mimeType: string,
     @UserId() user: {
       userId: string;
       email: string;
@@ -276,6 +282,7 @@ export class LeadsController {
       documentType,
       recordType,
       user.name,
+      mimeType,
     );
   }
 

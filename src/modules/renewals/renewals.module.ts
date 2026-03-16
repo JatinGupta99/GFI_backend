@@ -1,8 +1,8 @@
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
 import { BullModule } from '@nestjs/bullmq';
 import { CacheModule } from '@nestjs/cache-manager';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
 
 // Entities
@@ -12,15 +12,15 @@ import { Renewal, RenewalSchema } from './renewal.entity';
 import { RenewalsController } from './renewals.controller';
 
 // Services
-import { RenewalQueryService } from './services/renewal-query.service';
-import { RenewalSyncService } from './services/renewal-sync.service';
-import { RenewalSchedulerService } from './services/renewal-scheduler.service';
 import { FieldMappingService } from './services/field-mapping.service';
-import { MriChargesService } from './services/mri-charges.service';
-import { MriFinancialService } from './services/mri-financial.service';
-import { MriDataAggregatorService } from './services/mri-data-aggregator.service';
-import { MriCacheStrategyService } from './services/mri-cache-strategy.service';
 import { MriBatchOptimizerService } from './services/mri-batch-optimizer.service';
+import { MriCacheStrategyService } from './services/mri-cache-strategy.service';
+import { MriChargesService } from './services/mri-charges.service';
+import { MriDataAggregatorService } from './services/mri-data-aggregator.service';
+import { MriFinancialService } from './services/mri-financial.service';
+import { RenewalQueryService } from './services/renewal-query.service';
+import { RenewalSchedulerService } from './services/renewal-scheduler.service';
+import { RenewalSyncService } from './services/renewal-sync.service';
 
 // Repositories
 import { RenewalRepository } from './repositories/renewal.repository';
@@ -32,10 +32,10 @@ import { MriRenewalProvider } from './providers/mri-renewal.provider';
 import { RenewalSyncProcessor } from './processors/renewal-sync.processor';
 
 // External modules
+import { LeasingModule } from '../leasing/leasing.module';
+import { MediaModule } from '../media/media.module';
 import { PropertiesModule } from '../properties/properties.module';
 import { RentRollModule } from '../rent-roll/rent-roll.module';
-import { MediaModule } from '../media/media.module';
-import { LeasingModule } from '../leasing/leasing.module';
 
 @Module({
   imports: [
@@ -74,10 +74,10 @@ import { LeasingModule } from '../leasing/leasing.module';
     }),
 
     // External dependencies
-    PropertiesModule,
+    forwardRef(() => PropertiesModule),
     RentRollModule,
     MediaModule,
-    LeasingModule,
+    forwardRef(() => LeasingModule),
   ],
 
   controllers: [

@@ -41,7 +41,6 @@ export class RenewalRepository {
                 mriLeaseId: renewal.id,
                 propertyId: renewal.property
             });
-            const property=await this.getRenewalsByProperty
             // Map UpcomingRenewal DTO to Renewal entity schema format
             // The schema expects: mriLeaseId, tenantId, propertyId, propertyName, tenantName, suite, leaseEnd, currentMonthRent, lastSyncAt, status
             // All optional fields get default values instead of undefined to ensure consistent schema
@@ -117,6 +116,19 @@ export class RenewalRepository {
             );
             const deactivated = deactivateResult.modifiedCount;
             this.logger.log(`Deactivated ${deactivated} renewals that are no longer in MRI`);
+        }
+
+        // Also mark any already-expired leases in the DB as DEAD so stale records
+        // from previous syncs don't pollute the active list.
+        const expiredResult = await this.renewalModel.updateMany(
+            {
+                leaseEnd: { $lt: new Date() },
+                status: { $ne: 'DEAD' },
+            },
+            { status: 'DEAD', lastSyncAt: new Date() },
+        );
+        if (expiredResult.modifiedCount > 0) {
+            this.logger.log(`Marked ${expiredResult.modifiedCount} already-expired renewals as DEAD`);
         }
 
         this.logger.log(`Sync completed: ${created} created, ${updated} updated`);

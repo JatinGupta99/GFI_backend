@@ -28,6 +28,7 @@ export class BudgetSuiteUpdateDto {
   camPerSf: string;
   insPerSf: string;
   taxPerSf: string;
+  rcd: string | null;
   charges: {
     baseRentMonth: number;
     camMonth: number;

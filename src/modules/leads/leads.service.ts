@@ -11,6 +11,7 @@ import { PaginationHelper } from '../../common/helpers/pagination.helper';
 import { CompanyUserService } from '../company-user/company-user.service';
 import { MailService } from '../mail/mail.service';
 import { MediaService } from '../media/media.service';
+import { PropertiesService } from '../properties/properties.service';
 import { ActivitiesService } from '../property-assets/activities.service';
 import { RenewalRepository } from '../renewals/repositories/renewal.repository';
 import { TasksService } from '../tasks/tasks.service';
@@ -38,6 +39,7 @@ export class LeadsService {
     private readonly mailService: MailService,
     private readonly mediaService: MediaService,
     private readonly companyUserService: CompanyUserService,
+    private readonly propertiesService: PropertiesService,
     private readonly tasksService: TasksService,
     private readonly activitiesService: ActivitiesService,
     @InjectQueue(JOBNAME.LEADS_PROCESSING) private leadsQueue: Queue,
@@ -57,7 +59,19 @@ export class LeadsService {
       approval_status,
       lease_status,
       property,
+      propertyIds,
     } = query;
+
+    // Parse propertyIds - handle both array and comma-separated string
+    let parsedPropertyIds: string[] | undefined;
+    if (propertyIds) {
+      if (Array.isArray(propertyIds)) {
+        parsedPropertyIds = propertyIds;
+      } else if (typeof propertyIds === 'string') {
+        // Split comma-separated string and trim whitespace
+        parsedPropertyIds = propertyIds.split(',').map(id => id.trim()).filter(id => id.length > 0);
+      }
+    }
 
     const skip = (page - 1) * limit;
     const filter: FilterQuery<Lead> = {};
@@ -118,13 +132,17 @@ if (lead_status) {
     }
 
     // -------------------------
-    // Property Filter
+    // Property Filter (by propertyId or propertyIds array)
     // -------------------------
-    if (property) {
-      filter['general.property'] = new RegExp(
-        property.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-        'i'
-      );
+    if (parsedPropertyIds && parsedPropertyIds.length > 0) {
+      // Filter by multiple propertyIds
+      filter.propertyId = { $in: parsedPropertyIds };
+      this.logger.log(`Filtering leads by propertyIds: ${parsedPropertyIds.join(', ')}`);
+    } else if (property) {
+      // Filter by propertyId at root level only (legacy support)
+      const propertyIdValue = property.trim();
+      filter.propertyId = propertyIdValue;
+      this.logger.log(`Filtering leads by propertyId: ${propertyIdValue}`);
     }
 
     // -------------------------
@@ -360,6 +378,26 @@ if (lead_status) {
   async create(dto: CreateLeadDto, userId: string) {
     const normalizedData = this.normalizeLeadData(dto, userId);
 
+    // Convert property name to propertyId
+    if (dto.general?.property) {
+      const propertyInput = dto.general.property as string;
+      
+      // Look up property by name
+      const property = await this.propertiesService.findByName(propertyInput);
+      
+      if (property) {
+        // Store property NAME in general.property (e.g., "Richwood")
+        normalizedData['general.property'] = property.propertyName;
+        
+        // Store propertyId at root level (e.g., "008400")
+        normalizedData.propertyId = property.propertyId;
+        
+        this.logger.log(`Property "${propertyInput}" → propertyId: ${property.propertyId}, propertyName: ${property.propertyName}`);
+      } else {
+        this.logger.warn(`Property not found: ${propertyInput}`);
+      }
+    }
+
     // Handle budget_negotiation defaults during creation
     if (normalizedData.budget_negotiation) {
       normalizedData.budget_negotiation = {
@@ -381,6 +419,26 @@ if (lead_status) {
     }
 
     const normalizedData = this.normalizeLeadData(dto);
+    
+    // Convert property name to propertyId if property is being updated
+    if (dto.general?.property) {
+      const propertyInput = dto.general.property as string;
+      
+      // Look up property by name
+      const property = await this.propertiesService.findByName(propertyInput);
+      
+      if (property) {
+        // Store property NAME in general.property (e.g., "Richwood")
+        normalizedData['general.property'] = property.propertyName;
+        
+        // Store propertyId at root level (e.g., "008400")
+        normalizedData.propertyId = property.propertyId;
+        
+        this.logger.log(`Property "${propertyInput}" → propertyId: ${property.propertyId}, propertyName: ${property.propertyName}`);
+      } else {
+        this.logger.warn(`Property not found: ${propertyInput}`);
+      }
+    }
     
     // Handle budget_negotiation defaults
     if (normalizedData.budget_negotiation) {
@@ -1261,8 +1319,8 @@ if (lead_status) {
       lead.files[fileIndex].confidence = result.overallConfidence;
       lead.files[fileIndex].extractedData = result.data;
 
-      const CONFIDENCE_THRESHOLD = 0.85;
-      const REVIEW_THRESHOLD = 0.6;
+      const CONFIDENCE_THRESHOLD = 0.40;
+      const REVIEW_THRESHOLD = 0.40;
 
       const data = result.data || {};
 
@@ -1280,11 +1338,25 @@ if (lead_status) {
 
       if (!lead.general) lead.general = {} as any;
 
+      // Placeholder values set by frontend during PDF upload — treat as empty
+      const PLACEHOLDER_FIRST = ['file', ''];
+      const PLACEHOLDER_LAST = ['upload', ''];
+      const isPlaceholderFirst = PLACEHOLDER_FIRST.includes((lead.general.firstName || '').toLowerCase());
+      const isPlaceholderLast = PLACEHOLDER_LAST.includes((lead.general.lastName || '').toLowerCase());
+
       const fName = getValue(data.firstName);
-      if (!lead.general.firstName && fName) lead.general.firstName = fName;
+      if ((isPlaceholderFirst || !lead.general.firstName) && fName) lead.general.firstName = fName;
 
       const lName = getValue(data.lastName);
-      if (!lead.general.lastName && lName) lead.general.lastName = lName;
+      if ((isPlaceholderLast || !lead.general.lastName) && lName) lead.general.lastName = lName;
+
+      // tenantName like "Michelle Stor" — split into first/last if individual names not found
+      const tenantName = getValue(data.tenantName) || getValue(data.tenant_name);
+      if (tenantName && (isPlaceholderFirst || isPlaceholderLast || !lead.general.firstName || !lead.general.lastName)) {
+        const parts = tenantName.trim().split(/\s+/);
+        if (isPlaceholderFirst || !lead.general.firstName) lead.general.firstName = parts[0] || '';
+        if (isPlaceholderLast || !lead.general.lastName) lead.general.lastName = parts.slice(1).join(' ') || '';
+      }
 
       const email = getValue(data.email);
       if (!lead.general.email && email) lead.general.email = email;
@@ -1294,6 +1366,12 @@ if (lead_status) {
 
       const company = getValue(data.company);
       if (company && !lead.general.businessName) lead.general.businessName = company;
+
+      const suite = getValue(data.suite);
+      if (suite && !lead.general.suite) lead.general.suite = suite;
+
+      const use = getValue(data.use) || getValue(data.permitted_use);
+      if (use && !lead.general.use) lead.general.use = use;
 
       const updatePayload: any = {
         files: lead.files,
@@ -1346,7 +1424,6 @@ if (lead_status) {
       mimeType,
       documentType: 'loi', // Mark as LOI for special handling
     });
-
     this.logger.log(`LOI document queued for processing: ${key}`);
 
     return {
@@ -1368,15 +1445,28 @@ if (lead_status) {
    * @param leadId - Lead ID
    * @returns Presigned S3 upload URL and key
    */
-  async getLoiUploadUrl(leadId: string) {
+  async getLoiUploadUrl(leadId: string, contentType: string = 'application/pdf') {
     const lead = await this.repo.findById(leadId);
     if (!lead) {
       throw new NotFoundException('Lead not found');
     }
 
-    const folderPath = `leads/${leadId}/loi`;
-    const contentType = 'application/pdf';
+    const SUPPORTED_LOI_TYPES = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/png',
+      'image/jpeg',
+      'image/tiff',
+    ];
 
+    if (!SUPPORTED_LOI_TYPES.includes(contentType)) {
+      throw new BadRequestException(
+        `Unsupported file type "${contentType}". Allowed: PDF, Word (.docx), or image files.`,
+      );
+    }
+
+    const folderPath = `leads/${leadId}/loi`;
     const { key, url } = await this.mediaService.generateUploadUrl(folderPath, contentType);
 
     return {
@@ -1400,12 +1490,35 @@ if (lead_status) {
    * @param userName - User who uploaded
    * @returns Confirmation result
    */
+  /**
+   * Detect MIME type from S3 key / file name extension.
+   * Returns null for formats Document AI cannot process.
+   */
+  private getMimeTypeFromKey(key: string): string | null {
+    const ext = key.split('.').pop()?.toLowerCase();
+    const map: Record<string, string> = {
+      pdf:  'application/pdf',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      doc:  'application/msword',
+      png:  'image/png',
+      jpg:  'image/jpeg',
+      jpeg: 'image/jpeg',
+      tiff: 'image/tiff',
+      tif:  'image/tiff',
+      gif:  'image/gif',
+      bmp:  'image/bmp',
+      webp: 'image/webp',
+    };
+    return map[ext ?? ''] ?? null;
+  }
+
   async confirmLoiUpload(
     leadId: string,
     key: string,
     fileName: string,
     fileSize: number,
     userName: string = 'System',
+    mimeType?: string,
   ) {
     const lead = await this.repo.findById(leadId);
     if (!lead) {
@@ -1426,15 +1539,22 @@ if (lead_status) {
     this.logger.debug(`Updated lead loiDocumentUrl field: ${updateResult.loiDocumentUrl}`);
 
     // Queue for Document AI processing
+    const detectedMime = mimeType || this.getMimeTypeFromKey(key);
+    if (!detectedMime) {
+      throw new BadRequestException(
+        `Unsupported file format for Document AI. Please upload a PDF, Word (.docx), or image file.`,
+      );
+    }
+
     await this.leadsQueue.add(JOBNAME.PROCESS_DOCUMENT, {
       leadId,
       fileId: key,
       fileKey: key,
-      mimeType: 'application/pdf',
+      mimeType: detectedMime,
       documentType: 'loi',
     });
 
-    this.logger.log(`LOI document confirmed and queued for processing: ${key}`);
+    this.logger.log(`LOI document confirmed and queued for processing: ${key} (mimeType: ${detectedMime})`);
 
     return {
       statusCode: 200,
@@ -1466,7 +1586,7 @@ if (lead_status) {
     this.logger.log(`Updating lead ${leadId} with LOI extraction results`);
     this.logger.log(`Document AI Overall Confidence: ${result.overallConfidence}`);
     
-    const CONFIDENCE_THRESHOLD = 0.85;
+    const CONFIDENCE_THRESHOLD = 0.40;
     const data = result.data || {};
     
     // Log ALL extracted fields from Document AI
@@ -1490,9 +1610,9 @@ if (lead_status) {
       return null;
     };
 
-    // Helper for TI values with lower confidence threshold (TI extraction is often less accurate)
+    // Helper for TI values
     const getTIValue = (field: any) => {
-      const TI_CONFIDENCE_THRESHOLD = 0.5; // Lower threshold for TI values
+      const TI_CONFIDENCE_THRESHOLD = 0.40;
       if (field && field.value && field.confidence >= TI_CONFIDENCE_THRESHOLD) {
         const value = field.value;
         // Skip empty strings, null, undefined, or 0
@@ -1504,9 +1624,9 @@ if (lead_status) {
       return null;
     };
 
-    // Helper for RCD values with lower confidence threshold (RCD extraction is often less accurate due to complex text)
+    // Helper for RCD values
     const getRCDValue = (field: any) => {
-      const RCD_CONFIDENCE_THRESHOLD = 0.6; // Lower threshold for RCD values
+      const RCD_CONFIDENCE_THRESHOLD = 0.40;
       if (field && field.value && field.confidence >= RCD_CONFIDENCE_THRESHOLD) {
         const value = field.value;
         // Skip empty strings, null, undefined, or 0
@@ -1518,9 +1638,9 @@ if (lead_status) {
       return null;
     };
 
-    // Helper for Annual Increase values with slightly lower confidence threshold (percentage extraction can be tricky)
+    // Helper for Annual Increase values
     const getAnnIncValue = (field: any) => {
-      const ANN_INC_CONFIDENCE_THRESHOLD = 0.8; // Lower threshold for annual increase values
+      const ANN_INC_CONFIDENCE_THRESHOLD = 0.40;
       if (field && field.value && field.confidence >= ANN_INC_CONFIDENCE_THRESHOLD) {
         const value = field.value;
         // Skip empty strings, null, undefined, or 0
@@ -1631,9 +1751,28 @@ if (lead_status) {
     const updatePayload: any = {};
     let hasUpdates = false;
 
+    // Safe numeric extractor: handles "$38.00 per sq ft", "38", 38, "10% 12.5%" (takes first number)
+    const toNumber = (val: any): number | null => {
+      if (val === null || val === undefined || val === '') return null;
+      if (typeof val === 'number') return isNaN(val) ? null : val;
+      const m = String(val).match(/([\d,]+\.?\d*)/);
+      if (!m) return null;
+      const n = parseFloat(m[1].replace(',', ''));
+      return isNaN(n) ? null : n;
+    };
+
     // Extract negotiation fields with EXACT Document AI field names
     // Document AI returns: rent_psf, annual_increase, tenant_improvement_psf, rent_commencement_date, free_rent_months, term
-    const rentPerSf = getValue(data.rent_psf) || getValue(data.rent_per_sf) || getValue(data.base_rent_per_sf);
+    // base_rent may come as "$38.00 per square foot" - extract the numeric dollar value
+    const rawBaseRent = getValue(data.base_rent);
+    const parsedBaseRent = rawBaseRent
+      ? (() => {
+          const m = rawBaseRent.match(/\$?([\d,]+\.?\d*)/);
+          return m ? m[1].replace(',', '') : null;
+        })()
+      : null;
+    const rentPerSf = getValue(data.rent_psf) || getValue(data.rent_per_sf) || getValue(data.base_rent_per_sf) || parsedBaseRent;
+    // annual_increase may return multiple values like "10% 12.5%" - take the first number only
     const annInc = getAnnIncValue(data.annual_increase) || getAnnIncValue(data.ann_inc) || getAnnIncValue(data.rent_increase);
     const freeMonths = getValue(data.free_rent_months) || getValue(data.free_months);
     const term = getValue(data.term) || getValue(data.lease_term);
@@ -1644,31 +1783,34 @@ if (lead_status) {
 
     // Update current_negotiation and budget_negotiation fields
     if (rentPerSf !== null) {
-      const numericRentPerSf = parseFloat(rentPerSf);
-      lead.current_negotiation.rentPerSf = numericRentPerSf;
-      // lead.budget_negotiation.rentPerSf = numericRentPerSf;
-      hasUpdates = true;
-      this.logger.debug(`Extracted rentPerSf: ${rentPerSf} -> ${numericRentPerSf} (updated both objects)`);
+      const numericRentPerSf = toNumber(rentPerSf);
+      if (numericRentPerSf === null) {
+        this.logger.warn(`rentPerSf could not be parsed to a number: "${rentPerSf}" — skipping`);
+      } else {
+        lead.current_negotiation.rentPerSf = numericRentPerSf;
+        hasUpdates = true;
+        this.logger.debug(`Extracted rentPerSf: ${rentPerSf} -> ${numericRentPerSf}`);
+      }
     }
 
     if (annInc !== null) {
-      // Handle percentage values like "15%" - extract numeric value
-      const numericAnnInc = typeof annInc === 'string' && annInc.includes('%') 
-        ? parseFloat(annInc.replace('%', '')) 
-        : parseFloat(annInc);
-      
-      lead.current_negotiation.annInc = numericAnnInc;
-      // lead.budget_negotiation.annInc = numericAnnInc;
-      hasUpdates = true;
-      this.logger.debug(`Extracted annInc: ${annInc} -> ${numericAnnInc} (updated both objects)`);
+      const numericAnnInc = toNumber(annInc);
+      if (numericAnnInc !== null) {
+        lead.current_negotiation.annInc = numericAnnInc;
+        hasUpdates = true;
+        this.logger.debug(`Extracted annInc: ${annInc} -> ${numericAnnInc}`);
+      } else {
+        this.logger.warn(`annInc could not be parsed to a number: "${annInc}" — skipping`);
+      }
     }
 
     if (freeMonths !== null) {
-      const numericFreeMonths = parseFloat(freeMonths);
-      lead.current_negotiation.freeMonths = numericFreeMonths;
-      // lead.budget_negotiation.freeMonths = numericFreeMonths;
-      hasUpdates = true;
-      this.logger.debug(`Extracted freeMonths: ${freeMonths} -> ${numericFreeMonths} (updated both objects)`);
+      const numericFreeMonths = toNumber(freeMonths);
+      if (numericFreeMonths !== null) {
+        lead.current_negotiation.freeMonths = numericFreeMonths;
+        hasUpdates = true;
+        this.logger.debug(`Extracted freeMonths: ${freeMonths} -> ${numericFreeMonths}`);
+      }
     }
 
     if (term !== null) {
@@ -1679,27 +1821,14 @@ if (lead_status) {
     }
 
     if (tiPerSf !== null) {
-      // Handle text values like "twenty dollars per square foot ($20.00 psf)" - extract numeric value
-      let numericTiPerSf = tiPerSf;
-      if (typeof tiPerSf === 'string') {
-        // Try to extract number from parentheses like ($20.00 psf)
-        const match = tiPerSf.match(/\$(\d+\.?\d*)/);
-        if (match) {
-          numericTiPerSf = parseFloat(match[1]);
-        } else {
-          // Try to parse as float directly
-          numericTiPerSf = parseFloat(tiPerSf) || 0;
-        }
+      const numericTiPerSf = toNumber(tiPerSf);
+      if (numericTiPerSf !== null) {
+        lead.current_negotiation.tiPerSf = numericTiPerSf.toString();
+        hasUpdates = true;
+        this.logger.debug(`Extracted tiPerSf: ${tiPerSf} -> ${numericTiPerSf}`);
+      } else {
+        this.logger.warn(`tiPerSf could not be parsed to a number: "${tiPerSf}" — skipping`);
       }
-      
-      // Convert to string as per schema requirement (tiPerSf is string type)
-      const tiPerSfString = numericTiPerSf.toString();
-      lead.current_negotiation.tiPerSf = tiPerSfString;
-      // lead.budget_negotiation.tiPerSf = tiPerSfString;
-      hasUpdates = true;
-      this.logger.debug(`Extracted tiPerSf: ${tiPerSf} -> ${numericTiPerSf} -> "${tiPerSfString}" (updated both objects) [confidence: ${data.tenant_improvement_psf?.confidence?.toFixed(2)}]`);
-    } else {
-      this.logger.debug(`tiPerSf not extracted - confidence too low: ${data.tenant_improvement_psf?.confidence?.toFixed(2)} (threshold: 0.5)`);
     }
 
     if (rcd !== null) {
@@ -1717,6 +1846,73 @@ if (lead_status) {
     if (hasUpdates) {
       updatePayload.current_negotiation = lead.current_negotiation;
       updatePayload.budget_negotiation = lead.budget_negotiation;
+    }
+
+    // Map general fields from LOI extraction (sf, use, property_name, tenant_name)
+    if (!lead.general) lead.general = {} as any;
+    let generalUpdated = false;
+
+    const sf = getValue(data.sf) || getValue(data.square_footage);
+    if (sf && !lead.general.sf) {
+      lead.general.sf = sf;
+      generalUpdated = true;
+      this.logger.debug(`Extracted sf: ${sf}`);
+    }
+
+    const use = getValue(data.use) || getValue(data.permitted_use);
+    if (use && !lead.general.use) {
+      lead.general.use = use;
+      generalUpdated = true;
+      this.logger.debug(`Extracted use: ${use}`);
+    }
+
+    // Normalize tenant_name / tenantName — prefer the longer/more complete value
+    // Also overwrite placeholder values set by frontend ("File", "Upload")
+    const PLACEHOLDER_NAMES = ['file', 'upload', ''];
+    const tenantA = getValue(data.tenantName);
+    const tenantB = getValue(data.tenant_name);
+    const resolvedTenant = tenantA || tenantB;
+    const isPlaceholderBusiness = PLACEHOLDER_NAMES.includes((lead.general.businessName || '').toLowerCase());
+    if (resolvedTenant && (isPlaceholderBusiness || !lead.general.businessName)) {
+      lead.general.businessName = resolvedTenant;
+      generalUpdated = true;
+      this.logger.debug(`Extracted businessName: ${resolvedTenant}`);
+    }
+
+    // Also split tenantName into firstName/lastName if they are placeholders
+    const isPlaceholderFirst = PLACEHOLDER_NAMES.includes((lead.general.firstName || '').toLowerCase());
+    const isPlaceholderLast = PLACEHOLDER_NAMES.includes((lead.general.lastName || '').toLowerCase());
+    if (resolvedTenant && (isPlaceholderFirst || isPlaceholderLast)) {
+      const parts = resolvedTenant.trim().split(/\s+/);
+      if (isPlaceholderFirst) { lead.general.firstName = parts[0] || ''; generalUpdated = true; }
+      if (isPlaceholderLast) { lead.general.lastName = parts.slice(1).join(' ') || ''; generalUpdated = true; }
+      this.logger.debug(`Split tenantName into firstName: "${lead.general.firstName}", lastName: "${lead.general.lastName}"`);
+    }
+
+    // Lookup property by extracted property_name, save name in general and propertyId at root
+    const extractedPropertyName = getValue(data.property_name);
+    if (extractedPropertyName) {
+      this.logger.debug(`Looking up property by name: "${extractedPropertyName}"`);
+      try {
+        const matchedProperty = await this.propertiesService.findByNameFuzzy(extractedPropertyName);
+        if (matchedProperty) {
+          lead.general.property = matchedProperty.propertyName;
+          generalUpdated = true;
+          updatePayload.propertyId = matchedProperty.propertyId;
+          this.logger.log(`Matched property: "${matchedProperty.propertyName}" (${matchedProperty.propertyId})`);
+        } else {
+          // No match — still save the raw extracted name so it's not lost
+          lead.general.property = extractedPropertyName;
+          generalUpdated = true;
+          this.logger.warn(`No property matched for: "${extractedPropertyName}" — saved raw name only`);
+        }
+      } catch (err) {
+        this.logger.warn(`Property lookup failed for "${extractedPropertyName}": ${err.message}`);
+      }
+    }
+
+    if (generalUpdated) {
+      updatePayload.general = lead.general;
     }
 
     // Store extraction metadata
@@ -1750,14 +1946,22 @@ if (lead_status) {
     id: string,
     documentType: string,
     recordType: string = 'LEAD',
+    contentType: string = 'application/pdf',
   ) {
     // Validate record exists
     await this.validateAndFetchRecord(id, recordType);
 
+    const ALLOWED = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg', 'image/png', 'image/tiff', 'image/webp',
+    ];
+    if (!ALLOWED.includes(contentType)) contentType = 'application/pdf';
+
     // Determine folder path based on record type
     const basePath = recordType === 'RENEWAL' ? 'renewals' : 'leads';
     const folderPath = `${basePath}/${id}/documents/${documentType}`;
-    const contentType = 'application/pdf';
 
     const { key, url } = await this.mediaService.generateUploadUrl(folderPath, contentType);
 
@@ -1795,6 +1999,7 @@ if (lead_status) {
     documentType: string,
     recordType: string = 'LEAD',
     userName: string = 'System',
+    mimeType: string = 'application/pdf',
   ) {
     // Validate record exists
     const record = await this.validateAndFetchRecord(id, recordType);
@@ -1807,7 +2012,7 @@ if (lead_status) {
       key: key,
       fileName,
       fileSize,
-      fileType: 'application/pdf',
+      fileType: mimeType,
       category: documentType,
       uploadedBy: userName,
       uploadedDate: new Date(),
@@ -1833,19 +2038,24 @@ if (lead_status) {
       if (documentType === 'loi' && recordType === 'LEAD') {
         this.logger.log(`Triggering Document AI processing for LOI document: ${key}`);
         
-        // Update lead with LOI document URL (for compatibility)
-        await this.repo.update(id, { loiDocumentUrl: key });
-        
-        // Queue for Document AI processing
-        await this.leadsQueue.add(JOBNAME.PROCESS_DOCUMENT, {
-          leadId: id,
-          fileId: key,
-          fileKey: key,
-          mimeType: 'application/pdf',
-          documentType: 'loi',
-        });
+        const detectedMime = this.getMimeTypeFromKey(key);
+        if (!detectedMime) {
+          this.logger.warn(`Unsupported file format for Document AI: ${key} — skipping AI processing`);
+        } else {
+          // Update lead with LOI document URL (for compatibility)
+          await this.repo.update(id, { loiDocumentUrl: key });
+          
+          // Queue for Document AI processing
+          await this.leadsQueue.add(JOBNAME.PROCESS_DOCUMENT, {
+            leadId: id,
+            fileId: key,
+            fileKey: key,
+            mimeType: detectedMime,
+            documentType: 'loi',
+          });
 
-        this.logger.log(`LOI document queued for Document AI processing: ${key}`);
+          this.logger.log(`LOI document queued for Document AI processing: ${key} (mimeType: ${detectedMime})`);
+        }
       }
     }
 

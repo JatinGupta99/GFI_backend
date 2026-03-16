@@ -44,7 +44,11 @@ export class MediaService {
       'image/webp',
       'image/gif',
     ];
-    this.allowedDocumentTypes = mediaConfig.allowedDocumentTypes || ['application/pdf'];
+    this.allowedDocumentTypes = mediaConfig.allowedDocumentTypes || [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
     this.maxImageSizeMb = mediaConfig.maxImageSizeMb || 5;
     this.maxDocumentSizeMb = mediaConfig.maxDocumentSizeMb || 10;
     this.downloadUrlExpire = mediaConfig.downloadUrlExpire || 900;
@@ -72,7 +76,20 @@ export class MediaService {
   }
 
   private generateKey(folderPath: string, contentType: string) {
-    const extension = contentType.split('/')[1];
+    const extMap: Record<string, string> = {
+      'application/pdf': 'pdf',
+      'application/msword': 'doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+      'application/vnd.ms-excel': 'xls',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+      'image/tiff': 'tiff',
+      'image/bmp': 'bmp',
+    };
+    const extension = extMap[contentType] || contentType.split('/')[1] || 'bin';
     return `${folderPath}/${uuidv4()}.${extension}`;
   }
 
@@ -84,10 +101,12 @@ export class MediaService {
   ) {
     this.validateFile(contentType, sizeMb);
     const key = this.generateKey(folderPath, contentType);
+    // Do NOT lock ContentType in the presigned URL signature —
+    // frontend may upload .doc/.docx/pdf without matching the declared type.
+    // Magic byte detection at processing time handles the actual format.
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
-      ContentType: contentType,
     });
     const url = await getSignedUrl(this.s3Client, command, { expiresIn: downloadUrlExpire });
     return { key, url };

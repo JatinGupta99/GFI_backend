@@ -93,6 +93,12 @@ export class Suite {
   @Prop()
   budgetRCD: Date;
 
+  // RCD (Rent Commencement Date) extracted from the Proposed (BRR) row —
+  // the first month column in the sheet where the rent value becomes non-zero.
+  // Stored as MM/DD/YY string, e.g. "06/01/26"
+  @Prop({ type: String, default: null })
+  rcd: string | null;
+
   // New calculated fields from budget parsing
   @Prop({ type: String, default: '0' })
   tiPerSf: string;

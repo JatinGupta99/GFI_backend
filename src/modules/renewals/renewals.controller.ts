@@ -65,7 +65,13 @@ export class RenewalsController {
 
     // Handle both propertyIds and property parameters for backward compatibility
     if (propertyIds) {
-      filters.propertyIds = Array.isArray(propertyIds) ? propertyIds : [propertyIds];
+      // Handle comma-separated string or array
+      if (Array.isArray(propertyIds)) {
+        filters.propertyIds = propertyIds;
+      } else {
+        // Split comma-separated string and trim whitespace
+        filters.propertyIds = propertyIds.split(',').map(id => id.trim()).filter(id => id.length > 0);
+      }
     } else if (property) {
       filters.propertyIds = [property];
     }
@@ -160,7 +166,13 @@ export class RenewalsController {
 
     // Handle both propertyIds and property parameters for backward compatibility
     if (propertyIds) {
-      filters.propertyIds = Array.isArray(propertyIds) ? propertyIds : [propertyIds];
+      // Handle comma-separated string or array
+      if (Array.isArray(propertyIds)) {
+        filters.propertyIds = propertyIds;
+      } else {
+        // Split comma-separated string and trim whitespace
+        filters.propertyIds = propertyIds.split(',').map(id => id.trim()).filter(id => id.length > 0);
+      }
     } else if (property) {
       filters.propertyIds = [property];
     }
@@ -227,7 +239,13 @@ export class RenewalsController {
 
     // Handle propertyIds parameter
     if (propertyIds) {
-      filters.propertyIds = Array.isArray(propertyIds) ? propertyIds : [propertyIds];
+      // Handle comma-separated string or array
+      if (Array.isArray(propertyIds)) {
+        filters.propertyIds = propertyIds;
+      } else {
+        // Split comma-separated string and trim whitespace
+        filters.propertyIds = propertyIds.split(',').map(id => id.trim()).filter(id => id.length > 0);
+      }
     }
 
     const renewals = await this.queryService.getRenewals(filters);

@@ -60,4 +60,9 @@ export class PaginationQueryDto {
   @IsString()
   property?: string;
 
+  @IsOptional()
+  @IsString()
+  @IsString({ each: true })
+  propertyIds?: string | string[];
+
 }
