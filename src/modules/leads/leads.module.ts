@@ -16,6 +16,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { DocumentAiModule } from '../document-ai/document-ai.module';
 import { JOBNAME } from '../../common/enums/common-enums';
 import { RenewalsModule } from '../renewals/renewals.module';
+import { SuitesModule } from '../suites/suites.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { RenewalsModule } from '../renewals/renewals.module';
     TasksModule,
     PropertyAssetsModule,
     DocumentAiModule,
+    forwardRef(() => SuitesModule),
     BullModule.registerQueue({
       name: JOBNAME.LEADS_PROCESSING,
     }),

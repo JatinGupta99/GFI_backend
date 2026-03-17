@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Renewal, RenewalDocument } from '../../renewals/renewal.entity';
 import { UpcomingRenewal } from '../dto/upcoming-renewal.dto';
+import { SuiteRepository } from '../../suites/repository/suite.repository';
 
 @Injectable()
 export class RenewalRepository {
@@ -10,6 +11,7 @@ export class RenewalRepository {
 
     constructor(
         @InjectModel(Renewal.name) private renewalModel: Model<RenewalDocument>,
+        private readonly suiteRepository: SuiteRepository,
     ) {}
 
     /**
@@ -39,67 +41,100 @@ export class RenewalRepository {
             
             const existingRenewal = await this.renewalModel.findOne({
                 mriLeaseId: renewal.id,
-                propertyId: renewal.property
             });
+
+            // Look up suite data to enrich financial fields from the budget sheet
+            const suite = await this.suiteRepository.findBySuiteId(renewal.property, renewal.suite).catch(() => null);
+            const suiteCharges = suite?.charges;
+
             // Map UpcomingRenewal DTO to Renewal entity schema format
-            // The schema expects: mriLeaseId, tenantId, propertyId, propertyName, tenantName, suite, leaseEnd, currentMonthRent, lastSyncAt, status
-            // All optional fields get default values instead of undefined to ensure consistent schema
             const renewalData = {
                 mriLeaseId: renewal.id,
-                tenantId: renewal.id, // Using lease ID as tenant ID since we don't have separate tenant ID
-                propertyId: renewal.property, // This is now the actual property ID (e.g., "008214")
-                propertyName: propertyName || renewal.property, // Use actual property name from properties collection
+                tenantId: renewal.tenantId || renewal.id, // MasterOccupantID, fallback to LeaseID
+                propertyId: renewal.property,
+                propertyName: propertyName || renewal.property,
                 tenantName: renewal.tenant,
+                address: renewal.address || '',
                 suite: renewal.suite,
                 sf: parseFloat(renewal.sf) || 0,
                 leaseEnd: renewal.expDate !== 'N/A' ? new Date(renewal.expDate) : new Date(),
-                currentMonthRent: renewal.monthlyRent || 0,
+                currentMonthRent: suiteCharges?.baseRentMonth || renewal.monthlyRent || 0,
                 rentPerSf: renewal.rentPerSf || 0,
                 currentRentPerSf: renewal.rentPerSf || 0,
                 budget_negotiation: {
-                    tiPerSf: 0, // Not available in UpcomingRenewal
-                    rcd: '', // Not available in UpcomingRenewal
-                    rentPerSf: renewal.budgetRent && parseFloat(renewal.budgetSf) > 0 
-                        ? renewal.budgetRent / parseFloat(renewal.budgetSf) 
-                        : 0,
-                    baseRent: 0, // Not available in UpcomingRenewal
+                    tiPerSf: suite?.tiPerSf ? parseFloat(suite.tiPerSf) : 0,
+                    rcd: suite?.rcd || '',
+                    rentPerSf: suite?.baseRentPerSf ? parseFloat(suite.baseRentPerSf) : (
+                        renewal.budgetRent && parseFloat(renewal.budgetSf) > 0
+                            ? renewal.budgetRent / parseFloat(renewal.budgetSf)
+                            : 0
+                    ),
                 },
                 status: this.mapStatus(renewal.status),
                 notes: renewal.note || '',
                 option: renewal.option || 'N/A',
                 optionTerm: renewal.optionTerm || '',
                 lastSyncAt: new Date(),
-                // Financial fields from MRI APIs - always save with default values
-                monthlyRent: renewal.monthlyRent ?? 0,
-                cam: renewal.cam ?? 0,
-                ins: renewal.ins ?? 0,
-                tax: renewal.tax ?? 0,
-                totalDueMonthly: renewal.totalDueMonthly ?? 0,
+                // Financial fields — prefer suite charges (from budget sheet) over MRI zeros
+                monthlyRent: suiteCharges?.baseRentMonth || renewal.monthlyRent || 0,
+                cam: suiteCharges?.camMonth || renewal.cam || 0,
+                ins: suiteCharges?.insMonth || renewal.ins || 0,
+                tax: suiteCharges?.taxMonth || renewal.tax || 0,
+                totalDueMonthly: suiteCharges?.totalDueMonth || renewal.totalDueMonthly || 0,
                 balanceForward: renewal.balanceForward ?? 0,
                 cashReceived: renewal.cashReceived ?? 0,
                 balanceDue: renewal.balanceDue ?? 0,
                 days0To30: renewal.days0To30 ? parseFloat(renewal.days0To30) : 0,
                 days31To60: renewal.days31To60 ? parseFloat(renewal.days31To60) : 0,
                 days61Plus: renewal.days61Plus ? parseFloat(renewal.days61Plus) : 0,
-                totalArBalance: (renewal.balanceDue ?? 0),
-                // Rent escalations - empty object if not available
+                totalArBalance: renewal.balanceDue ?? 0,
                 rentEscalations: {},
-                // MRI raw data - empty object if not available
                 mriData: {},
-                // Files array - empty array if not available
-                files: [],
             };
 
             if (existingRenewal) {
-                // Update existing renewal
-                await this.renewalModel.updateOne(
-                    { _id: existingRenewal._id },
-                    renewalData
-                );
+                // For existing renewals: update MRI + suite fields via $set with dot-notation
+                // so manually-set negotiation fields (annInc, term, freeMonths etc.) are preserved
+                const updateSet: Record<string, any> = {
+                    tenantId: renewalData.tenantId,
+                    propertyId: renewalData.propertyId,
+                    propertyName: renewalData.propertyName,
+                    tenantName: renewalData.tenantName,
+                    address: renewalData.address,
+                    suite: renewalData.suite,
+                    sf: renewalData.sf,
+                    leaseEnd: renewalData.leaseEnd,
+                    currentMonthRent: renewalData.currentMonthRent,
+                    rentPerSf: renewalData.rentPerSf,
+                    currentRentPerSf: renewalData.currentRentPerSf,
+                    option: renewalData.option,
+                    optionTerm: renewalData.optionTerm,
+                    notes: renewalData.notes,
+                    monthlyRent: renewalData.monthlyRent,
+                    cam: renewalData.cam,
+                    ins: renewalData.ins,
+                    tax: renewalData.tax,
+                    totalDueMonthly: renewalData.totalDueMonthly,
+                    balanceForward: renewalData.balanceForward,
+                    cashReceived: renewalData.cashReceived,
+                    balanceDue: renewalData.balanceDue,
+                    days0To30: renewalData.days0To30,
+                    days31To60: renewalData.days31To60,
+                    days61Plus: renewalData.days61Plus,
+                    totalArBalance: renewalData.totalArBalance,
+                    lastSyncAt: renewalData.lastSyncAt,
+                };
+                // Only overwrite suite-sourced budget fields if suite data exists
+                if (suite) {
+                    if (suite.tiPerSf) updateSet['budget_negotiation.tiPerSf'] = parseFloat(suite.tiPerSf);
+                    if (suite.rcd) updateSet['budget_negotiation.rcd'] = suite.rcd;
+                    if (suite.baseRentPerSf) updateSet['budget_negotiation.rentPerSf'] = parseFloat(suite.baseRentPerSf);
+                }
+                await this.renewalModel.updateOne({ _id: existingRenewal._id }, { $set: updateSet });
                 updated++;
             } else {
-                // Create new renewal
-                await this.renewalModel.create(renewalData);
+                // Create new renewal — set files to empty array only on creation
+                await this.renewalModel.create({ ...renewalData, files: [] });
                 created++;
             }
         }
@@ -118,8 +153,6 @@ export class RenewalRepository {
             this.logger.log(`Deactivated ${deactivated} renewals that are no longer in MRI`);
         }
 
-        // Also mark any already-expired leases in the DB as DEAD so stale records
-        // from previous syncs don't pollute the active list.
         const expiredResult = await this.renewalModel.updateMany(
             {
                 leaseEnd: { $lt: new Date() },
@@ -140,8 +173,14 @@ export class RenewalRepository {
      * Map UpcomingRenewal status to Renewal entity status enum
      */
     private mapStatus(status?: string): string {
-        // Valid enum values: DRAFTING_AMENDMENT, OUT_FOR_EXECUTION, DRAFTING_LEASE, DEAD, NO_CONTACT, AMENDMENT_EXECUTED, SEND_ATTORNEY_NOTICE, SEND_COURTESY_NOTICE, SEND_THREE_DAY_NOTICE
         const statusMap: Record<string, string> = {
+            // MRI OccupancyStatus values
+            'Current': 'DRAFTING_AMENDMENT',
+            'Vacant': 'DRAFTING_AMENDMENT',
+            'Notice': 'SEND_COURTESY_NOTICE',
+            'Eviction': 'SEND_THREE_DAY_NOTICE',
+            'Month-to-Month': 'DRAFTING_AMENDMENT',
+            // Internal status values
             'Renewal Negotiation': 'DRAFTING_AMENDMENT',
             'Drafting Amendment': 'DRAFTING_AMENDMENT',
             'Out for Execution': 'OUT_FOR_EXECUTION',
@@ -154,7 +193,6 @@ export class RenewalRepository {
             'Send Courtesy Notice': 'SEND_COURTESY_NOTICE',
             'Send Three Day Notice': 'SEND_THREE_DAY_NOTICE',
         };
-
         return statusMap[status || ''] || 'DRAFTING_AMENDMENT';
     }
 
@@ -167,13 +205,17 @@ export class RenewalRepository {
         page: number = 1, 
         limit: number = 50
     ): Promise<UpcomingRenewal[]> {
+        if (!propertyId) return [];
+
         const skip = (page - 1) * limit;
+        // limit=301 is the "fetch all" sentinel — remove the cap so all records come back
+        const mongoLimit = limit >= 301 ? 0 : limit;
         
         const renewals = await this.renewalModel
             .find({ propertyId: propertyId, status: { $ne: 'DEAD' } })
-            .sort({ leaseEnd: 1 }) // Sort by expiration date
+            .sort({ leaseEnd: 1 })
             .skip(skip)
-            .limit(limit)
+            .limit(mongoLimit)
             .lean()
             .exec();
 

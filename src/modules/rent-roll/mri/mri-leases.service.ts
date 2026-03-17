@@ -2,14 +2,24 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MriCoreService } from './mri-core.service';
 
 export interface MriLeaseRaw {
+    BuildingID: string;
     BuildingName: string;
     OccupantName: string;
+    LegalName?: string;
+    MasterOccupantID: string;
     SuiteID: string;
     OrigSqFt: number;
     LeaseID: string;
-    MasterOccupantID: string;
     OccupancyStatus: string;
     LeaseExpirationDate: string;
+    ExpirationDate?: string;
+    LastUpdate?: string;
+    Address1?: string;
+    City?: string;
+    State?: string;
+    Zip?: string;
+    GenerationCodeDescription?: string;
+    Term?: number;
 }
 
 @Injectable()

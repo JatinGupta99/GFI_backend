@@ -79,7 +79,7 @@ export class Suite {
   squareFootage: number;
 
   @Prop({
-    enum: ['Vacant', 'Occupied', 'ComingSoon'],
+    enum: ['Vacant', 'Occupied', 'ComingSoon', 'Proposed'],
     default: 'Vacant',
   })
   status: string;

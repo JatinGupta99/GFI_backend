@@ -14,6 +14,7 @@ import { MediaService } from '../media/media.service';
 import { PropertiesService } from '../properties/properties.service';
 import { ActivitiesService } from '../property-assets/activities.service';
 import { RenewalRepository } from '../renewals/repositories/renewal.repository';
+import { SuiteRepository } from '../suites/repository/suite.repository';
 import { TasksService } from '../tasks/tasks.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { SendAppEmailDto, SendApprovalEmailDto, SendLoiEmailDto, SendRenewalLetterDto, SendTenantMagicLinkDto } from './dto/send-email.dto';
@@ -42,6 +43,7 @@ export class LeadsService {
     private readonly propertiesService: PropertiesService,
     private readonly tasksService: TasksService,
     private readonly activitiesService: ActivitiesService,
+    private readonly suiteRepository: SuiteRepository,
     @InjectQueue(JOBNAME.LEADS_PROCESSING) private leadsQueue: Queue,
     @InjectModel(TenantFormProgress.name) private tenantFormModel: Model<TenantFormProgressDocument>,
     private readonly configService: ConfigService,
@@ -398,17 +400,38 @@ if (lead_status) {
       }
     }
 
-    // Handle budget_negotiation defaults during creation
-    if (normalizedData.budget_negotiation) {
-      normalizedData.budget_negotiation = {
-        rentPerSf: normalizedData.budget_negotiation.rentPerSf ?? 0,
-        annInc: normalizedData.budget_negotiation.annInc ?? 3,  // Default to 3
-        freeMonths: normalizedData.budget_negotiation.freeMonths ?? 0,  // Default to 0
-        term: normalizedData.budget_negotiation.term ?? 0,
-        tiPerSf: normalizedData.budget_negotiation.tiPerSf ?? 0,
-        rcd: normalizedData.budget_negotiation.rcd ?? '',
-      };
+    // Populate budget_negotiation from suite data ONLY if suite exists in DB
+    // (meaning a budget file was uploaded for it). Otherwise use DTO values as-is.
+    const suiteId = dto.general?.suite;
+    const resolvedPropertyId = normalizedData.propertyId || (dto as any).propertyId;
+    if (suiteId && resolvedPropertyId) {
+      const suite = await this.suiteRepository.findBySuiteId(resolvedPropertyId, suiteId);
+      if (suite) {
+        // Suite found — budget file was uploaded, populate from suite data
+        this.logger.log(`Budget file data found for suite ${suiteId} — populating budget_negotiation`);
+        normalizedData.budget_negotiation = {
+          rentPerSf: suite.baseRentPerSf ? parseFloat(suite.baseRentPerSf) : 0,
+          annInc: normalizedData.budget_negotiation?.annInc ?? 3,
+          freeMonths: normalizedData.budget_negotiation?.freeMonths ?? 0,
+          term: normalizedData.budget_negotiation?.term ?? 0,
+          tiPerSf: suite.tiPerSf ?? '0',
+          rcd: suite.rcd ?? '',
+        };
+      } else {
+        // No suite in DB — no budget file uploaded, use DTO values as-is
+        this.logger.log(`No budget file found for suite ${suiteId} — using DTO budget_negotiation values`);
+      }
     }
+
+    // Apply defaults only for any fields still missing
+    normalizedData.budget_negotiation = {
+      rentPerSf: normalizedData.budget_negotiation?.rentPerSf ?? 0,
+      annInc: normalizedData.budget_negotiation?.annInc ?? 3,
+      freeMonths: normalizedData.budget_negotiation?.freeMonths ?? 0,
+      term: normalizedData.budget_negotiation?.term ?? 0,
+      tiPerSf: normalizedData.budget_negotiation?.tiPerSf ?? 0,
+      rcd: normalizedData.budget_negotiation?.rcd ?? '',
+    };
 
     return this.repo.create(normalizedData);
   }
@@ -419,24 +442,17 @@ if (lead_status) {
     }
 
     const normalizedData = this.normalizeLeadData(dto);
-    
-    // Convert property name to propertyId if property is being updated
+
+    // Resolve general.property name → propertyId whenever property is sent in the DTO
     if (dto.general?.property) {
-      const propertyInput = dto.general.property as string;
-      
-      // Look up property by name
-      const property = await this.propertiesService.findByName(propertyInput);
-      
+      const property = await this.propertiesService.findByName(dto.general.property as string);
       if (property) {
-        // Store property NAME in general.property (e.g., "Richwood")
-        normalizedData['general.property'] = property.propertyName;
-        
-        // Store propertyId at root level (e.g., "008400")
+        if (!normalizedData.general) normalizedData.general = {};
+        normalizedData.general.property = property.propertyName;
         normalizedData.propertyId = property.propertyId;
-        
-        this.logger.log(`Property "${propertyInput}" → propertyId: ${property.propertyId}, propertyName: ${property.propertyName}`);
+        this.logger.log(`Property "${dto.general.property}" → propertyId: ${property.propertyId}, propertyName: ${property.propertyName}`);
       } else {
-        this.logger.warn(`Property not found: ${propertyInput}`);
+        this.logger.warn(`Property not found: ${dto.general.property}`);
       }
     }
     
@@ -450,6 +466,27 @@ if (lead_status) {
         tiPerSf: normalizedData.budget_negotiation.tiPerSf ?? 0,
         rcd: normalizedData.budget_negotiation.rcd ?? '',
       };
+    }
+
+    // If suite is being set/changed and budget file was uploaded (suite exists in DB),
+    // populate budget_negotiation from suite. Otherwise use DTO values as-is.
+    const updateSuiteId = dto.general?.suite;
+    const updatePropertyId = normalizedData.propertyId || (dto as any).propertyId;
+    if (updateSuiteId && updatePropertyId) {
+      const suite = await this.suiteRepository.findBySuiteId(updatePropertyId, updateSuiteId);
+      if (suite) {
+        // Suite found — budget file was uploaded, override budget_negotiation from suite
+        this.logger.log(`Budget file data found for suite ${updateSuiteId} — populating budget_negotiation on update`);
+        normalizedData.budget_negotiation = {
+          rentPerSf: suite.baseRentPerSf ? parseFloat(suite.baseRentPerSf) : (normalizedData.budget_negotiation?.rentPerSf ?? 0),
+          annInc: normalizedData.budget_negotiation?.annInc ?? 3,
+          freeMonths: normalizedData.budget_negotiation?.freeMonths ?? 0,
+          term: normalizedData.budget_negotiation?.term ?? 0,
+          tiPerSf: suite.tiPerSf ?? normalizedData.budget_negotiation?.tiPerSf ?? '0',
+          rcd: suite.rcd ?? normalizedData.budget_negotiation?.rcd ?? '',
+        };
+      }
+      // else: no suite in DB, no budget file uploaded — keep DTO values unchanged
     }
     
     // Map budget_sheet to accounting if present

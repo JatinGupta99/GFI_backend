@@ -13,14 +13,13 @@ import { MriChargesService } from '../rent-roll/mri/mri-charges.service';
 import { MriCommercialLeaseNotesService } from '../rent-roll/mri/mri-commercial-lease-notes.service';
 import { MriCommercialLeasesCmreccService } from '../rent-roll/mri/mri-commercial-leases-cmrecc.service';
 import { MriCurrentDelinquenciesService } from '../rent-roll/mri/mri-current-delinquencies.service';
-import { MriLeaseEmeaService } from '../rent-roll/mri/mri-lease-emea.service';
 import { MriLeasesService } from '../rent-roll/mri/mri-leases.service';
 import { MriNotesService } from '../rent-roll/mri/mri-notes.service';
 import { MriOptionsService } from '../rent-roll/mri/mri-options.service';
-import { MriRenewalOffersService } from '../rent-roll/mri/mri-renewal-offers.service';
 
 import { PropertiesService } from '../properties/properties.service';
 import { Property } from '../properties/schema/property.entity';
+import { SuiteRepository } from '../suites/repository/suite.repository';
 import { UpcomingRenewal } from './dto/upcoming-renewal.dto';
 import { RenewalsSyncJob, RenewalsSyncResult } from './renewals.processor';
 import { RenewalRepository } from './repository/renewal.repository';
@@ -57,8 +56,6 @@ export class LeasingService {
         private readonly renewalsQueue: Queue<RenewalsSyncJob, RenewalsSyncResult>,
 
         private readonly leasesService: MriLeasesService,
-        private readonly renewalOffersService: MriRenewalOffersService,
-        private readonly emeaService: MriLeaseEmeaService,
         private readonly notesService: MriNotesService,
         private readonly commercialLeaseNotesService: MriCommercialLeaseNotesService,
         private readonly optionsService: MriOptionsService,
@@ -67,6 +64,7 @@ export class LeasingService {
         private readonly commercialLeasesCmreccService: MriCommercialLeasesCmreccService,
         private readonly propertiesService: PropertiesService,
         private readonly renewalRepository: RenewalRepository,
+        private readonly suiteRepository: SuiteRepository,
     ) { }
 
     /* -------------------------------------------------------------------------- */
@@ -697,15 +695,27 @@ export class LeasingService {
 
             this.logger.log(`📍 Property: ${propertyName} (internal: ${propertyId}, MRI buildingId: ${mriId})`);
 
-            // Fetch all leases for the property using the MRI building ID
-            const leases = await this.safeFetch(
-                () => this.leasesService.fetch(mriId, 1000, 0),
-                [],
-            );
+            // Paginate MRI lease fetch — keep pulling pages until we get fewer than PAGE_SIZE
+            const PAGE_SIZE = 1000;
+            const allLeases: any[] = [];
+            let skip = 0;
+            while (true) {
+                const page = await this.safeFetch(
+                    () => this.leasesService.fetch(mriId, PAGE_SIZE, skip),
+                    [],
+                );
+                if (!page?.length) break;
+                allLeases.push(...page);
+                this.logger.log(`📄 Fetched ${page.length} leases (skip=${skip}, total so far: ${allLeases.length})`);
+                if (page.length < PAGE_SIZE) break; // last page
+                skip += PAGE_SIZE;
+            }
+            const leases = allLeases;
 
             if (!leases?.length) {
-                this.logger.warn(`No leases found in MRI for property ${propertyId}`);
-                return { totalLeases: 0, processedLeases: 0, savedRenewals: 0, failedLeases: 0 };
+                this.logger.warn(`No leases found in MRI for property ${propertyId} — falling back to suite data`);
+                const saved = await this.syncRenewalsFromSuites(propertyId, propertyName, mriId, syncJobId);
+                return { totalLeases: 0, processedLeases: 0, savedRenewals: saved, failedLeases: 0 };
             }
 
             totalLeases = leases.length;
@@ -730,23 +740,15 @@ export class LeasingService {
             );
 
             if (!upcomingLeases.length) {
-                this.logger.warn(`No upcoming renewals (within 24 months) for property ${propertyId}`);
-                return { totalLeases, processedLeases: 0, savedRenewals: 0, failedLeases: 0 };
+                this.logger.warn(`No upcoming renewals (within 24 months) for property ${propertyId} — falling back to suite data`);
+                const saved = await this.syncRenewalsFromSuites(propertyId, propertyName, mriId, syncJobId);
+                return { totalLeases, processedLeases: 0, savedRenewals: saved, failedLeases: 0 };
             }
             // ─────────────────────────────────────────────────────────────────
 
-            // Fetch property metadata (offers and EMEA) using MRI building ID
-            const [offers, emea] = await this.getPropertyMetadata(mriId);
-
-            // Create lookup maps
-            const offersMap = new Map(offers.map(o => [o.LeaseID, o]));
-            const emeaMap = new Map(emea.map(e => [e.LeaseId, e]));
-
-            this.logger.log(`📊 Metadata: ${offers.length} offers, ${emea.length} EMEA records`);
-
             // Process leases in batches to respect rate limits
-            const BATCH_SIZE = 5; // 5 leases per batch
-            const BATCH_DELAY = 2000; // 2 seconds between batches
+            const BATCH_SIZE = 5;
+            const BATCH_DELAY = 2000;
             const totalBatches = Math.ceil(upcomingLeases.length / BATCH_SIZE);
 
             this.logger.log(`🔄 Processing ${upcomingLeases.length} upcoming leases in ${totalBatches} batches (${BATCH_SIZE} leases per batch)`);
@@ -765,8 +767,6 @@ export class LeasingService {
                         const renewal = await this.processLease(
                             mriId,
                             lease,
-                            offersMap,
-                            emeaMap,
                         );
                         batchRenewals.push(renewal);
                         processedLeases++;
@@ -836,18 +836,9 @@ export class LeasingService {
 
             this.logger.log(`📋 Found ${leases.length} leases in MRI for property ${propertyId}`);
 
-            // Fetch property metadata (offers and EMEA)
-            const [offers, emea] = await this.getPropertyMetadata(propertyId);
-
-            // Create lookup maps
-            const offersMap = new Map(offers.map(o => [o.LeaseID, o]));
-            const emeaMap = new Map(emea.map(e => [e.LeaseId, e]));
-
-            this.logger.log(`📊 Metadata: ${offers.length} offers, ${emea.length} EMEA records`);
-
             // Process leases in batches to respect rate limits
-            const BATCH_SIZE = 5; // 5 leases per batch
-            const BATCH_DELAY = 2000; // 2 seconds between batches
+            const BATCH_SIZE = 5;
+            const BATCH_DELAY = 2000;
             const renewals: UpcomingRenewal[] = [];
             const totalBatches = Math.ceil(leases.length / BATCH_SIZE);
 
@@ -866,8 +857,6 @@ export class LeasingService {
                         const renewal = await this.processLease(
                             propertyId,
                             lease,
-                            offersMap,
-                            emeaMap,
                         );
                         renewals.push(renewal);
                     } catch (error) {
@@ -906,23 +895,54 @@ export class LeasingService {
     }
 
     /**
-     * Fetch property metadata (offers and EMEA) (used by incremental processor)
+     * Build renewal records from local suite data when MRI has no leases for a property.
+     * Uses suite charges, rcd, tiPerSf, squareFootage as the source of truth.
      */
-    async getPropertyMetadata(propertyId: string): Promise<[any[], any[]]> {
-        this.logger.debug(`Fetching metadata for property ${propertyId}`);
-        
-        const [offers, emea] = await Promise.all([
-            this.safeFetch(
-                () => this.renewalOffersService.fetch(propertyId),
-                [],
-            ),
-            this.safeFetch(
-                () => this.emeaService.fetch(propertyId),
-                [],
-            ),
-        ]);
+    private async syncRenewalsFromSuites(
+        propertyId: string,
+        propertyName: string,
+        mriId: string,
+        syncJobId: string,
+    ): Promise<number> {
+        const suites = await this.suiteRepository.findByPropertyId(mriId).catch(() => []);
+        if (!suites?.length) {
+            this.logger.warn(`No suite data found for property ${propertyId} (mriId: ${mriId}). Nothing to save.`);
+            return 0;
+        }
 
-        return [offers, emea];
+        this.logger.log(`📦 Building ${suites.length} renewals from suite data for property ${propertyId}`);
+
+        const renewals: UpcomingRenewal[] = suites.map(suite => ({
+            id: `${mriId}-${suite.suiteId}`, // synthetic lease ID
+            tenant: 'Unknown',
+            property: mriId,
+            suite: suite.suiteId,
+            sf: (suite.squareFootage || 0).toString(),
+            expDate: 'N/A',
+            option: 'N/A' as const,
+            optionTerm: '',
+            rentPerSf: suite.baseRentPerSf ? parseFloat(suite.baseRentPerSf) : 0,
+            tiPerSf: suite.tiPerSf || '0',
+            budgetSf: (suite.squareFootage || 0).toString(),
+            budgetRent: suite.charges?.baseRentMonth || 0,
+            status: 'Renewal Negotiation',
+            note: '',
+            monthlyRent: suite.charges?.baseRentMonth || 0,
+            cam: suite.charges?.camMonth || 0,
+            ins: suite.charges?.insMonth || 0,
+            tax: suite.charges?.taxMonth || 0,
+            totalDueMonthly: suite.charges?.totalDueMonth || 0,
+            balanceForward: 0,
+            cashReceived: 0,
+            balanceDue: suite.balanceDue || 0,
+            days0To30: '0',
+            days31To60: '0',
+            days61Plus: '0',
+        }));
+
+        const result = await this.renewalRepository.syncRenewals(renewals, syncJobId, propertyName);
+        this.logger.log(`✅ Suite fallback: ${result.created} created, ${result.updated} updated for property ${propertyId}`);
+        return result.created + result.updated;
     }
 
     /**
@@ -931,15 +951,8 @@ export class LeasingService {
     async processLease(
         propertyId: string,
         lease: any,
-        offersMap: Map<string, any>,
-        emeaMap: Map<string, any>,
     ): Promise<UpcomingRenewal> {
-        return this.mapLeaseToUpcomingRenewal(
-            propertyId,
-            lease,
-            offersMap,
-            emeaMap,
-        );
+        return this.mapLeaseToUpcomingRenewal(propertyId, lease);
     }
 
     /* -------------------------------------------------------------------------- */
@@ -949,8 +962,6 @@ export class LeasingService {
     private async mapLeaseToUpcomingRenewal(
             propertyId: string,
             lease: any,
-            offersMap: Map<string, any>,
-            emeaMap: Map<string, any>,
             minimal = false,
         ): Promise<UpcomingRenewal> {
             // No artificial delay needed - batch processing handles rate limiting
@@ -1006,28 +1017,26 @@ export class LeasingService {
                 
                 return {
                     id: lease.LeaseID,
-                    tenant: lease.OccupantName,
-                    property: propertyId, // Use propertyId parameter instead of BuildingName
+                    tenantId: lease.MasterOccupantID,
+                    tenant: lease.OccupantName || lease.LegalName || 'Unknown',
+                    address: [lease.Address1, lease.City, lease.State, lease.Zip].filter(Boolean).join(', '),
+                    property: propertyId,
                     suite: lease.SuiteID,
                     sf: (lease.OrigSqFt || 0).toString(),
                     expDate:
-                        emeaMap.get(lease.LeaseID)?.Expiration ||
-                        offersMap.get(lease.LeaseID)?.ExpirationDate ||
-                        'N/A',
-                    option: 'N/A', // Skip options API call
+                        lease.ExpirationDate || lease.LeaseExpirationDate || 'N/A',
+                    option: 'N/A' as const,
                     optionTerm: 'N/A',
-                    rentPerSf: 0, // Skip charges API call
+                    rentPerSf: 0,
                     tiPerSf: 'N/A',
                     budgetSf: (lease.OrigSqFt || 0).toString(),
                     budgetRent: 0,
-                    status: 'Renewal Negotiation',
+                    status: lease.OccupancyStatus || 'Renewal Negotiation',
                     note: allNotes,
-                    // Financial fields from CurrentDelinquencies API (minimal mode)
                     balanceDue,
                     days0To30: days0To30.toFixed(2),
                     days31To60: days31To60.toFixed(2),
                     days61Plus: days61Plus.toFixed(2),
-                    // Rent charge fields from CMRECC API (minimal mode)
                     monthlyRent: rentCharges.monthlyRent,
                     cam: rentCharges.cam,
                     ins: rentCharges.ins,
@@ -1123,28 +1132,26 @@ export class LeasingService {
 
             return {
                 id: lease.LeaseID,
-                tenant: lease.OccupantName,
-                property: propertyId, // Use propertyId parameter instead of BuildingName
+                tenantId: lease.MasterOccupantID,
+                tenant: lease.OccupantName || lease.LegalName || 'Unknown',
+                address: [lease.Address1, lease.City, lease.State, lease.Zip].filter(Boolean).join(', '),
+                property: propertyId,
                 suite: lease.SuiteID,
                 sf: sf.toString(),
                 expDate:
-                    emeaMap.get(lease.LeaseID)?.Expiration ||
-                    offersMap.get(lease.LeaseID)?.ExpirationDate ||
-                    'N/A',
+                    lease.ExpirationDate || lease.LeaseExpirationDate || 'N/A',
                 option: options.length ? 'Yes' : 'No',
                 optionTerm,
                 rentPerSf,
                 tiPerSf: 'N/A',
                 budgetSf: sf.toString(),
                 budgetRent: 0,
-                status: 'Renewal Negotiation',
+                status: lease.OccupancyStatus || 'Renewal Negotiation',
                 note: allNotes,
-                // Financial fields from CurrentDelinquencies API
                 balanceDue,
                 days0To30: days0To30.toFixed(2),
                 days31To60: days31To60.toFixed(2),
                 days61Plus: days61Plus.toFixed(2),
-                // Rent charge fields from CMRECC API
                 monthlyRent: rentCharges.monthlyRent,
                 cam: rentCharges.cam,
                 ins: rentCharges.ins,

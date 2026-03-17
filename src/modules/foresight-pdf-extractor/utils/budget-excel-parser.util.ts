@@ -5,7 +5,7 @@ import { NumericCleanerUtil } from './numeric-cleaner.util';
 export interface ExcelSuiteData {
   propertyId: string;
   suiteId: string;
-  status: 'Vacant' | 'Occupied' | 'Unknown';
+  status: 'Vacant' | 'Occupied' | 'Unknown' | 'Proposed';
   squareFootage: number;
   baseRentMonth: number;
   baseRentPerSf: number;
@@ -85,7 +85,7 @@ interface TenantRowInfo {
   rowIndex: number;
   suiteId: string;
   propertyId: string;
-  status: 'Vacant' | 'Occupied' | 'Unknown';
+  status: 'Vacant' | 'Occupied' | 'Unknown' | 'Proposed';
   tenantName: string;
   section: string;
 }
@@ -674,7 +674,7 @@ export class BudgetExcelParserUtil {
   private static extractTenantIdentifiers(cellValue: string): { 
     suiteId: string; 
     propertyId: string; 
-    status: 'Vacant' | 'Occupied' | 'Unknown';
+    status: 'Vacant' | 'Occupied' | 'Unknown' | 'Proposed';
     tenantName: string;
   } | null {
     // Pattern 1: "- SSSS - [Tenant Name] (BRR) PPPPPP-SSSS" (leading dash optional)
@@ -690,9 +690,9 @@ export class BudgetExcelParserUtil {
       const suiteId = match[3];           // e.g. "2111" or "18"
 
       // Determine status based on tenant name
-      let status: 'Vacant' | 'Occupied' | 'Unknown';
+      let status: 'Vacant' | 'Occupied' | 'Unknown' | 'Proposed';
       if (rawLabel.toLowerCase().includes('proposed')) {
-        status = 'Vacant';
+        status = 'Proposed';
       } else if (rawLabel.trim().length > 0) {
         status = 'Occupied';
       } else {
@@ -710,9 +710,9 @@ export class BudgetExcelParserUtil {
       const suiteId = tiMatch[1];
       const tenantName = tiMatch[2].trim();
       
-      let status: 'Vacant' | 'Occupied' | 'Unknown';
+      let status: 'Vacant' | 'Occupied' | 'Unknown' | 'Proposed';
       if (tenantName.toLowerCase().includes('proposed')) {
-        status = 'Vacant';
+        status = 'Proposed';
       } else if (tenantName.trim().length > 0) {
         status = 'Occupied';
       } else {
@@ -735,9 +735,9 @@ export class BudgetExcelParserUtil {
       const suiteId = commissionMatch[1];
       const tenantName = commissionMatch[2].trim();
       
-      let status: 'Vacant' | 'Occupied' | 'Unknown';
+      let status: 'Vacant' | 'Occupied' | 'Unknown' | 'Proposed';
       if (tenantName.toLowerCase().includes('proposed')) {
-        status = 'Vacant';
+        status = 'Proposed';
       } else if (tenantName.trim().length > 0) {
         status = 'Occupied';
       } else {
@@ -755,12 +755,9 @@ export class BudgetExcelParserUtil {
     return null;
   }
 
-  /**
-   * Extract data from Rental Income section
-   */
-  private static extractFromRentalIncomeSection(worksheet: any, tenantInfo: TenantRowInfo[]): Map<string, { baseRentMonth: number; squareFootage: number; rcd: string | null }> {
+  private static extractFromRentalIncomeSection(worksheet: any, tenantInfo: TenantRowInfo[]): Map<string, { baseRentMonth: number; squareFootage: number; rcd: string | null; monthlyPayments: any }> {
     const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-    const results = new Map<string, { baseRentMonth: number; squareFootage: number; rcd: string | null }>();
+    const results = new Map<string, { baseRentMonth: number; squareFootage: number; rcd: string | null; monthlyPayments: any }>();
 
     // Read month header labels from the sheet (row where cols 2–13 look like "MM/YY")
     let headerLabels: string[] | undefined;
@@ -772,20 +769,26 @@ export class BudgetExcelParserUtil {
       }
     }
     
+    const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sept', 'oct', 'nov', 'dec'];
+
     for (const tenant of tenantInfo) {
-      if (!tenant.section.includes('RENTAL INCOME') && !tenant.section.includes('Rental Income')) continue;
+      // Accept any section that contains rental income keywords (case-insensitive)
+      const sectionLower = tenant.section.toLowerCase();
+      if (!sectionLower.includes('rental income') && !sectionLower.includes('rental') && tenant.section !== 'UNKNOWN') continue;
       
       const row = data[tenant.rowIndex];
       if (!row) continue;
       
-      // Extract base rent — first non-zero value in columns 2–13
+      // Extract all 12 monthly payments from columns 2–13
+      const monthlyPayments: any = {};
       let baseRentMonth = 0;
-      for (let i = 2; i <= 13; i++) {
-        const cell = row[i];
+      for (let i = 0; i < 12; i++) {
+        const cell = row[i + 2];
         const val = typeof cell === 'number' ? cell : parseFloat(String(cell ?? '').replace(/,/g, ''));
-        if (!isNaN(val) && val > 0) {
-          baseRentMonth = val;
-          break;
+        const amount = !isNaN(val) ? val : 0;
+        monthlyPayments[months[i]] = amount;
+        if (amount > 0 && baseRentMonth === 0) {
+          baseRentMonth = amount;
         }
       }
       
@@ -798,11 +801,15 @@ export class BudgetExcelParserUtil {
           squareFootage = parseInt(match[1]);
         }
       }
+      // Also try numeric last cell
+      if (squareFootage === 0 && lastCell && typeof lastCell === 'number' && lastCell > 100 && lastCell < 50000) {
+        squareFootage = lastCell;
+      }
 
       // RCD — first month column (2–13) where value > 0, using actual header labels
       const rcd = this.extractRcdFromRow(row as any[], headerLabels);
       
-      results.set(tenant.suiteId, { baseRentMonth, squareFootage, rcd });
+      results.set(tenant.suiteId, { baseRentMonth, squareFootage, rcd, monthlyPayments });
     }
     
     return results;
@@ -1110,41 +1117,49 @@ export class BudgetExcelParserUtil {
         };
       }
 
+      // Filter to only Proposed units
+      const proposedTenants = tenantRows.filter(t => t.tenantName.toLowerCase().includes('proposed'));
+      logs.push(`Found ${proposedTenants.length} proposed tenant rows out of ${tenantRows.length} total`);
+
+      if (proposedTenants.length === 0) {
+        return {
+          success: false,
+          suites: [],
+          extractionLogs: logs,
+          errors: ['No proposed units found in Excel file']
+        };
+      }
+
       // Fill in missing property IDs from other tenant rows
       const knownPropertyId = tenantRows.find(t => t.propertyId !== 'UNKNOWN')?.propertyId;
       if (knownPropertyId) {
-        tenantRows.forEach(tenant => {
+        proposedTenants.forEach(tenant => {
           if (tenant.propertyId === 'UNKNOWN') {
             tenant.propertyId = knownPropertyId;
           }
         });
       }
 
-      // 2. Extraction Pass: Process each section
-      const rentalIncomeData = this.extractFromRentalIncomeSection(worksheet, tenantRows);
-      const camData = this.extractFromCAMSection(worksheet, tenantRows);
-      const insData = this.extractFromINSSection(worksheet, tenantRows);
-      const retData = this.extractFromRETSection(worksheet, tenantRows);
-      const tiData = this.extractFromTISection(worksheet, tenantRows);
-      const monthlyPaymentsData = this.extractFromLeasingCommissionSection(worksheet, tenantRows);
+      // 2. Extraction Pass: Process each section (pass all tenantRows for section context, but only use proposedTenants for building suites)
+      const rentalIncomeData = this.extractFromRentalIncomeSection(worksheet, proposedTenants);
+      const camData = this.extractFromCAMSection(worksheet, proposedTenants);
+      const insData = this.extractFromINSSection(worksheet, proposedTenants);
+      const retData = this.extractFromRETSection(worksheet, proposedTenants);
+      const tiData = this.extractFromTISection(worksheet, proposedTenants);
 
-      // 3. Calculation Pass: Build suite data
+      // 3. Calculation Pass: Build suite data (proposed only)
       const suiteMap = new Map<string, ExcelSuiteData>();
 
-      for (const tenant of tenantRows) {
+      for (const tenant of proposedTenants) {
         const suiteId = tenant.suiteId;
         
         if (!suiteMap.has(suiteId)) {
           // Get base data
-          const rentalData = rentalIncomeData.get(suiteId) || { baseRentMonth: 0, squareFootage: 0, rcd: null };
+          const rentalData = rentalIncomeData.get(suiteId) || { baseRentMonth: 0, squareFootage: 0, rcd: null, monthlyPayments: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sept: 0, oct: 0, nov: 0, dec: 0 } };
           const camMonth = camData.get(suiteId) || 0;
           const insMonth = insData.get(suiteId) || 0;
           const taxMonth = retData.get(suiteId) || 0;
           const tiAmount = tiData.get(suiteId) || 0;
-          const monthlyPayments = monthlyPaymentsData.get(suiteId) || {
-            jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
-            jul: 0, aug: 0, sept: 0, oct: 0, nov: 0, dec: 0
-          };
 
           // Calculate derived values
           const baseRentPerSf = this.calculateBaseRentPerSf(rentalData.baseRentMonth, rentalData.squareFootage);
@@ -1154,7 +1169,7 @@ export class BudgetExcelParserUtil {
           const suiteData: ExcelSuiteData = {
             propertyId: tenant.propertyId,
             suiteId: tenant.suiteId,
-            status: tenant.status,
+            status: 'Proposed',
             squareFootage: rentalData.squareFootage,
             baseRentMonth: rentalData.baseRentMonth,
             baseRentPerSf,
@@ -1164,7 +1179,7 @@ export class BudgetExcelParserUtil {
             totalDueMonth,
             tiPerSf,
             rcd: rentalData.rcd ?? null,
-            monthlyPayments
+            monthlyPayments: rentalData.monthlyPayments,
           };
 
           suiteMap.set(suiteId, suiteData);

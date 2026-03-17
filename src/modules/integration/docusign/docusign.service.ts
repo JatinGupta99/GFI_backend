@@ -1128,4 +1128,69 @@ export class DocuSignService {
 
     return envelopeDefinition;
   }
+
+  /**
+   * Create a draft envelope and return a DocuSign Sender View URL.
+   * The sender opens this URL to drag-and-drop signature fields onto the PDF,
+   * then clicks Send — DocuSign delivers the envelope to the recipient.
+   */
+  async createSenderView(
+    leaseId: string,
+    pdfBuffer: Buffer,
+    recipientEmail: string,
+    recipientName: string,
+    returnUrl: string,
+  ): Promise<{ envelopeId: string; senderViewUrl: string }> {
+    const accessToken = await this.getAccessToken();
+    const accountId = this.configService.get<string>('DOCUSIGN_ACCOUNT_ID')!;
+    const basePath = this.configService.get<string>('DOCUSIGN_BASE_PATH')!;
+
+    // Build a draft envelope (status: "created") with no tabs — sender will place them
+    const envelopeDefinition = {
+      emailSubject: `Please sign your Letter of Intent - ${leaseId}`,
+      documents: [
+        {
+          documentBase64: pdfBuffer.toString('base64'),
+          name: `LOI_${leaseId}.pdf`,
+          fileExtension: 'pdf',
+          documentId: '1',
+        },
+      ],
+      recipients: {
+        signers: [
+          {
+            email: recipientEmail,
+            name: recipientName,
+            recipientId: '1',
+            routingOrder: '1',
+            // No tabs — sender will drag them in the UI
+          },
+        ],
+      },
+      status: 'created', // Draft — not sent yet
+    };
+
+    // Create the draft envelope
+    const envelopeRes = await firstValueFrom(
+      this.httpService.post(
+        `${basePath}/v2.1/accounts/${accountId}/envelopes`,
+        envelopeDefinition,
+        { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } },
+      ),
+    );
+    const envelopeId: string = envelopeRes.data.envelopeId;
+
+    // Generate sender view URL
+    const senderViewRes = await firstValueFrom(
+      this.httpService.post(
+        `${basePath}/v2.1/accounts/${accountId}/envelopes/${envelopeId}/views/sender`,
+        { returnUrl },
+        { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    this.logger.log(`Sender view created for envelope ${envelopeId}, lease ${leaseId}`);
+
+    return { envelopeId, senderViewUrl: senderViewRes.data.url };
+  }
 }

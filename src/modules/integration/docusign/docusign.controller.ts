@@ -18,6 +18,7 @@ import { EnvelopeResponseDto } from './dto/envelope-response.dto';
 import { DocuSignWebhookDto } from './dto/docusign-webhook.dto';
 import { GenerateSigningUrlDto } from './dto/generate-signing-url.dto';
 import { SigningUrlResponseDto } from './dto/signing-url-response.dto';
+import { CreateSenderViewDto, SenderViewResponseDto } from './dto/sender-view.dto';
 import { LeadsRepository } from '../../leads/repository/lead.repository';
 import { HmacValidationGuard } from './guards/hmac-validation.guard';
 import { Public } from '../../../common/decorators/public.decorator';
@@ -28,6 +29,7 @@ import { firstValueFrom } from 'rxjs';
 import { MailService } from '../../mail/mail.service';
 import { EmailType } from '../../../common/enums/common-enums';
 import { UserId } from '../../../common/decorators/user-id.decorator';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('leases')
 export class DocuSignController {
@@ -39,6 +41,7 @@ export class DocuSignController {
     private readonly mediaService: MediaService,
     private readonly httpService: HttpService,
     private readonly mailService: MailService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -520,6 +523,51 @@ export class DocuSignController {
         `Failed to generate signing URL: ${error.message}`,
       );
     }
+  }
+
+  /**
+   * Create a DocuSign sender view for drag-and-drop signature field placement.
+   * POST /leases/:id/sender-view
+   *
+   * Returns a senderViewUrl — open this in an iframe or new tab.
+   * The sender drags a "Signature" field onto the PDF, clicks Send,
+   * and DocuSign delivers the envelope to the tenant automatically.
+   */
+  @Post(':id/sender-view')
+  @HttpCode(HttpStatus.OK)
+  async createSenderView(
+    @Param('id') leaseId: string,
+    @Body() dto: CreateSenderViewDto,
+  ): Promise<SenderViewResponseDto> {
+    const lease = await this.leadRepository.findById(leaseId);
+    if (!lease) throw new NotFoundException(`Lease not found: ${leaseId}`);
+
+    const pdfBuffer = await this.downloadPdf(dto.Key);
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new BadRequestException('PDF document is empty or could not be downloaded');
+    }
+
+    const recipientEmail = dto.recipientEmail || lease.general?.email;
+    if (!recipientEmail) throw new BadRequestException('Recipient email is required');
+
+    const recipientName = `${lease.general?.firstName || ''} ${lease.general?.lastName || ''}`.trim() || 'Tenant';
+
+    const returnUrl = dto.returnUrl
+      || this.configService.get<string>('DOCUSIGN_RETURN_URL')
+      || 'https://www.docusign.com/deeplinkRedirect';
+
+    const result = await this.docuSignService.createSenderView(
+      leaseId,
+      pdfBuffer,
+      recipientEmail,
+      recipientName,
+      returnUrl,
+    );
+
+    // Store the draft envelope ID on the lead so webhook can match it later
+    await this.leadRepository.updateEnvelopeId(leaseId, result.envelopeId);
+
+    return result;
   }
 }
 

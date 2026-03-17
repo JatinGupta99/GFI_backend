@@ -25,8 +25,6 @@ interface PropertyLeaseState {
   totalLeases: number;
   processedLeases: number;
   leases: any[];
-  offersMap: Map<string, any>;
-  emeaMap: Map<string, any>;
 }
 
 @Processor('renewals-incremental-sync', {
@@ -81,15 +79,11 @@ export class IncrementalRenewalsProcessor extends WorkerHost {
           continue;
         }
 
-        const [offers, emea] = await this.leasingService.getPropertyMetadata(propertyId);
-        
         propertyStates.push({
           propertyId,
           totalLeases: leases.length,
           processedLeases: 0,
           leases,
-          offersMap: new Map(offers.map(o => [o.LeaseID, o])),
-          emeaMap: new Map(emea.map(e => [e.LeaseId, e])),
         });
 
         this.logger.log(`  ✓ Property ${propertyId}: ${leases.length} leases queued`);
@@ -154,8 +148,6 @@ export class IncrementalRenewalsProcessor extends WorkerHost {
           const renewal = await this.leasingService.processLease(
             propertyState.propertyId,
             lease,
-            propertyState.offersMap,
-            propertyState.emeaMap,
           );
 
           allRenewals.push(renewal);

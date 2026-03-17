@@ -1,16 +1,17 @@
 export interface UpcomingRenewal {
-    id: string;
-    tenant: string;
+    id: string;           // mriLeaseId (LeaseID)
+    tenantId?: string;    // MasterOccupantID
+    tenant: string;       // OccupantName / LegalName
+    address?: string;     // Address1, City, State Zip
     property: string;
     suite: string;
-    sf: string; // Changed from number to string to match API response
+    sf: string;
     expDate: string;
     option: 'Yes' | 'No' | 'N/A';
     optionTerm?: string;
     rentPerSf?: number;
-    tiPerSf: string; // Tenant Improvement (comes as string like "N/A")
- // Lease Commencement Date (comes as string like "N/A")
-    budgetSf: string; // Changed from number to string to match API response
+    tiPerSf: string;
+    budgetSf: string;
     budgetRent?: number;
     status: string;
     note?: string;
@@ -24,7 +25,7 @@ export interface UpcomingRenewal {
     balanceForward?: number;
     cashReceived?: number;
     balanceDue?: number;
-    days0To30?: string; // Comes as string like "0.00"
-    days31To60?: string; // Comes as string like "0.00"
-    days61Plus?: string; // Comes as string like "0.00"
+    days0To30?: string;
+    days31To60?: string;
+    days61Plus?: string;
 }
