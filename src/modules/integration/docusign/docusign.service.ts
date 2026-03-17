@@ -1147,7 +1147,7 @@ export class DocuSignService {
 
     // Build a draft envelope (status: "created") with no tabs — sender will place them
     const envelopeDefinition = {
-      emailSubject: `Please sign your Letter of Intent - ${leaseId}`,
+      emailSubject: `Please sign your Letter - ${leaseId}`,
       documents: [
         {
           documentBase64: pdfBuffer.toString('base64'),
