@@ -18,6 +18,7 @@ import { SendAppEmailDto, SendApprovalEmailDto, SendLoiEmailDto, SendRenewalLett
 import { SendGenericEmailDto } from './dto/send-generic-email.dto';
 import { UpdateLeadPublicDto } from './dto/update-lead-public.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
+import { UpdateDealTermsDto } from './dto/sub-dtos/deal-terms.dto';
 import { LeadsService } from './leads.service';
 
 import { Public } from '../../common/decorators/public.decorator';
@@ -71,6 +72,12 @@ export class LeadsController {
   @UsePipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true }))
   update(@Param('id') id: string, @Body() dto: UpdateLeadDto) {
     return this.service.update(id, dto);
+  }
+
+  @Patch(':id/deal-terms')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  updateDealTerms(@Param('id') id: string, @Body() dto: UpdateDealTermsDto) {
+    return this.service.updateDealTerms(id, dto.rounds);
   }
 
   @Delete(':id')

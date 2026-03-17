@@ -131,7 +131,30 @@ export class Lead {
   @Prop({ 
     type: DealTermsSchema, 
     default: () => ({
-      rounds: [],
+      rounds: [
+        {
+          id: 'round-1',
+          label: 'Round 1',
+          initial: {
+            term: '', baseRent: 0, annualIncrease: '', rcd: '', nnn: 0,
+            camCap: '', camCapDetails: '', insReimbursement: '', insReimbursementDetails: '',
+            retReimbursement: '', retReimbursementDetails: '', securityDeposit: '',
+            securityDepositDetails: '', prepaidRent: '', use: '', exclusiveUse: '',
+            option: '', optionDetails: '', guaranty: '', guarantyDetails: '',
+            tiAllowance: '', tiAllowanceDetails: '', percentageRent: '',
+            percentageRentDetails: '', deliveryOfSpace: '',
+          },
+          counter: {
+            term: '', baseRent: 0, annualIncrease: '', rcd: '', nnn: 0,
+            camCap: '', camCapDetails: '', insReimbursement: '', insReimbursementDetails: '',
+            retReimbursement: '', retReimbursementDetails: '', securityDeposit: '',
+            securityDepositDetails: '', prepaidRent: '', use: '', exclusiveUse: '',
+            option: '', optionDetails: '', guaranty: '', guarantyDetails: '',
+            tiAllowance: '', tiAllowanceDetails: '', percentageRent: '',
+            percentageRentDetails: '', deliveryOfSpace: '',
+          },
+        },
+      ],
     })
   })
   dealTerms: DealTerms;
@@ -289,12 +312,6 @@ export class Lead {
 
   @Prop({ type: LeaseInfoSchema })
   lease?: LeaseInfo;
-
-    @Prop({
-      type: String,
-      index: true,
-    })
-    lease_status?: string;
     
     @Prop({
       type: String,
@@ -307,7 +324,6 @@ export class Lead {
 export type LeadDocument = Lead & Document;
 export const LeadSchema = SchemaFactory.createForClass(Lead);
 LeadSchema.index({ status: 1 });
-LeadSchema.index({ 'lease.lease_status': 1 });
 LeadSchema.index({ 'lease.approval_status': 1 });
 LeadSchema.index({ signatureStatus: 1 });
 LeadSchema.index({ createdAt: -1 });

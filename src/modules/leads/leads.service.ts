@@ -6,7 +6,7 @@ import { Queue } from 'bullmq';
 import { FilterQuery, Model, Types } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
-import { EmailType, FormStatus, JOBNAME, LeadStatus, Role, SortOrder, RenewalStatus } from '../../common/enums/common-enums';
+import { EmailType, FormStatus, JOBNAME, LeadStatus, RenewalStatus, Role, SortOrder } from '../../common/enums/common-enums';
 import { PaginationHelper } from '../../common/helpers/pagination.helper';
 import { CompanyUserService } from '../company-user/company-user.service';
 import { MailService } from '../mail/mail.service';
@@ -59,7 +59,6 @@ export class LeadsService {
       sortBy = 'createdAt',
       lead_status,
       approval_status,
-      lease_status,
       property,
       propertyIds,
     } = query;
@@ -92,22 +91,16 @@ export class LeadsService {
     // -------------------------
     // Lead Status Filter
     // -------------------------
-    // -------------------------
-// Lead Status Filter
-// -------------------------
-if (lead_status) {
-  let values: string[];
+    if (lead_status) {
+      const values: string[] =
+        lead_status === 'LEAD_ALL'
+          ? STATUS_GROUPS.LEAD_ALL
+          : lead_status === 'TENANT_AR_ALL'
+            ? STATUS_GROUPS.TENANT_AR_ALL
+            : lead_status.split(',').map((s: string) => s.trim()).filter(Boolean);
 
-  if (lead_status === 'LEAD_ALL') {
-    values = STATUS_GROUPS.LEAD_ALL;
-  } else if (lead_status === 'TENANT_AR_ALL') {
-    values = STATUS_GROUPS.TENANT_AR_ALL;
-  } else {
-    values = [lead_status];
-  }
-
-  filter.lead_status = { $in: values };
-}
+      filter.lead_status = { $in: values };
+    }
 
     // -------------------------
     // Approval Status Filter
@@ -119,18 +112,6 @@ if (lead_status) {
           : [approval_status];
 
       filter.approval_status = { $in: values };
-    }
-
-    // -------------------------
-    // Lease Status Filter
-    // -------------------------
-    if (lease_status) {
-      const values =
-        lease_status === 'LEASE_ALL'
-          ? STATUS_GROUPS.LEASE_ALL
-          : [lease_status];
-
-      filter.lease_status = { $in: values };
     }
 
     // -------------------------
@@ -2710,7 +2691,7 @@ if (lead_status) {
     const result = await this.repo.aggregate([
       {
         $match: {
-          lease_status: 'DRAFTING_LEASE',
+          lead_status: 'DRAFTING_LEASE',
         },
       },
       {
@@ -2744,8 +2725,7 @@ if (lead_status) {
     const result = await this.repo.aggregate([
       {
         $match: {
-          lease_status: 'LEASE_NEGOTIATION',
-          lead_status: { $nin: ['RENEWAL_NEGOTIATION', 'Renewal Negotiation'] },
+          lead_status: { $nin: ['LEASE_NEGOTIATION','RENEWAL_NEGOTIATION', 'Renewal Negotiation'] },
         },
       },
       {
@@ -3195,6 +3175,49 @@ if (lead_status) {
       this.logger.error('Error fetching overview metrics:', error);
       throw new InternalServerErrorException('Failed to fetch overview metrics');
     }
+  }
+
+  async updateDealTerms(id: string, rounds: any[]) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    const lead = await this.repo.findById(id);
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    const emptyValues = () => ({
+      term: '', baseRent: 0, annualIncrease: '', rcd: '', nnn: 0,
+      camCap: '', camCapDetails: '', insReimbursement: '', insReimbursementDetails: '',
+      retReimbursement: '', retReimbursementDetails: '', securityDeposit: '',
+      securityDepositDetails: '', prepaidRent: '', use: '', exclusiveUse: '',
+      option: '', optionDetails: '', guaranty: '', guarantyDetails: '',
+      tiAllowance: '', tiAllowanceDetails: '', percentageRent: '',
+      percentageRentDetails: '', deliveryOfSpace: '',
+    });
+
+    const existingRounds: any[] = (lead as any).dealTerms?.rounds || [];
+
+    // Strip fields that are empty string or 0 (treat as "not provided")
+    const stripEmpty = (obj: Record<string, any>) =>
+      Object.fromEntries(
+        Object.entries(obj).filter(([, v]) => v !== '' && v !== 0 && v != null),
+      );
+
+    const normalizedRounds = rounds.map((round, index) => {
+      const existingRound = existingRounds.find(r => r.id === round.id) || existingRounds[index] || {};
+      const existingInitial = existingRound.initial || {};
+      const existingCounter = existingRound.counter || {};
+
+      return {
+        id: round.id || `round-${index + 1}`,
+        label: round.label || `Round ${index + 1}`,
+        initial: { ...emptyValues(), ...existingInitial, ...stripEmpty(round.initial || {}) },
+        counter: { ...emptyValues(), ...existingCounter, ...stripEmpty(round.counter || {}) },
+      };
+    });
+
+    const updated = await this.repo.update(id, { dealTerms: { rounds: normalizedRounds } } as any);
+    return updated;
   }
 }
 

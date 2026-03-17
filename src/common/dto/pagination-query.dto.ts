@@ -49,10 +49,6 @@ export class PaginationQueryDto {
   approval_status?: string='';
 
   @IsOptional()
-  @IsEnum(LeaseStatusFilter)
-  lease_status?: LeaseStatusFilter;
-
-  @IsOptional()
   @IsString()
   sortBy: string = 'createdAt';
 

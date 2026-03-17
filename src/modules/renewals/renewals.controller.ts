@@ -87,25 +87,27 @@ export class RenewalsController {
 
     // Handle status filtering with groups
     if (status) {
-      const statusArray = Array.isArray(status) ? status : [status];
-      
-      // Check if any status is a group
+      // Handle comma-separated string or array
+      const statusArray = Array.isArray(status)
+        ? status
+        : String(status).split(',').map(s => s.trim()).filter(Boolean);
+
       let expandedStatuses: string[] = [];
       for (const s of statusArray) {
-        if (s === 'ALL_NOTICES' && STATUS_GROUPS.ALL_NOTICES) {
+        if (s === 'ALL_NOTICES') {
           expandedStatuses.push(...STATUS_GROUPS.ALL_NOTICES);
         } else {
           expandedStatuses.push(s);
         }
       }
-      
+
       filters.status = expandedStatuses;
     } else if (renewalStatus) {
-      // Handle renewal_status parameter
+      // Handle renewal_status parameter — supports comma-separated multiple values
       if (renewalStatus === 'ALL_NOTICES') {
         filters.status = STATUS_GROUPS.ALL_NOTICES;
       } else {
-        filters.status = [renewalStatus];
+        filters.status = String(renewalStatus).split(',').map(s => s.trim()).filter(Boolean);
       }
     }
 

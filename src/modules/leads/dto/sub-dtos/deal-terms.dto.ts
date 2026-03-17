@@ -11,28 +11,35 @@ export class NegotiationValuesDto {
     @IsOptional() @IsString() camCapDetails?: string;
     @IsOptional() @IsString() insReimbursement?: string;
     @IsOptional() @IsString() insReimbursementDetails?: string;
-}
-
-export class AgreementDto {
-    @IsOptional() @IsBoolean() term?: boolean;
-    @IsOptional() @IsBoolean() baseRent?: boolean;
-    @IsOptional() @IsBoolean() annualIncrease?: boolean;
-    @IsOptional() @IsBoolean() rcd?: boolean;
-    @IsOptional() @IsBoolean() nnn?: boolean;
-    @IsOptional() @IsBoolean() camCap?: boolean;
-    @IsOptional() @IsBoolean() camCapDetails?: boolean;
-    @IsOptional() @IsBoolean() insReimbursement?: boolean;
-    @IsOptional() @IsBoolean() insReimbursementDetails?: boolean;
+    @IsOptional() @IsString() retReimbursement?: string;
+    @IsOptional() @IsString() retReimbursementDetails?: string;
+    @IsOptional() @IsString() securityDeposit?: string;
+    @IsOptional() @IsString() securityDepositDetails?: string;
+    @IsOptional() @IsString() prepaidRent?: string;
+    @IsOptional() @IsString() use?: string;
+    @IsOptional() @IsString() exclusiveUse?: string;
+    @IsOptional() @IsString() option?: string;
+    @IsOptional() @IsString() optionDetails?: string;
+    @IsOptional() @IsString() guaranty?: string;
+    @IsOptional() @IsString() guarantyDetails?: string;
+    @IsOptional() @IsString() tiAllowance?: string;
+    @IsOptional() @IsString() tiAllowanceDetails?: string;
+    @IsOptional() @IsString() percentageRent?: string;
+    @IsOptional() @IsString() percentageRentDetails?: string;
+    @IsOptional() @IsString() deliveryOfSpace?: string;
 }
 
 export class NegotiationRoundDto {
     @IsOptional() @IsString() id?: string;
     @IsOptional() @IsString() label?: string;
-    @IsOptional() @ValidateNested() @Type(() => NegotiationValuesDto) initialValues?: NegotiationValuesDto;
-    @IsOptional() @ValidateNested() @Type(() => NegotiationValuesDto) counterValues?: NegotiationValuesDto;
-    @IsOptional() @ValidateNested() @Type(() => AgreementDto) agreement?: AgreementDto;
+    @IsOptional() @ValidateNested() @Type(() => NegotiationValuesDto) initial?: NegotiationValuesDto;
+    @IsOptional() @ValidateNested() @Type(() => NegotiationValuesDto) counter?: NegotiationValuesDto;
 }
 
 export class DealTermsDto {
     @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => NegotiationRoundDto) rounds?: NegotiationRoundDto[];
+}
+
+export class UpdateDealTermsDto {
+    @IsArray() @ValidateNested({ each: true }) @Type(() => NegotiationRoundDto) rounds: NegotiationRoundDto[];
 }
