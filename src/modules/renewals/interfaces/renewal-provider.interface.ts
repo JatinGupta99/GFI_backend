@@ -34,6 +34,19 @@ export interface RenewalData {
   days0To30?: string;
   days31To60?: string;
   days61Plus?: string;
+
+  // Additional MRI fields
+  leaseId?: string;
+  legalName?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  leaseStop?: string;
+  origSqFt?: string;
+  term?: string;
+  billingEmailAddress?: string;
 }
 
 export interface RenewalProvider {

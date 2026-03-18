@@ -307,7 +307,7 @@ export class MriRenewalProvider implements RenewalProvider {
       tenantId: lease.MasterOccupantID || lease.LeaseID,
       propertyId,
       propertyName: lease.BuildingName || 'Unknown',
-      tenantName: lease.OccupantName || 'Unknown Tenant',
+      tenantName: lease.LegalName || lease.OccupantName || 'Unknown Tenant',
       suite: lease.SuiteID || 'Unknown suite',
       sf,
       leaseEnd: new Date(expirationDate),
@@ -328,6 +328,18 @@ export class MriRenewalProvider implements RenewalProvider {
         offer,
         emea: emeaData,
       },
+      // Additional MRI fields
+      leaseId: lease.LeaseID,
+      legalName: lease.LegalName,
+      address1: lease.Address1,
+      address2: lease.Address2,
+      city: lease.City,
+      state: lease.State,
+      zip: lease.Zip,
+      leaseStop: lease.LeaseStop,
+      origSqFt: lease.OrigSqFt,
+      term: lease.Term,
+      billingEmailAddress: lease.BillingEmailAddress,
       // Spread the mapped MRI report fields (monthlyRent, cam, ins, tax, etc.)
       ...mriReportFields,
     };
@@ -359,6 +371,14 @@ export class MriRenewalProvider implements RenewalProvider {
   }
 
   private hasRenewalOption(lease: any, offer: any): 'Yes' | 'No' | 'N/A' {
+    if (lease.LeaseStop === 'N') {
+      return 'Yes';
+    }
+
+    if (lease.LeaseStop === 'Y') {
+      return 'No';
+    }
+
     if (offer && offer.LeaseTerm) {
       return 'Yes';
     }
