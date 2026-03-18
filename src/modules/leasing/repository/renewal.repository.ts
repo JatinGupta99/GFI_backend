@@ -53,14 +53,18 @@ export class RenewalRepository {
                 tenantId: renewal.tenantId || renewal.id, // MasterOccupantID, fallback to LeaseID
                 propertyId: renewal.property,
                 propertyName: propertyName || renewal.property,
-                tenantName: renewal.tenant,
+                tenantName: renewal.legalName||renewal.OccupantName||'Unknown' ,
                 address: renewal.address || '',
                 suite: renewal.suite,
                 sf: parseFloat(renewal.sf) || 0,
                 leaseEnd: renewal.expDate !== 'N/A' ? new Date(renewal.expDate) : new Date(),
                 currentMonthRent: suiteCharges?.baseRentMonth || renewal.monthlyRent || 0,
                 rentPerSf: renewal.rentPerSf || 0,
-                currentRentPerSf: renewal.rentPerSf || 0,
+                currentRentPerSf: (() => {
+                    const monthRent = suiteCharges?.baseRentMonth || renewal.monthlyRent || 0;
+                    const sqFt = parseFloat(renewal.sf) || 0;
+                    return sqFt > 0 ? Number((monthRent / sqFt).toFixed(2)) : 0;
+                })(),
                 budget_negotiation: {
                     tiPerSf: suite?.tiPerSf ? parseFloat(suite.tiPerSf) : 0,
                     rcd: suite?.rcd || '',
@@ -75,6 +79,18 @@ export class RenewalRepository {
                 option: renewal.option || 'N/A',
                 optionTerm: renewal.optionTerm || '',
                 lastSyncAt: new Date(),
+                // Additional MRI fields
+                leaseId: renewal.leaseId || '',
+                legalName: renewal.legalName || '',
+                address1: renewal.address1 || '',
+                address2: renewal.address2 || '',
+                city: renewal.city || '',
+                state: renewal.state || '',
+                zip: renewal.zip || '',
+                leaseStop: renewal.leaseStop || 'N',
+                origSqFt: renewal.origSqFt || '0',
+                term: renewal.term || '0',
+                billingEmailAddress: renewal.billingEmailAddress || '',
                 // Financial fields — prefer suite charges (from budget sheet) over MRI zeros
                 monthlyRent: suiteCharges?.baseRentMonth || renewal.monthlyRent || 0,
                 cam: suiteCharges?.camMonth || renewal.cam || 0,
@@ -110,6 +126,19 @@ export class RenewalRepository {
                     option: renewalData.option,
                     optionTerm: renewalData.optionTerm,
                     notes: renewalData.notes,
+                    // Additional MRI fields
+                    leaseId: renewalData.leaseId,
+                    legalName: renewalData.legalName,
+                    address1: renewalData.address1,
+                    address2: renewalData.address2,
+                    city: renewalData.city,
+                    state: renewalData.state,
+                    zip: renewalData.zip,
+                    leaseStop: renewalData.leaseStop,
+                    origSqFt: renewalData.origSqFt,
+                    term: renewalData.term,
+                    billingEmailAddress: renewalData.billingEmailAddress,
+                    // Financial fields
                     monthlyRent: renewalData.monthlyRent,
                     cam: renewalData.cam,
                     ins: renewalData.ins,

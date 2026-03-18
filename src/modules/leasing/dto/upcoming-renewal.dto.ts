@@ -16,6 +16,20 @@ export interface UpcomingRenewal {
     status: string;
     note?: string;
 
+    // Additional MRI fields
+    leaseId?: string;
+    legalName?: string;
+    OccupantName?: string;
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    leaseStop?: string;
+    origSqFt?: string;
+    term?: string;
+    billingEmailAddress?: string;
+
     // MRI Report API Data
     monthlyRent?: number;
     cam?: number;

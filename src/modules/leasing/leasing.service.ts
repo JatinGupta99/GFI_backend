@@ -721,26 +721,11 @@ export class LeasingService {
             totalLeases = leases.length;
             this.logger.log(`📋 Found ${totalLeases} leases in MRI for property ${propertyId}`);
 
-            // ── Upcoming-only filter ──────────────────────────────────────────
-            // Keep only leases expiring between today and 24 months from now.
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const cutoff = new Date(today);
-            cutoff.setMonth(cutoff.getMonth() + 24);
+            // ── Process ALL leases (no date filter) ──────────────────────────
+            this.logger.log(`📅 Processing all ${totalLeases} leases (no date filter applied)`);
 
-            const upcomingLeases = leases.filter(lease => {
-                const raw = lease.LeaseExpirationDate;
-                if (!raw || raw === 'N/A') return false;
-                const exp = new Date(raw);
-                return !isNaN(exp.getTime()) && exp >= today && exp <= cutoff;
-            });
-
-            this.logger.log(
-                `📅 Upcoming filter (today → +24 months): ${upcomingLeases.length}/${totalLeases} leases qualify`,
-            );
-
-            if (!upcomingLeases.length) {
-                this.logger.warn(`No upcoming renewals (within 24 months) for property ${propertyId} — falling back to suite data`);
+            if (!leases.length) {
+                this.logger.warn(`No leases found for property ${propertyId} — falling back to suite data`);
                 const saved = await this.syncRenewalsFromSuites(propertyId, propertyName, mriId, syncJobId);
                 return { totalLeases, processedLeases: 0, savedRenewals: saved, failedLeases: 0 };
             }
@@ -749,14 +734,14 @@ export class LeasingService {
             // Process leases in batches to respect rate limits
             const BATCH_SIZE = 5;
             const BATCH_DELAY = 2000;
-            const totalBatches = Math.ceil(upcomingLeases.length / BATCH_SIZE);
+            const totalBatches = Math.ceil(leases.length / BATCH_SIZE);
 
-            this.logger.log(`🔄 Processing ${upcomingLeases.length} upcoming leases in ${totalBatches} batches (${BATCH_SIZE} leases per batch)`);
+            this.logger.log(`🔄 Processing ${leases.length} leases in ${totalBatches} batches (${BATCH_SIZE} leases per batch)`);
 
             for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
                 const start = batchIndex * BATCH_SIZE;
-                const end = Math.min(start + BATCH_SIZE, upcomingLeases.length);
-                const batch = upcomingLeases.slice(start, end);
+                const end = Math.min(start + BATCH_SIZE, leases.length);
+                const batch = leases.slice(start, end);
 
                 this.logger.log(`📦 Processing batch ${batchIndex + 1}/${totalBatches} (leases ${start + 1}-${end})`);
 
@@ -1018,7 +1003,7 @@ export class LeasingService {
                 return {
                     id: lease.LeaseID,
                     tenantId: lease.MasterOccupantID,
-                    tenant: lease.OccupantName || lease.LegalName || 'Unknown',
+                    tenant: lease.LegalName || lease.OccupantName || 'Unknown',
                     address: [lease.Address1, lease.City, lease.State, lease.Zip].filter(Boolean).join(', '),
                     property: propertyId,
                     suite: lease.SuiteID,
@@ -1033,6 +1018,19 @@ export class LeasingService {
                     budgetRent: 0,
                     status: lease.OccupancyStatus || 'Renewal Negotiation',
                     note: allNotes,
+                    // Additional MRI fields
+                    leaseId: lease.LeaseID,
+                    legalName: lease.LegalName,
+                    address1: lease.Address1,
+                    address2: lease.Address2,
+                    city: lease.City,
+                    state: lease.State,
+                    zip: lease.Zip,
+                    leaseStop: lease.LeaseStop,
+                    origSqFt: lease.OrigSqFt,
+                    term: lease.Term,
+                    billingEmailAddress: lease.BillingEmailAddress,
+                    // Financial fields
                     balanceDue,
                     days0To30: days0To30.toFixed(2),
                     days31To60: days31To60.toFixed(2),
@@ -1133,7 +1131,7 @@ export class LeasingService {
             return {
                 id: lease.LeaseID,
                 tenantId: lease.MasterOccupantID,
-                tenant: lease.OccupantName || lease.LegalName || 'Unknown',
+                tenant: lease.LegalName || lease.OccupantName || 'Unknown',
                 address: [lease.Address1, lease.City, lease.State, lease.Zip].filter(Boolean).join(', '),
                 property: propertyId,
                 suite: lease.SuiteID,
@@ -1148,6 +1146,19 @@ export class LeasingService {
                 budgetRent: 0,
                 status: lease.OccupancyStatus || 'Renewal Negotiation',
                 note: allNotes,
+                // Additional MRI fields
+                leaseId: lease.LeaseID,
+                legalName: lease.LegalName,
+                address1: lease.Address1,
+                address2: lease.Address2,
+                city: lease.City,
+                state: lease.State,
+                zip: lease.Zip,
+                leaseStop: lease.LeaseStop,
+                origSqFt: lease.OrigSqFt,
+                term: lease.Term,
+                billingEmailAddress: lease.BillingEmailAddress,
+                // Financial fields
                 balanceDue,
                 days0To30: days0To30.toFixed(2),
                 days31To60: days31To60.toFixed(2),

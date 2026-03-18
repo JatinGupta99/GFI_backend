@@ -9,8 +9,8 @@ import { DraftingDetails, DraftingDetailsSchema } from './sub-schemas/drafting.s
 import { FileInfo, FileInfoSchema } from './sub-schemas/file.schema';
 import { FinancialDetails, FinancialDetailsSchema } from './sub-schemas/financial.schema';
 import { GeneralDetails, GeneralDetailsSchema } from './sub-schemas/general.schema';
-import { ReferenceInfo, ReferenceInfoSchema } from './sub-schemas/reference.schema';
 import { LeaseInfo, LeaseInfoSchema } from './sub-schemas/lease-info.schema';
+import { ReferenceInfo, ReferenceInfoSchema } from './sub-schemas/reference.schema';
 export enum LeaseStatus {
   LEASE_NEGOTIATION = 'LEASE_NEGOTIATION',
   OUT_FOR_EXECUTION = 'OUT_FOR_EXECUTION',
@@ -279,10 +279,10 @@ export class Lead {
   })
   form_status?: FormStatus;
 
-  @Prop({ type: String, trim: true })
+  @Prop({ type: String, trim: true,default:'Note' })
   lead_notes?: string;
 
-  @Prop({ type: String, trim: true })
+  @Prop({ type: String, trim: true,default:'Note' })
   lease_notes?: string;
 
   @Prop({ type: String })

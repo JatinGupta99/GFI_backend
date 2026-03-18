@@ -102,37 +102,38 @@ export class Renewal {
 
   @Prop({ required: true })
   mriLeaseId: string;
-  @Prop({ required: false })
+
+  @Prop({ required: false, default: '' })
   leaseId?: string; // LeaseID from MRI
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: '' })
   legalName?: string; // LegalName from MRI
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: '' })
   address1?: string; // Address1 from MRI
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: '' })
   address2?: string; // Address2 from MRI
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: '' })
   city?: string; // City from MRI
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: '' })
   state?: string; // State from MRI
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: '' })
   zip?: string; // Zip from MRI
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: 'N' })
   leaseStop?: string; // LeaseStop from MRI (Y/N)
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: '0' })
   origSqFt?: string; // OrigSqFt from MRI
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: '0' })
   term?: string; // Term from MRI
 
-  @Prop({ required: false })
+  @Prop({ required: false, default: '' })
   billingEmailAddress?: string; // BillingEmailAddress from MRI
 
   // MRI Report API Data
