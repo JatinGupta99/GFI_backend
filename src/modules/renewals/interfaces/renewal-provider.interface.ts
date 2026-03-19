@@ -47,6 +47,7 @@ export interface RenewalData {
   origSqFt?: string;
   term?: string;
   billingEmailAddress?: string;
+  emailAddress?: string;
 }
 
 export interface RenewalProvider {
