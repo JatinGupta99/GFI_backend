@@ -136,6 +136,9 @@ export class Renewal {
   @Prop({ required: false, default: '' })
   billingEmailAddress?: string; // BillingEmailAddress from MRI
 
+  @Prop({ required: false, default: '' })
+  emailAddress?: string; // EmailAddress from MRI
+
   // MRI Report API Data
   @Prop({ required: false })
   monthlyRent?: number;

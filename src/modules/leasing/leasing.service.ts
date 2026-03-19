@@ -977,6 +977,9 @@ export class LeasingService {
                     : '';
 
                 // Process CurrentDelinquencies data for financial fields (minimal mode)
+                // Note: Each delinquency record represents an individual charge with aging flags
+                // Multiple flags can be 'Y' for the same charge (e.g., 60-day AND 90-day)
+                // We need to determine the OLDEST bucket for each charge to avoid double-counting
                 let balanceDue = 0;
                 let days0To30 = 0;
                 let days31To60 = 0;
@@ -984,8 +987,12 @@ export class LeasingService {
 
                 if (currentDelinquencies.length > 0) {
                     balanceDue = Number(currentDelinquencies[0].TotalDelinquency) || 0;
+                    
                     for (const delinquency of currentDelinquencies) {
                         const amount = Number(delinquency.DelinquentAmount) || 0;
+                        
+                        // Assign to the OLDEST bucket (most severe delinquency)
+                        // Priority: 90+ days > 90 days > 60 days > 30 days
                         if (delinquency.NinetyPlusDayDelinquency === 'Y') {
                             days61Plus += amount;
                         } else if (delinquency.NinetyDayDelinquency === 'Y') {
@@ -1030,6 +1037,7 @@ export class LeasingService {
                     origSqFt: lease.OrigSqFt,
                     term: lease.Term,
                     billingEmailAddress: lease.BillingEmailAddress,
+                    emailAddress: currentDelinquencies[0]?.EmailAddress || lease.BillingEmailAddress || '',
                     // Financial fields
                     balanceDue,
                     days0To30: days0To30.toFixed(2),
@@ -1101,6 +1109,9 @@ export class LeasingService {
             this.logger.debug(`Fetched ${commercialNotes.length} notes for lease ${lease.LeaseID}, formatted: ${allNotes.substring(0, 100)}...`);
 
             // Process CurrentDelinquencies data for financial fields
+            // Note: MRI_S-PMCM_CurrentDelinquencies returns individual open charges by income category
+            // Each record has aging flags (30-day, 60-day, 90-day, 90+ day) indicating delinquency age
+            // Multiple flags can be 'Y' for the same charge, so we assign to the OLDEST bucket
             let balanceDue = 0;
             let days0To30 = 0;
             let days31To60 = 0;
@@ -1111,9 +1122,11 @@ export class LeasingService {
                 balanceDue = Number(currentDelinquencies[0].TotalDelinquency) || 0;
 
                 // Calculate aging buckets based on delinquency flags
+                // Assign each charge to the OLDEST bucket to avoid double-counting
                 for (const delinquency of currentDelinquencies) {
                     const amount = Number(delinquency.DelinquentAmount) || 0;
                     
+                    // Priority: 90+ days > 90 days > 60 days > 30 days
                     if (delinquency.NinetyPlusDayDelinquency === 'Y') {
                         days61Plus += amount;
                     } else if (delinquency.NinetyDayDelinquency === 'Y') {
@@ -1158,6 +1171,7 @@ export class LeasingService {
                 origSqFt: lease.OrigSqFt,
                 term: lease.Term,
                 billingEmailAddress: lease.BillingEmailAddress,
+                emailAddress: currentDelinquencies[0]?.EmailAddress || lease.BillingEmailAddress || '',
                 // Financial fields
                 balanceDue,
                 days0To30: days0To30.toFixed(2),

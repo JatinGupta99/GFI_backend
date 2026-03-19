@@ -29,6 +29,7 @@ export interface UpcomingRenewal {
     origSqFt?: string;
     term?: string;
     billingEmailAddress?: string;
+    emailAddress?: string;
 
     // MRI Report API Data
     monthlyRent?: number;

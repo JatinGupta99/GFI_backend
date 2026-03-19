@@ -91,6 +91,7 @@ export class RenewalRepository {
                 origSqFt: renewal.origSqFt || '0',
                 term: renewal.term || '0',
                 billingEmailAddress: renewal.billingEmailAddress || '',
+                emailAddress: renewal.emailAddress || '',
                 // Financial fields — prefer suite charges (from budget sheet) over MRI zeros
                 monthlyRent: suiteCharges?.baseRentMonth || renewal.monthlyRent || 0,
                 cam: suiteCharges?.camMonth || renewal.cam || 0,
@@ -138,6 +139,7 @@ export class RenewalRepository {
                     origSqFt: renewalData.origSqFt,
                     term: renewalData.term,
                     billingEmailAddress: renewalData.billingEmailAddress,
+                    emailAddress: renewalData.emailAddress,
                     // Financial fields
                     monthlyRent: renewalData.monthlyRent,
                     cam: renewalData.cam,
