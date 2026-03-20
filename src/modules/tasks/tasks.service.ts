@@ -1,32 +1,44 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, isValidObjectId } from 'mongoose';
-import { Task, TaskDocument } from './schema/task.schema';
-import { CreateTaskDto } from './dto/create-task.dto';
-import { UpdateTaskDto } from './dto/update-task.dto';
-import { QueryTaskDto } from './dto/query-task.dto';
-import { MediaService } from '../media/media.service';
 import * as crypto from 'crypto';
-import { UpdateQuery } from 'mongoose';
+import { isValidObjectId, Model, Types } from 'mongoose';
+import { MediaService } from '../media/media.service';
+import { Property, PropertyDocument } from '../properties/schema/property.entity';
+import { CreateTaskDto } from './dto/create-task.dto';
+import { QueryTaskDto } from './dto/query-task.dto';
+import { UpdateTaskDto } from './dto/update-task.dto';
+import { Task, TaskDocument } from './schema/task.schema';
 
 @Injectable()
 export class TasksService {
     constructor(
         @InjectModel(Task.name) private taskModel: Model<TaskDocument>,
+        @InjectModel(Property.name) private propertyModel: Model<PropertyDocument>,
         private readonly mediaService: MediaService,
     ) { }
 
-    async create(createTaskDto: CreateTaskDto): Promise<any> {
+    async create(createTaskDto: CreateTaskDto, userId: string, userName: string): Promise<any> {
+        // Look up property by propertyId to get propertyName
+        const property = await this.propertyModel.findOne({ propertyId: createTaskDto.property }).exec();
+        if (!property) {
+            throw new NotFoundException(`Property with ID ${createTaskDto.property} not found`);
+        }
+
         const task = new this.taskModel({
             ...createTaskDto,
-            ownerName: createTaskDto.ownerName,
+            property: property.propertyName, // Save propertyName instead of propertyId
+            userId,
+            ownerName: userName,
         });
         const savedTask = await task.save();
+        
         return this.wrapTaskWithSignedUrls(savedTask);
     }
 
-    private async wrapTaskWithSignedUrls(task: TaskDocument) {
-        const taskObj = task.toObject();
+    private async wrapTaskWithSignedUrls(task: any) {
+        // Handle both Mongoose documents and plain objects from aggregation
+        const taskObj = task.toObject ? task.toObject() : task;
+        
         if (taskObj.attachments?.length) {
             taskObj.attachments = await Promise.all(
                 taskObj.attachments.map(async (att) => ({
@@ -38,9 +50,9 @@ export class TasksService {
         return taskObj;
     }
 
-    async findAll(query: QueryTaskDto) {
+    async findAll(query: QueryTaskDto, userId: string) {
         const { search, property, priority, isCompleted, ownerName, page = 1, limit = 10 } = query;
-        const filter: any = {};
+        const filter: any = { userId: new Types.ObjectId(userId) }; // Filter by logged-in user
 
         if (search) {
             filter.$or = [
@@ -76,9 +88,10 @@ export class TasksService {
         };
     }
 
-    async findOne(id: string): Promise<any> {
+    async findOne(id: string, userId: string): Promise<any> {
         if (!isValidObjectId(id)) throw new NotFoundException('Invalid task ID');
-        const task = await this.taskModel.findById(id).exec();
+        
+        const task = await this.taskModel.findOne({ _id: id, userId }).exec();
         if (!task) throw new NotFoundException('Task not found');
 
         return this.wrapTaskWithSignedUrls(task);
@@ -104,16 +117,16 @@ export class TasksService {
         }
 
         const task = await this.taskModel
-            .findByIdAndUpdate(id, updateData, { new: true })
+            .findOneAndUpdate({ _id: id, userId }, updateData, { new: true })
             .exec();
 
         if (!task) throw new NotFoundException('Task not found');
         return this.wrapTaskWithSignedUrls(task);
     }
 
-    async remove(id: string): Promise<void> {
+    async remove(id: string, userId: string): Promise<void> {
         if (!isValidObjectId(id)) throw new NotFoundException('Invalid task ID');
-        const result = await this.taskModel.findByIdAndDelete(id).exec();
+        const result = await this.taskModel.findOneAndDelete({ _id: id, userId }).exec();
         if (!result) throw new NotFoundException('Task not found');
     }
 
@@ -159,7 +172,7 @@ export class TasksService {
         }
 
         const result = await this.taskModel.updateMany(
-            { _id: { $in: validIds } },
+            { _id: { $in: validIds }, userId }, // Only update user's own tasks
             { $set: updateData }
         ).exec();
 
@@ -168,7 +181,7 @@ export class TasksService {
 
     async toggleStatus(id: string, userId: string): Promise<Task | null> {
         if (!isValidObjectId(id)) throw new NotFoundException('Invalid task ID');
-        const task = await this.taskModel.findById(id).exec();
+        const task = await this.taskModel.findOne({ _id: id, userId }).exec();
         if (!task) throw new NotFoundException('Task not found');
 
         const newStatus = !task.isCompleted;
@@ -183,9 +196,25 @@ export class TasksService {
         }
 
         const updatedTask = await this.taskModel
-            .findByIdAndUpdate(id, { $set: updateData }, { new: true })
+            .findOneAndUpdate({ _id: id, userId }, { $set: updateData }, { new: true })
             .exec();
 
-        return updatedTask;
+        if (!updatedTask) throw new NotFoundException('Task not found');
+        return this.wrapTaskWithSignedUrls(updatedTask);
+    }
+
+    async updateAttachments(id: string, attachments: any[], userId: string): Promise<any> {
+        if (!isValidObjectId(id)) throw new NotFoundException('Invalid task ID');
+
+        const task = await this.taskModel
+            .findOneAndUpdate(
+                { _id: id, userId },
+                { $set: { attachments } },
+                { new: true }
+            )
+            .exec();
+
+        if (!task) throw new NotFoundException('Task not found');
+        return this.wrapTaskWithSignedUrls(task);
     }
 }

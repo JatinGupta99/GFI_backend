@@ -71,8 +71,4 @@ export class CreateTaskDto {
     @ValidateNested({ each: true })
     @Type(() => AttachmentDto)
     attachments?: AttachmentDto[];
-
-    @IsString()
-    @IsNotEmpty()
-    ownerName: string;
 }

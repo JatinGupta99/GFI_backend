@@ -25,6 +25,7 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import { LeadsRepository } from './repository/lead.repository';
 import { Lead } from './schema/lead.schema';
 import { TenantFormProgress, TenantFormProgressDocument } from './schema/tenant-form-progress.schema';
+import { TaskPriority } from '../tasks/schema/task.schema';
 
 export const COMPANY = {
   NAME: 'Global Fund Investments',
@@ -1098,7 +1099,7 @@ export class LeadsService {
     return { success: true };
   }
 
-  async sendRenewalLetter(id: string, dto: SendRenewalLetterDto) {
+  async sendRenewalLetter(id: string, dto: SendRenewalLetterDto,user: { userId: string; email: string; name: string; role: string }) {
     const lead = await this.findOne(id);
 
     // Resolve attachments if any
@@ -1136,15 +1137,17 @@ export class LeadsService {
       const followUpDate = new Date();
       followUpDate.setDate(followUpDate.getDate() + (dto.followUpDays || 3));
 
-      await this.tasksService.create({
-        title: `Follow up: ${dto.subject}`,
-        description: `Follow up on renewal letter sent to ${dto.to}. Lead: ${lead.general?.firstName} ${lead.general?.lastName}`,
-        dueDate: followUpDate.toISOString(),
-        property: lead.general?.property || '',
-        priority: 'Medium',
-        category: 'Leasing',
-        ownerName: 'System', // Or current user if available
-      } as any);
+      await this.tasksService.create(
+        {
+          title: `Follow up: ${dto.subject}`,
+          description: `Follow up on renewal letter sent to ${dto.to}. Lead: ${lead.general?.firstName} ${lead.general?.lastName}`,
+          dueDate: followUpDate,
+          property: lead.general?.property || '',
+          priority: TaskPriority.MEDIUM,
+        },
+        user.userId, // userId - system-generated task
+        user.name, // userName
+      );
     }
 
     return { success: true };

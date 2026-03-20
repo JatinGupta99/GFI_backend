@@ -131,8 +131,8 @@ export class LeadsController {
   }
 
   @Post(':id/renewal/letter/send')
-  sendRenewalLetter(@Param('id') id: string, @Body() dto: SendRenewalLetterDto) {
-    return this.service.sendRenewalLetter(id, dto);
+  sendRenewalLetter(@Param('id') id: string, @Body() dto: SendRenewalLetterDto, @UserId() user: { userId: string; email: string; name: string; role: string }) {
+    return this.service.sendRenewalLetter(id, dto,user);
   }
 
   @Post(':id/files/:fileId/process')

@@ -16,6 +16,7 @@ import { MriCurrentDelinquenciesService } from '../rent-roll/mri/mri-current-del
 import { MriLeasesService } from '../rent-roll/mri/mri-leases.service';
 import { MriNotesService } from '../rent-roll/mri/mri-notes.service';
 import { MriOptionsService } from '../rent-roll/mri/mri-options.service';
+import { MriTenantLedgerService } from '../rent-roll/mri/mri-tenant-ledger.service';
 
 import { PropertiesService } from '../properties/properties.service';
 import { Property } from '../properties/schema/property.entity';
@@ -62,6 +63,7 @@ export class LeasingService {
         private readonly chargesService: MriChargesService,
         private readonly currentDelinquenciesService: MriCurrentDelinquenciesService,
         private readonly commercialLeasesCmreccService: MriCommercialLeasesCmreccService,
+        private readonly tenantLedgerService: MriTenantLedgerService,
         private readonly propertiesService: PropertiesService,
         private readonly renewalRepository: RenewalRepository,
         private readonly suiteRepository: SuiteRepository,
@@ -944,6 +946,34 @@ export class LeasingService {
     /*                             MAPPING LOGIC                                   */
     /* -------------------------------------------------------------------------- */
 
+    /**
+     * Get current and previous month date ranges for tenant ledger calculations
+     */
+    private getMonthDateRanges(): {
+        currentMonthStart: string;
+        currentMonthEnd: string;
+        previousMonthEnd: string;
+    } {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0-indexed
+
+        // Current month start (e.g., 2026-03-01)
+        const currentMonthStart = new Date(year, month, 1);
+        
+        // Current month end (e.g., 2026-03-31)
+        const currentMonthEnd = new Date(year, month + 1, 0);
+        
+        // Previous month end (e.g., 2026-02-28)
+        const previousMonthEnd = new Date(year, month, 0);
+
+        return {
+            currentMonthStart: currentMonthStart.toISOString().split('T')[0],
+            currentMonthEnd: currentMonthEnd.toISOString().split('T')[0],
+            previousMonthEnd: previousMonthEnd.toISOString().split('T')[0],
+        };
+    }
+
     private async mapLeaseToUpcomingRenewal(
             propertyId: string,
             lease: any,
@@ -1051,8 +1081,11 @@ export class LeasingService {
                 };
             }
             
-            // Full mode: Fetch options, charges, commercial lease notes, current delinquencies, and rent charges
-            const [options, charges, commercialNotes, currentDelinquencies, rentCharges] = await Promise.all([
+            // Full mode: Fetch options, charges, commercial lease notes, and optionally tenant ledger
+            // Use tenant ledger for more accurate financial data (balance forward, cash received, aging)
+            const useTenantLedger = true; // Set to true to use tenant ledger API
+            
+            const [options, charges, commercialNotes, tenantLedgerData] = await Promise.all([
                 this.safeFetch(
                     () => this.optionsService.fetch(propertyId, lease.LeaseID),
                     [],
@@ -1065,15 +1098,86 @@ export class LeasingService {
                     () => this.commercialLeaseNotesService.fetchByLease(propertyId, lease.LeaseID),
                     [],
                 ),
-                this.safeFetch(
-                    () => this.currentDelinquenciesService.fetch(propertyId, lease.LeaseID),
-                    [],
-                ),
-                this.safeFetch(
-                    () => this.commercialLeasesCmreccService.fetchAndProcessRentCharges(propertyId, lease.LeaseID),
-                    { baseRent: 0, cam: 0, ins: 0, tax: 0, monthlyRent: 0, totalDueMonthly: 0 },
-                ),
+                // Fetch tenant ledger for accurate financial data
+                useTenantLedger ? this.safeFetch(async () => {
+                    const dates = this.getMonthDateRanges();
+                    return await this.tenantLedgerService.calculateFinancials(
+                        propertyId,
+                        lease.LeaseID,
+                        dates.currentMonthStart,
+                        dates.currentMonthEnd,
+                        dates.previousMonthEnd,
+                    );
+                }, null) : Promise.resolve(null),
             ]);
+
+            // If tenant ledger is not available, fall back to current delinquencies and CMRECC
+            let balanceDue = 0;
+            let balanceForward = 0;
+            let cashReceived = 0;
+            let days0To30 = 0;
+            let days31To60 = 0;
+            let days61Plus = 0;
+            let monthlyRent = 0;
+            let cam = 0;
+            let ins = 0;
+            let tax = 0;
+            let totalDueMonthly = 0;
+
+            if (tenantLedgerData) {
+                // Use tenant ledger data (more accurate)
+                this.logger.debug(`Using tenant ledger data for lease ${lease.LeaseID}`);
+                balanceForward = tenantLedgerData.balanceForward;
+                cashReceived = tenantLedgerData.cashReceived;
+                monthlyRent = tenantLedgerData.monthlyRent;
+                cam = tenantLedgerData.cam;
+                ins = tenantLedgerData.ins;
+                tax = tenantLedgerData.tax;
+                days0To30 = tenantLedgerData.days0To30;
+                days31To60 = tenantLedgerData.days31To60;
+                days61Plus = tenantLedgerData.days61Plus;
+                balanceDue = tenantLedgerData.totalArBalance;
+                totalDueMonthly = monthlyRent + cam + ins + tax;
+            } else {
+                // Fall back to current delinquencies and CMRECC
+                this.logger.debug(`Falling back to current delinquencies for lease ${lease.LeaseID}`);
+                const [currentDelinquencies, rentCharges] = await Promise.all([
+                    this.safeFetch(
+                        () => this.currentDelinquenciesService.fetch(propertyId, lease.LeaseID),
+                        [],
+                    ),
+                    this.safeFetch(
+                        () => this.commercialLeasesCmreccService.fetchAndProcessRentCharges(propertyId, lease.LeaseID),
+                        { baseRent: 0, cam: 0, ins: 0, tax: 0, monthlyRent: 0, totalDueMonthly: 0 },
+                    ),
+                ]);
+
+                monthlyRent = rentCharges.monthlyRent;
+                cam = rentCharges.cam;
+                ins = rentCharges.ins;
+                tax = rentCharges.tax;
+                totalDueMonthly = rentCharges.totalDueMonthly;
+
+                if (currentDelinquencies.length > 0) {
+                    balanceDue = Number(currentDelinquencies[0].TotalDelinquency) || 0;
+                    balanceForward = Number(currentDelinquencies[0].PrepaidCharges) || 0;
+
+                    // Calculate aging buckets based on delinquency flags
+                    for (const delinquency of currentDelinquencies) {
+                        const amount = Number(delinquency.DelinquentAmount) || 0;
+                        
+                        if (delinquency.NinetyPlusDayDelinquency === 'Y') {
+                            days61Plus += amount;
+                        } else if (delinquency.NinetyDayDelinquency === 'Y') {
+                            days61Plus += amount;
+                        } else if (delinquency.SixtyDayDelinquency === 'Y') {
+                            days31To60 += amount;
+                        } else if (delinquency.ThirtyDayDelinquency === 'Y') {
+                            days0To30 += amount;
+                        }
+                    }
+                }
+            }
 
             // BRR = Base Rent from CurrentDelinquencies API
             const annualBaseRent =
@@ -1106,39 +1210,16 @@ export class LeasingService {
                     .join(' | ')
                 : '';
 
-            this.logger.debug(`Fetched ${commercialNotes.length} notes for lease ${lease.LeaseID}, formatted: ${allNotes.substring(0, 100)}...`);
+            this.logger.debug(`Fetched ${commercialNotes.length} notes for lease ${lease.LeaseID}`);
 
-            // Process CurrentDelinquencies data for financial fields
-            // Note: MRI_S-PMCM_CurrentDelinquencies returns individual open charges by income category
-            // Each record has aging flags (30-day, 60-day, 90-day, 90+ day) indicating delinquency age
-            // Multiple flags can be 'Y' for the same charge, so we assign to the OLDEST bucket
-            let balanceDue = 0;
-            let days0To30 = 0;
-            let days31To60 = 0;
-            let days61Plus = 0;
-
-            if (currentDelinquencies.length > 0) {
-                // Get TotalDelinquency from first record (should be same across all records for the lease)
-                balanceDue = Number(currentDelinquencies[0].TotalDelinquency) || 0;
-
-                // Calculate aging buckets based on delinquency flags
-                // Assign each charge to the OLDEST bucket to avoid double-counting
-                for (const delinquency of currentDelinquencies) {
-                    const amount = Number(delinquency.DelinquentAmount) || 0;
-                    
-                    // Priority: 90+ days > 90 days > 60 days > 30 days
-                    if (delinquency.NinetyPlusDayDelinquency === 'Y') {
-                        days61Plus += amount;
-                    } else if (delinquency.NinetyDayDelinquency === 'Y') {
-                        days61Plus += amount;
-                    } else if (delinquency.SixtyDayDelinquency === 'Y') {
-                        days31To60 += amount;
-                    } else if (delinquency.ThirtyDayDelinquency === 'Y') {
-                        days0To30 += amount;
-                    }
-                }
-
-                this.logger.debug(`Processed ${currentDelinquencies.length} delinquency records for lease ${lease.LeaseID}: balanceDue=${balanceDue}, 0-30=${days0To30}, 31-60=${days31To60}, 61+=${days61Plus}`);
+            // Get email address from current delinquencies if available
+            let emailAddress = lease.BillingEmailAddress || '';
+            if (!useTenantLedger) {
+                const currentDelinquencies = await this.safeFetch(
+                    () => this.currentDelinquenciesService.fetch(propertyId, lease.LeaseID),
+                    [],
+                );
+                emailAddress = currentDelinquencies[0]?.EmailAddress || lease.BillingEmailAddress || '';
             }
 
             return {
@@ -1171,17 +1252,19 @@ export class LeasingService {
                 origSqFt: lease.OrigSqFt,
                 term: lease.Term,
                 billingEmailAddress: lease.BillingEmailAddress,
-                emailAddress: currentDelinquencies[0]?.EmailAddress || lease.BillingEmailAddress || '',
-                // Financial fields
+                emailAddress: emailAddress,
+                // Financial fields (from tenant ledger or fallback to current delinquencies)
                 balanceDue,
+                balanceForward,
+                cashReceived,
                 days0To30: days0To30.toFixed(2),
                 days31To60: days31To60.toFixed(2),
                 days61Plus: days61Plus.toFixed(2),
-                monthlyRent: rentCharges.monthlyRent,
-                cam: rentCharges.cam,
-                ins: rentCharges.ins,
-                tax: rentCharges.tax,
-                totalDueMonthly: rentCharges.totalDueMonthly,
+                monthlyRent: monthlyRent,
+                cam: cam,
+                ins: ins,
+                tax: tax,
+                totalDueMonthly: totalDueMonthly,
             };
         }
 

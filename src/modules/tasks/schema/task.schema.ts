@@ -34,6 +34,9 @@ export class Task {
     @Prop({ required: false, trim: true })
     description: string;
 
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyUser', required: true })
+    userId: string;
+
     @Prop({ type: String, required: true })
     ownerName: string;
 

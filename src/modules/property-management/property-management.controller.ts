@@ -2,6 +2,7 @@ import { Controller, Get, Post, Query, Param, Body, ParseIntPipe, UsePipes, Vali
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { PropertyManagementService } from './property-management.service';
 import { ARBalance, ARBalanceResponse, NoticeType, SendNoticeDto } from './dto/ar-balance.dto';
+import { UserId } from '../../common/decorators/user-id.decorator';
 
 @ApiTags('Property Management')
 @Controller('property-management')
@@ -38,8 +39,9 @@ export class PropertyManagementController {
     async sendNotice(
         @Param('tenantId') tenantId: string,
         @Param('type') type: NoticeType,
-        @Body() body: SendNoticeDto
+        @Body() body: SendNoticeDto,
+        @UserId() user: { userId: string; email: string; name: string; role: string }
     ) {
-        return this.propertyManagementService.sendNotice(tenantId, type, body);
+        return this.propertyManagementService.sendNotice(tenantId, type, body,user);
     }
 }

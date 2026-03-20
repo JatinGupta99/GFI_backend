@@ -1,17 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { PropertiesService } from '../properties/properties.service';
-import { MriLeasesService } from '../rent-roll/mri/mri-leases.service';
-import { MriArService } from '../rent-roll/mri/mri-ar.service';
-import { MriChargesService } from '../rent-roll/mri/mri-charges.service';
-import { ARBalance, ARStatus, NoticeType, SendNoticeDto } from './dto/ar-balance.dto';
-import { ARNoticeStatus, ARNoticeStatusDocument } from './schema/ar-notice-status.schema';
-import { MailService } from '../mail/mail.service';
-import { MediaService } from '../media/media.service';
-import { TasksService } from '../tasks/tasks.service';
 import { EmailType, LeadStatus } from '../../common/enums/common-enums';
 import { LeadsRepository } from '../leads/repository/lead.repository';
+import { MailService } from '../mail/mail.service';
+import { MediaService } from '../media/media.service';
+import { PropertiesService } from '../properties/properties.service';
+import { MriArService } from '../rent-roll/mri/mri-ar.service';
+import { MriChargesService } from '../rent-roll/mri/mri-charges.service';
+import { MriLeasesService } from '../rent-roll/mri/mri-leases.service';
+import { TaskPriority } from '../tasks/schema/task.schema';
+import { TasksService } from '../tasks/tasks.service';
+import { ARBalance, ARStatus, NoticeType, SendNoticeDto } from './dto/ar-balance.dto';
+import { ARNoticeStatus, ARNoticeStatusDocument } from './schema/ar-notice-status.schema';
 
 @Injectable()
 export class PropertyManagementService {
@@ -88,7 +89,7 @@ export class PropertyManagementService {
         };
     }
 
-    async sendNotice(id: string, type: NoticeType, dto: SendNoticeDto) {
+    async sendNotice(id: string, type: NoticeType, dto: SendNoticeDto,user: { userId: string; email: string; name: string; role: string }) {
         // Re-mapping logic
         const statusMapping: Record<string, ARStatus> = {
             [NoticeType.COURTESY]: ARStatus.SENT_COURTESY_NOTICE,
@@ -229,12 +230,13 @@ export class PropertyManagementService {
                 await this.tasksService.create({
                     title: `Follow up: ${noticeTypeLabel} Notice - ${tenantName}`,
                     description: `Follow up on ${noticeTypeLabel} notice sent to ${tenantName} at ${propertyName}. Lead ID: ${id}`,
-                    dueDate: followUpDate.toISOString(),
+                    dueDate: followUpDate,
                     property: propertyName,
-                    priority: 'High',
-                    category: 'Property Management',
-                    ownerName: emailData.userName || 'System',
-                } as any);
+                    priority: TaskPriority.MEDIUM,
+                } ,
+                user.userId,
+                user.name
+            );
 
                 this.logger.log(`Created follow-up task for ${followUpDays} days from now`);
             } catch (error) {

@@ -4,10 +4,14 @@ import { TasksService } from './tasks.service';
 import { TasksController } from './tasks.controller';
 import { Task, TaskSchema } from './schema/task.schema';
 import { MediaModule } from '../media/media.module';
+import { Property, PropertySchema } from '../properties/schema/property.entity';
 
 @Module({
     imports: [
-        MongooseModule.forFeature([{ name: Task.name, schema: TaskSchema }]),
+        MongooseModule.forFeature([
+            { name: Task.name, schema: TaskSchema },
+            { name: Property.name, schema: PropertySchema },
+        ]),
         MediaModule,
     ],
     controllers: [TasksController],
