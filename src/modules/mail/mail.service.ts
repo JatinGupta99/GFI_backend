@@ -26,6 +26,8 @@ export class MailService {
     this.logger.debug(
       `send() called with type: ${type}, email: ${payload.email}`,
     );
+    this.logger.debug(`CC recipients received: ${JSON.stringify(payload.cc || [])}`);
+    this.logger.debug(`Attachments received: ${payload.attachments?.length || 0} files`);
 
     const config = this.EmailConfigs[type];
     if (!config) {
@@ -58,15 +60,25 @@ export class MailService {
 
     try {
       this.logger.debug(`Attempting to send email via SMTP...`);
+      this.logger.debug(`Email payload:`, {
+        to: payload.email,
+        cc: payload.cc,
+        subject,
+        template: config.template,
+        attachmentCount: payload.attachments?.length || 0,
+        hasBody: !!payload.body
+      });
 
       await this.mailerService.sendMail({
         to: payload.email,
+        cc: payload.cc,
         subject,
+        attachments: payload.attachments, // Support for email attachments
         template: config.template,
         context: data,
       });
 
-      this.logger.log(`  Email sent successfully to ${payload.email}`);
+      this.logger.log(`✅ Email sent successfully to ${payload.email}`);
     } catch (err) {
       this.logger.error(`❌ Failed to send email to ${payload.email}`);
 
@@ -86,6 +98,9 @@ export class MailService {
       if (smtpError?.response) {
         this.logger.error(`SMTP Response: ${smtpError.response}`);
       }
+
+      // Log the full error object for debugging
+      this.logger.error(`Full error object:`, JSON.stringify(err, Object.getOwnPropertyNames(err)));
 
       throw new InternalServerErrorException('Failed to send email');
     }

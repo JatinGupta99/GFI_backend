@@ -1,13 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
-import { CompanyUserRole } from '../../../common/enums/common-enums';
+import { UserRole } from '../../../common/enums/common-enums';
 import { IsStrongPassword } from '../../../common/validators/isStrongPassword';
 
 export class SignupDto {
@@ -31,9 +33,17 @@ export class SignupDto {
   password: string;
 
   @ApiProperty({
-    enum: CompanyUserRole,
-    example: CompanyUserRole.OWNER,
+    enum: UserRole,
+    example: UserRole.OWNER,
   })
-  @IsEnum(CompanyUserRole, { message: 'Invalid user role' })
-  role: CompanyUserRole = CompanyUserRole.OWNER;
+  @IsEnum(UserRole, {
+    message: `Invalid user role. Allowed roles are: ${Object.values(UserRole).join(', ')}`,
+  })
+  role: UserRole = UserRole.OWNER;
+
+  @ApiProperty({ example: ['008400'], type: [String], required: false })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  properties?: string[];
 }

@@ -1,31 +1,58 @@
-export enum CompanyUserRole {
-  OWNER = 'Owner',
-  USER = 'User',
-  LEASING = 'Leasing',
-  PROPERTY_MANAGER = 'Property Manager',
-  ACQUISITION = 'Acquisitions',
-  SUPER_ADMIN = 'Super Admin',
+export enum UserRole {
+  OWNER = 'OWNER',
+  LEASING = 'LEASING',
+  PROPERTY_MANAGER = 'PROPERTY_MANAGER',
+  LEGAL = 'LEGAL',
+  ACQUISITIONS = 'ACQUISITIONS',
+  MANAGEMENT = 'MANAGEMENT'
 }
-
+export enum MediaEntityType {
+  LEAD = 'lead',
+  PROPERTY = 'property',
+  USER = 'user',
+  COMPANY = 'company',
+  MEDIA = 'media',
+  USERS = 'users',
+  LEADS = 'leads',
+  EVENTS = 'events',
+  GENERAL = 'general',
+}
 export enum EmailType {
   PASSWORD_RESET = 'PASSWORD_RESET',
   SETUP_ACCOUNT = 'SETUP_ACCOUNT',
   LOGIN_OTP = 'LOGIN_OTP',
+  GENERAL = 'GENERAL',
+  COURTESY = 'COURTESY',
+  THREE_DAY = 'THREE_DAY',
+  ATTORNEY = 'ATTORNEY',
+}
+export enum FormStatus {
+  CREATED = 'CREATED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  SUBMITTED = 'SUBMITTED',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum Role {
+  LEASING = 'LEASING',
 }
 export enum LeadType {
   GENERAL = 'general',
   BUSINESS = 'business',
 }
+export enum ActivityType {
+  DOC_AI_PROCESSED = 'DOC_AI_PROCESSED',
+  NOTE = 'NOTE',
+  FILE_UPLOAD = 'FILE_UPLOAD',
+}
 export enum LeadStatus {
-  LOI_NEGOTIATION = 'LOI Negotiation',
-  LEASE_NEGOTIATION = 'Lease Negotiation',
-  QUALIFYING = 'Qualifying',
-  OUT_FOR_EXECUTION = 'Out for Execution',
+  PROCESSING = 'PROCESSING',
+  REVIEW_REQUIRED = 'REVIEW_REQUIRED',
+  FAILED = 'FAILED',
   NO_CONTACT = 'No Contact',
-  RENEWAL_NEGOTIATION = 'Renewal Negotiation',
-  DRAFTING_AMENDMENT = 'Drafting Amendment',
+  RENEWAL_NEGOTIATION = 'RENEWAL_NEGOTIATION',
   LOST = 'Lost',
-  PROSPECT = 'Prospect',
   NEW = 'new',
   CONTACTED = 'contacted',
   QUALIFIED = 'qualified',
@@ -34,6 +61,25 @@ export enum LeadStatus {
   NEGOTIATION = 'negotiation',
   CONTRACT_SENT = 'contract_sent',
   WON = 'won',
+  LOI_NEGOTIATION = 'LOI_NEGOTIATION',
+  LEASE_NEGOTIATION = 'LEASE_NEGOTIATION',
+  QUALIFYING = 'QUALIFYING',
+  OUT_FOR_EXECUTION = 'OUT_FOR_EXECUTION',
+  LEASE_EXECUTED = 'LEASE_EXECUTED',
+  SEND_ATTORNEY_NOTICE = 'SEND_ATTORNEY_NOTICE',
+  SEND_COURTESY_NOTICE = 'SEND_COURTESY_NOTICE',
+  SEND_THREE_DAY_NOTICE = 'SEND_THREE_DAY_NOTICE',
+  PENDING = 'PENDING',
+  IN_REVIEW = 'IN_REVIEW',
+  APPROVED = 'APPROVED',
+  DEAD = 'DEAD',
+  DRAFTING_LEASE = 'DRAFTING_LEASE',
+  DRAFTING_AMENDMENT = 'DRAFTING_AMENDMENT',
+}
+
+export enum JOBNAME {
+  PROCESS_DOCUMENT = 'process-document',
+  LEADS_PROCESSING = 'leads-processing'
 }
 export enum AccountStatus {
   ACTIVE = 'ACTIVE',
@@ -45,4 +91,35 @@ export enum ResetTokenType {
   RESET = 'RESET',
   SETUP = 'SETUP',
   OTP = 'OTP',
+}
+
+export enum SortOrder {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}
+
+export enum RenewalStatus {
+  DRAFTING_AMENDMENT = 'DRAFTING_AMENDMENT',
+  OUT_FOR_EXECUTION = 'OUT_FOR_EXECUTION',
+  DRAFTING_LEASE = 'DRAFTING_LEASE',
+  DEAD = 'DEAD',
+  NO_CONTACT = 'NO_CONTACT',
+  AMENDMENT_EXECUTED = 'AMENDMENT_EXECUTED',
+  SEND_ATTORNEY_NOTICE = 'SEND_ATTORNEY_NOTICE',
+  SEND_COURTESY_NOTICE = 'SEND_COURTESY_NOTICE',
+  SEND_THREE_DAY_NOTICE = 'SEND_THREE_DAY_NOTICE',
+}
+
+export enum DocumentType {
+  COURTESY_NOTICE = 'courtesy-notice',
+  THREE_DAY_NOTICE = '3-day-notice',
+  ATTORNEY_NOTICE = 'attorney-notice',
+  LOI = 'loi',
+  APPLICATION = 'application',
+  APPROVAL_LEASE_DRAFT = 'approval-lease-draft',
+  RENEWAL_LETTER = 'renewal-letter',
+  APPROVAL_AMENDMENT_DRAFT = 'approval-amendment-draft',
+  LEASE_DRAFT = 'lease-draft',
+  EXECUTION = 'execution',
+  MRI_UPLOAD = 'mri-upload',
 }

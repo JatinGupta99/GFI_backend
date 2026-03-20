@@ -5,13 +5,14 @@ import { ResetTokenType } from '../../common/enums/common-enums';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { RequestOtpDto } from './dto/request-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SignupDto } from './dto/signup.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('signup')
   @Public()
@@ -51,8 +52,8 @@ export class AuthController {
   @Post('request-otp')
   @Public()
   @ResponseMessage('OTP sent successfully')
-  sendOtp(@Body() email: string) {
-    return this.authService.sendOtp(email);
+  requestOtp(@Body() dto: RequestOtpDto) {
+    return this.authService.sendOtp(dto.email);
   }
 
   @Post('verify-otp')

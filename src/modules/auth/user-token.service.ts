@@ -21,7 +21,7 @@ export class UserTokenService {
     private readonly mailService: MailService,
   ) {
     this.resetTokenExpiryMinutes =
-      Number(this.configService.get('RESET_TOKEN_EXPIRY_MINUTES')) || 15;
+      Number(this.configService.get('RESET_TOKEN_EXPIRY_MINUTES')) || 1440;
   }
 
   private generateToken() {
@@ -96,7 +96,7 @@ export class UserTokenService {
     const otp = randomInt(1000, 10000).toString();
 
     const hashedOtp = createHash('sha256').update(otp).digest('hex');
-    const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);//otp expires in 10 minutes
 
     await this.resetTokenRepo.create(
       userId,

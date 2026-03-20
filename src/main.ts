@@ -1,28 +1,46 @@
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
+import * as bodyParser from 'body-parser';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exception.filter';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { PropertySeeder } from './modules/properties/seeds/property.seed';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+
+  // Configure body-parser to preserve raw body for HMAC validation
+  // This is required for webhook signature verification
+  app.use(
+    bodyParser.json({
+      verify: (req: any, res, buf) => {
+        // Store raw body buffer for HMAC validation in webhook endpoints
+        req.rawBody = buf;
+      },
+    }),
+  );
+
+  // Run seeding in background, don't block app startup
+  const propertySeeder = app.get(PropertySeeder);
+  console.log('🌱 Starting property seeding...');
+  propertySeeder.seed().catch((error) => {
+    console.error('❌ Failed to seed properties:', error);
+  });
+
   app.setGlobalPrefix('api', {
     exclude: ['docs', 'admin/queues'],
   });
 
   app.enableCors({
-    origin: [
-      'http://localhost:4000',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-    ],
+    origin: configService.get<string[]>('frontend.corsOrigins'),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   });
@@ -32,7 +50,7 @@ async function bootstrap() {
   setupGlobalRegistrations(app);
 
   const logger = app.get<Logger>(WINSTON_MODULE_PROVIDER);
-  const port = process.env.PORT ?? 4000;
+  const port = configService.get<number>('port') || 4000;
   await app.listen(port);
 
   logger.info(`Server running at http://localhost:${port}/api`);

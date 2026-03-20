@@ -1,0 +1,45 @@
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+
+  <!-- Body -->
+  <div>
+    <p>Hi ${lease.general?.firstName || 'there'},</p>
+
+    <p style="color:#555; line-height:1.6;">
+      Here is the execution copy of the lease for <strong>${propertyDisplay}</strong>.
+    </p>
+
+    <p style="color:#555; line-height:1.6;">
+      You will receive a separate email from DocuSign with a secure link to review and sign the lease.
+      Please follow the instructions in the DocuSign email to complete the signing process.
+    </p>
+
+    <p style="color:#555; line-height:1.6;">
+      If you do not receive the DocuSign email within a few minutes, please check your spam or junk folder.
+    </p>
+
+    <!-- Lease Details -->
+    <div style="margin-top:30px;">
+      <h3>Lease Details</h3>
+      <ul>
+        <li><strong>Tenant:</strong> ${lease.general?.businessName || ''}</li>
+        <li><strong>Property:</strong> ${propertyDisplay}</li>
+        <li><strong>Suite:</strong> ${lease.general?.suite || ''}</li>
+      </ul>
+    </div>
+
+    <!-- Signature -->
+    <div style="margin-top:30px;">
+      <p>Thanks,</p>
+      <p>${user.name}</p>
+      <p>${user.role}</p>
+      <p>Global Fund Investments</p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="margin-top:40px; font-size:12px; color:#999;">
+    <p>This is an automated email from Global Fund Investments.</p>
+    <p>Please do not reply to this email.</p>
+  </div>
+
+</div>

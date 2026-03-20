@@ -1,3 +1,3 @@
-export * from './configuration';
+export * from '../../config/configuration';
 export * from './email-configs';
 export * from './mongoose.config';

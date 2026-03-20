@@ -4,10 +4,18 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { join } from 'path';
 import { MailService } from './mail.service';
+import { EmailController } from './controllers/email.controller';
+import { EmailOrchestratorService } from './services/email-orchestrator.service';
+import { EmailProcessorService } from './services/email-processor.service';
+import { EmailValidatorService } from './services/email-validator.service';
+import { EmailAttachmentService } from './services/email-attachment.service';
+import { EnhancedMailService } from './services/enhanced-mail.service';
+import { MediaModule } from '../media/media.module';
 
 @Module({
   imports: [
     ConfigModule,
+    MediaModule, // For S3 attachment handling
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -28,13 +36,17 @@ import { MailService } from './mail.service';
         const logger = new Logger('MailModule');
         logger.log(
           '📧 Mailer Transport Config: ' +
-            JSON.stringify({
-              host: transportConfig.host,
-              port: transportConfig.port,
-              secure: transportConfig.secure,
-              authUser: transportConfig.auth.user,
-            }),
+          JSON.stringify({
+            host: transportConfig.host,
+            port: transportConfig.port,
+            secure: transportConfig.secure,
+            authUser: transportConfig.auth.user,
+          }),
         );
+
+        // Template directory path - use process.cwd() for more reliable path resolution
+        const templateDir = join(process.cwd(), 'dist', 'modules', 'mail', 'templates');
+        logger.log(`📁 Template directory: ${templateDir}`);
 
         return {
           transport: transportConfig,
@@ -42,15 +54,39 @@ import { MailService } from './mail.service';
             from: config.get('MAIL_FROM'),
           },
           template: {
-            dir: join(__dirname, 'templates'),
+            dir: templateDir,
             adapter: new HandlebarsAdapter(),
-            options: { strict: true },
+            options: {
+              strict: true,
+            },
+          },
+          options: {
+            partials: {
+              dir: join(templateDir, 'partials'),
+              options: {
+                strict: true,
+              },
+            },
           },
         };
       },
     }),
   ],
-  providers: [MailService],
-  exports: [MailService],
+  controllers: [EmailController],
+  providers: [
+    // Legacy service for backward compatibility
+    MailService,
+    
+    // New enhanced services following SOLID principles
+    EmailOrchestratorService,
+    EmailProcessorService,
+    EmailValidatorService,
+    EmailAttachmentService,
+    EnhancedMailService,
+  ],
+  exports: [
+    MailService, // Keep for backward compatibility
+    EmailOrchestratorService, // Main service for new implementations
+  ],
 })
-export class MailModule {}
+export class MailModule { }

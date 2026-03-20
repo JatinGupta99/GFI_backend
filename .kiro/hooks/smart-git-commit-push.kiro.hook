@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Smart Git Commit & Push",
+  "description": "Analyzes git changes, generates a professional commit message as a senior software engineer would write, commits, and pushes to the current branch",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "You are a senior software engineer reviewing code changes for commit.\n\n**TASK**: Analyze the git changes and create a professional commit, then push to the current branch.\n\n**STEPS**:\n1. Run `git status` to see what files have changed\n2. Run `git diff` to see the actual changes (if output is too large, run `git diff --stat` first)\n3. Analyze the changes and determine:\n   - What feature/fix was implemented\n   - What files were modified\n   - The scope and impact of changes\n4. Generate a professional commit message following this format:\n   ```\n   <type>(<scope>): <subject>\n   \n   <body>\n   \n   <footer>\n   ```\n   \n   Where:\n   - **type**: feat, fix, docs, style, refactor, test, chore\n   - **scope**: module/component affected (e.g., property-management, mail, leads)\n   - **subject**: short description (50 chars max)\n   - **body**: detailed explanation of what and why (wrap at 72 chars)\n   - **footer**: breaking changes, issue references\n\n5. Stage all changes: `git add .`\n6. Commit with the generated message: `git commit -m \"message\"`\n7. Get current branch: `git branch --show-current`\n8. Push to current branch: `git push origin <branch-name>`\n\n**COMMIT MESSAGE GUIDELINES**:\n- Use imperative mood (\"Add feature\" not \"Added feature\")\n- Be specific and descriptive\n- Explain WHY the change was made, not just WHAT\n- Reference related issues/tickets if applicable\n- Keep subject line under 50 characters\n- Wrap body at 72 characters\n\n**EXAMPLE COMMIT MESSAGE**:\n```\nfeat(property-management): add S3 attachment resolution and follow-up tasks\n\n- Implement S3 file download for email attachments using MediaService\n- Add CC recipient support for notice emails\n- Add follow-up task creation with configurable days\n- Include additional email data fields (balance, fees, rent details)\n- Add comprehensive logging for debugging\n\nThis resolves the nodemailer attachment error and enables automated\nfollow-up reminders for property management notices.\n\nFixes #123\n```\n\nAfter pushing, confirm the commit hash and branch name to the user."
+  }
+}

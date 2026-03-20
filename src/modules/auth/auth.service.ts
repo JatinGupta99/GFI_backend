@@ -45,6 +45,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
+        properties: user.properties,
       },
     };
   }
@@ -68,12 +69,12 @@ export class AuthService {
     const match = expiresIn.match(/(\d+)([smhd])/);
     if (!match) return 3600;
     const value = parseInt(match[1], 10);
-    const unit = match[2];
-    return unit === 's'
+    const suite = match[2];
+    return suite === 's'
       ? value
-      : unit === 'm'
+      : suite === 'm'
         ? value * 60
-        : unit === 'h'
+        : suite === 'h'
           ? value * 3600
           : value * 86400;
   }
@@ -104,6 +105,7 @@ export class AuthService {
 
     await this.companyUserRepo.update(user._id.toString(), {
       password: dto.newPassword,
+
     });
     await this.userTokenService.markTokenUsed(tokenRecord._id.toString(), type);
 
@@ -131,8 +133,10 @@ export class AuthService {
     const payload = {
       sub: user._id.toString(),
       email: user.email,
+      name: user.name,
       role: user.role,
       avatar: user.avatar,
+      properties: user.properties,
     };
 
     const access_token = this.jwtService.sign(payload);

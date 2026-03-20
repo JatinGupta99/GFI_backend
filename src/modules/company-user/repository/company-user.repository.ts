@@ -19,7 +19,7 @@ import { QueryCompanyUserDto } from '../dto/query-company-user.dto';
 export class CompanyUserRepository {
   constructor(
     @InjectModel(CompanyUser.name) private model: Model<CompanyUserDocument>,
-  ) {}
+  ) { }
 
   async create(dto: CreateCompanyUserDto) {
     const user = new this.model(dto);
@@ -39,8 +39,8 @@ export class CompanyUserRepository {
       search = '',
       page = 1,
       limit = 10,
-      sortBy = 'name',
-      sortOrder = 'asc',
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
     } = query;
 
     const filter: any = {};
@@ -81,7 +81,32 @@ export class CompanyUserRepository {
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
+  async updateSignatureKey(userId: string, s3Key: string) {
+    console.log(`Updating signature for user ${userId} with key: ${s3Key}`);
+    
+    if (!isValidObjectId(userId)) {
+      throw new BadRequestException('Invalid user ID');
+    }
 
+    try {
+      const result = await this.model.findByIdAndUpdate(
+        userId,
+        { $set: { signature: s3Key } },
+        { new: true, runValidators: true }
+      ).select('-password');
+      
+      console.log(`Update result:`, result);
+      
+      if (!result) {
+        throw new NotFoundException('User not found');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error updating signature:', error);
+      throw error;
+    }
+  }
   async update(id: string, dto: UpdateCompanyUserDto) {
     if (!isValidObjectId(id)) throw new BadRequestException('Invalid user ID');
 
@@ -94,7 +119,7 @@ export class CompanyUserRepository {
     }
 
     const updated = await this.model
-      .findByIdAndUpdate(id, { ...dto, phone_no: dto.phoneNo }, { new: true })
+      .findByIdAndUpdate(id, { ...dto }, { new: true })
       .select('-password');
     if (!updated) throw new NotFoundException('User not found');
     return updated;

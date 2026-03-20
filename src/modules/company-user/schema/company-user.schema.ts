@@ -3,8 +3,11 @@ import { Document } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import {
   AccountStatus,
-  CompanyUserRole,
+  UserRole,
 } from '../../../common/enums/common-enums';
+import { configuration } from '../../../config/configuration';
+
+const config = configuration();
 
 export type CompanyUserDocument = CompanyUser & Document;
 
@@ -15,11 +18,23 @@ export class CompanyUser {
   @Prop({ required: true, trim: true })
   name: string;
 
+  @Prop({ required: false, default: null })
+  signature: string;
+
+  @Prop({ required: false, default: null })
+  signatureFileName: string;
+
+  @Prop({ required: false, default: null })
+  signatureFileSize: number;
+
+  @Prop({ required: false, default: null })
+  signatureFileType: string;
+
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
 
-  @Prop({ enum: CompanyUserRole, default: CompanyUserRole.OWNER })
-  role: CompanyUserRole;
+  @Prop({ enum: UserRole, default: UserRole.OWNER })
+  role: UserRole;
 
   @Prop({ enum: AccountStatus, default: AccountStatus.ACTIVE })
   status: AccountStatus;
@@ -45,15 +60,15 @@ export class CompanyUser {
   @Prop({ type: String, default: null })
   deletedBy: string;
 
-  @Prop({ type: String, default: null })
-  properties?: string;
+  @Prop({ type: [String], default: [] })
+  properties?: string[];
 }
 
 export const CompanyUserSchema = SchemaFactory.createForClass(CompanyUser);
 
 CompanyUserSchema.pre<CompanyUserDocument>('save', async function (next) {
   if (!this.isModified('password')) return next();
-  const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
+  const saltRounds = config.auth.bcryptSaltRounds;
   const salt = await bcrypt.genSalt(saltRounds);
   this.password = await bcrypt.hash(this.password, salt);
   this.passwordChangedAt = new Date();
@@ -66,14 +81,14 @@ CompanyUserSchema.pre('findOneAndUpdate', async function (next) {
   if (!update) return next();
 
   if (update.password) {
-    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
+    const saltRounds = config.auth.bcryptSaltRounds;
     const salt = await bcrypt.genSalt(saltRounds);
     update.password = await bcrypt.hash(update.password, salt);
     update.passwordChangedAt = new Date();
   }
 
   if (update.$set && update.$set.password) {
-    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
+    const saltRounds = config.auth.bcryptSaltRounds;
     const salt = await bcrypt.genSalt(saltRounds);
     update.$set.password = await bcrypt.hash(update.$set.password, salt);
     update.$set.passwordChangedAt = new Date();

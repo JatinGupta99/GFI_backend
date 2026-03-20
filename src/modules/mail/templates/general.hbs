@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{subject}}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #334155;
+            margin: 0;
+            padding: 0;
+            background-color: #f8fafc;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .header {
+            background-color: #1e293b;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .content {
+            padding: 32px 40px;
+            font-size: 16px;
+        }
+
+        .content p {
+            margin-bottom: 20px;
+        }
+
+        .body-text {
+            margin-bottom: 24px;
+        }
+
+        .fallback-text p {
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .cta-container {
+            text-align: center;
+            margin: 28px 0;
+            white-space: normal;
+        }
+
+        .link {
+            word-break: break-all;
+            color: #1e293b;
+            font-weight: 500;
+        }
+
+        .cta-container {
+            text-align: center;
+            margin: 28px 0;
+        }
+
+        .button {
+            display: inline-block;
+            background-color: #1e293b;
+            color: #ffffff !important;
+            padding: 14px 28px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .footer {
+            background-color: #f1f5f9;
+            padding: 20px;
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .content {
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Global Fund Investments</h1>
+        </div>
+
+        <div class="content">
+            {{#if body}}
+            <div class="body-text">{{{body}}}</div>
+            {{else}}
+            <p>Hi {{firstName}} {{lastName}},</p>
+
+            <p>
+                Here is a link that will take you to the tenant application for you to complete,
+                so we can move forward with the leasing process.
+            </p>
+
+            <p>
+                <strong>Link to Application:</strong><br>
+                <a href="{{applicationLink}}" class="link">{{applicationLink}}</a>
+            </p>
+
+            <p>
+                Please let me know if you have any questions.
+            </p>
+
+            <p>
+                Thanks,<br>
+                <strong>{{userName}}</strong><br>
+                {{userTitle}}<br>
+                {{companyName}}
+            </p>
+            {{/if}}
+
+            {{#if applicationLink}}
+            <div class="cta-container">
+                <a href="{{applicationLink}}" class="button">
+                    Click here to complete your application
+                </a>
+            </div>
+            {{/if}}
+        </div>
+
+        <div class="footer">
+            <p><strong>Global Fund Investments</strong></p>
+            <p>Professional Real Estate Management & Leasing</p>
+            <p>&copy; {{year}} Global Fund Investments. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+
+</html>

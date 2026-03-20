@@ -1,26 +1,55 @@
 import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  Post,
   Body,
-  Patch,
+  Controller,
   Delete,
+  Get,
+  Headers,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 
-import { LeadsService } from './leads.service';
-import { CreateLeadDto } from './dto/create-lead.dto';
-import { UpdateLeadDto } from './dto/update-lead.dto';
 import { LeadStatus } from '../../common/enums/common-enums';
+import { CreateLeadDto } from './dto/create-lead.dto';
+import { SendAppEmailDto, SendApprovalEmailDto, SendLoiEmailDto, SendRenewalLetterDto, SendTenantMagicLinkDto } from './dto/send-email.dto';
+import { SendGenericEmailDto } from './dto/send-generic-email.dto';
+import { UpdateLeadPublicDto } from './dto/update-lead-public.dto';
+import { UpdateLeadDto } from './dto/update-lead.dto';
+import { UpdateDealTermsDto } from './dto/sub-dtos/deal-terms.dto';
+import { LeadsService } from './leads.service';
 
-@Controller('leads')
+import { Public } from '../../common/decorators/public.decorator';
+import { UserId } from '../../common/decorators/user-id.decorator';
+import { User } from '../../common/decorators/user.decorator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { SaveTenantFormDto, SubmitTenantFormDto } from './dto/tenant-form.dto';
+
+@Controller('leasing/active-leads')
 export class LeadsController {
-  constructor(private readonly service: LeadsService) {}
+  constructor(private readonly service: LeadsService) { }
 
   @Get()
-  findAll(@Query() query: any) {
+  @UsePipes(new ValidationPipe({ transform: true }))
+  findAll(@Query() query: PaginationQueryDto) {
     return this.service.findAll(query);
+  }
+
+  @Get('dashboard/metrics')
+  getDashboardMetrics() {
+    return this.service.getDashboardMetrics();
+  }
+
+  @Get('dashboard/lease-metrics')
+  getLeaseDashboardMetrics() {
+    return this.service.getLeaseDashboardMetrics();
+  }
+
+  @Get('dashboard/overview')
+  getOverviewMetrics() {
+    return this.service.getOverviewMetrics();
   }
 
   @Get(':id')
@@ -29,13 +58,26 @@ export class LeadsController {
   }
 
   @Post()
-  create(@Body() dto: CreateLeadDto) {
-    return this.service.create(dto);
+  @UsePipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true }))
+  create(@Body() dto: CreateLeadDto, @UserId() user:{
+            userId: string;
+            email: string;
+            name: string;
+            role: string;
+        }) {
+    return this.service.create(dto, user.userId);
   }
 
   @Patch(':id')
+  @UsePipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true }))
   update(@Param('id') id: string, @Body() dto: UpdateLeadDto) {
     return this.service.update(id, dto);
+  }
+
+  @Patch(':id/deal-terms')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  updateDealTerms(@Param('id') id: string, @Body() dto: UpdateDealTermsDto) {
+    return this.service.updateDealTerms(id, dto.rounds);
   }
 
   @Delete(':id')
@@ -46,5 +88,217 @@ export class LeadsController {
   @Post('bulk/status')
   bulkStatus(@Body() body: { ids: string[]; status: LeadStatus }) {
     return this.service.bulkUpdateStatus(body.ids, body.status);
+  }
+
+  @Get(':id/loi/generate')
+  generateLoi(@Param('id') id: string) {
+    return this.service.generateLoi(id);
+  }
+
+  @Get(':id/loi/attachments')
+  getLoiAttachments(@Param('id') id: string) {
+    return this.service.getLoiAttachments(id);
+  }
+
+  @Post(':id/send')
+  sendLoiEmail(@Param('id') id: string, @Body() dto: SendLoiEmailDto) {
+    return this.service.sendLoiEmail(id, dto);
+  }
+
+  @Post('send/generic')
+  sendGenericEmail(@Body() dto: SendGenericEmailDto) {
+    return this.service.sendGenericEmail(dto);
+  }
+
+  @Post(':id/app/send')
+  sendAppEmail(@Param('id') id: string, @Body() dto: SendAppEmailDto, @UserId() user: {
+            userId: string;
+            email: string;
+            name: string;
+            role: string;
+        }) {
+    return this.service.sendAppEmail(id, dto, user.userId);
+  }
+
+  @Post(':id/approval/send')
+  sendApprovalEmail(@Param('id') id: string, @Body() dto: SendApprovalEmailDto, @User() user: {
+    userId: string;
+    name: string;
+    role: string;
+    email: string;
+  }) {
+    return this.service.sendApprovalEmail(id, dto, user);
+  }
+
+  @Post(':id/renewal/letter/send')
+  sendRenewalLetter(@Param('id') id: string, @Body() dto: SendRenewalLetterDto, @UserId() user: { userId: string; email: string; name: string; role: string }) {
+    return this.service.sendRenewalLetter(id, dto,user);
+  }
+
+  @Post(':id/files/:fileId/process')
+  processFile(@Param('id') id: string, @Param('fileId') fileId: string) {
+    return this.service.processFile(id, fileId);
+  }
+
+  @Post(':id/files/upload-url')
+  getFileUploadUrl(
+    @Param('id') id: string,
+    @Body('contentType') contentType: string,
+    @Body('category') category: string,
+  ) {
+    return this.service.getFileUploadUrl(id, contentType, category);
+  }
+
+  @Post(':id/files/confirm')
+  confirmFileUpload(
+    @Param('id') id: string,
+    @Body('key') key: string,
+    @Body('fileName') fileName: string,
+    @Body('fileSize') fileSize: number,
+    @Body('fileType') fileType: string,
+    @Body('category') category: string,
+    @UserId() user: {
+      userId: string;
+      email: string;
+      name: string;
+      role: string;
+    },
+  ) {
+    return this.service.confirmFileUpload(id, key, fileName, fileSize, fileType, category, user.name);
+  }
+
+  @Delete(':id/files')
+  deleteFile(
+    @Param('id') id: string,
+    @Query('fileKey') fileKey: string,
+  ) {
+    return this.service.deleteFile(id, fileKey);
+  }
+
+  @Get('files/download-url')
+  getFileDownloadUrl(@Query('key') key: string) {
+    return this.service.getFileDownloadUrl(key);
+  }
+
+
+  @Post(':id/tenant-form/send')
+  sendTenantMagicLink(@Param('id') id: string, @Body() dto: SendTenantMagicLinkDto) {
+    return this.service.sendTenantMagicLink(id, dto);
+  }
+
+  @Public()
+  @Get('public/tenant-form')
+  getTenantForm(@Headers('authorization') auth: string) {
+    const token = auth?.replace('Bearer ', '');
+    return this.service.getTenantForm(token);
+  }
+
+  @Public()
+  @Post('public/tenant-form/save')
+  saveTenantForm(@Headers('authorization') auth: string, @Body() dto: SaveTenantFormDto) {
+    const token = auth?.replace('Bearer ', '');
+    return this.service.saveTenantForm(token, dto);
+  }
+
+  @Public()
+  @Patch('public/tenant-form/update')
+  updateTenantForm(@Headers('authorization') auth: string, @Body() body: any) {
+    const token = auth?.replace('Bearer ', '');
+    return this.service.updateTenantForm(token, body);
+  }
+
+  @Public()
+  @Patch('public/:id/update')
+  // Rate limiting: Max 5 submission attempts per hour per IP
+  async updateLeadPublic(@Param('id') id: string, @Body() dto: UpdateLeadPublicDto) {
+    return this.service.updateLeadPublic(id, dto);
+  }
+
+  @Public()
+  @Get('public/:id')
+  getLeadPublic(@Param('id') id: string) {
+    return this.service.findOnePublic(id);
+  }
+
+  @Public()
+  @Get('public/:id/submission-status')
+  getSubmissionStatus(@Param('id') id: string) {
+    return this.service.getSubmissionStatus(id);
+  }
+
+  // ==================== LOI Document Upload & Processing ====================
+
+  @Post(':id/loi/upload-url')
+  getLoiUploadUrl(
+    @Param('id') id: string,
+    @Body('contentType') contentType: string,
+  ) {
+    return this.service.getLoiUploadUrl(id, contentType);
+  }
+
+  @Post(':id/loi/confirm')
+  confirmLoiUpload(
+    @Param('id') id: string,
+    @Body('key') key: string,
+    @Body('fileName') fileName: string,
+    @Body('fileSize') fileSize: number,
+    @Body('mimeType') mimeType: string,
+    @UserId() user: {
+      userId: string;
+      email: string;
+      name: string;
+      role: string;
+    },
+  ) {
+    return this.service.confirmLoiUpload(id, key, fileName, fileSize, user.name, mimeType);
+  }
+
+  // ==================== Unified Document Upload (3-Day, Courtesy, Attorney, etc.) ====================
+
+  @Post(':id/documents/upload-url')
+  getDocumentUploadUrl(
+    @Param('id') id: string,
+    @Body('documentType') documentType: string,
+    @Body('recordType') recordType: string = 'LEAD',
+    @Body('contentType') contentType: string,
+  ) {
+    return this.service.getDocumentUploadUrl(id, documentType, recordType || 'LEAD', contentType);
+  }
+
+  @Post(':id/documents/confirm')
+  confirmDocumentUploadUnified(
+    @Param('id') id: string,
+    @Body('key') key: string,
+    @Body('fileName') fileName: string,
+    @Body('fileSize') fileSize: number,
+    @Body('documentType') documentType: string,
+    @Body('recordType') recordType: string,
+    @Body('mimeType') mimeType: string,
+    @UserId() user: {
+      userId: string;
+      email: string;
+      name: string;
+      role: string;
+    },
+  ) {
+    return this.service.confirmDocumentUploadUnified(
+      id,
+      key,
+      fileName,
+      fileSize,
+      documentType,
+      recordType,
+      user.name,
+      mimeType,
+    );
+  }
+
+  // ==================== Public Tenant Form ====================
+
+  @Public()
+  @Post('public/tenant-form/submit')
+  submitTenantForm(@Headers('authorization') auth: string, @Body() dto: SubmitTenantFormDto) {
+    const token = auth?.replace('Bearer ', '');
+    return this.service.submitTenantForm(token, dto);
   }
 }
