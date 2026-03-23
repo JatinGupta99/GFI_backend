@@ -88,6 +88,9 @@ export class Renewal {
   })
   status: RenewalStatus;
 
+  @Prop({ required: false, default: 'Vacant', index: true })
+  occupancy_status: 'Occupied' | 'Vacant';
+
   @Prop({ required: false })
   notes?: string;
 

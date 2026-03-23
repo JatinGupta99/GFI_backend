@@ -16,6 +16,7 @@ export interface RenewalData {
   budgetTI?: number;
   budgetLCD?: string;
   status: string;
+  occupancy_status?: 'Occupied' | 'Vacant';
   notes?: string;
   option: 'Yes' | 'No' | 'N/A';
   optionTerm?: string;

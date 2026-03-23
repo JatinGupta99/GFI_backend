@@ -20,6 +20,8 @@ export interface MriLeaseRaw {
     Zip?: string;
     GenerationCodeDescription?: string;
     Term?: number;
+    LeaseBeginDate?: string;
+    VacateDate?: string;
 }
 
 @Injectable()

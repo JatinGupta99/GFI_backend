@@ -319,6 +319,7 @@ export class MriRenewalProvider implements RenewalProvider {
       budgetTI: emeaData?.BudgetTI || undefined,
       budgetLCD: emeaData?.BudgetLCD || undefined,
       status: this.determineRenewalStatus(lease, offer, expirationDate),
+      occupancy_status: this.calculateOccupancyStatus(lease),
       notes: lease.Notes || undefined,
       option: this.hasRenewalOption(lease, offer),
       optionTerm: offer?.LeaseTerm || undefined,
@@ -388,6 +389,34 @@ export class MriRenewalProvider implements RenewalProvider {
     }
 
     return 'No';
+  }
+
+  private calculateOccupancyStatus(lease: any): 'Occupied' | 'Vacant' {
+    // SQL Logic:
+    // CASE
+    //   WHEN OccupancyStatus = 'Current'
+    //     AND LeaseBeginDate <= GETDATE()
+    //     AND (VacateDate IS NULL OR VacateDate > GETDATE())
+    //   THEN 'Occupied'
+    //   ELSE 'Vacant'
+    // END
+
+    const now = new Date();
+    const occupancyStatus = lease.OccupancyStatus;
+    const leaseBeginDate = lease.LeaseBeginDate ? new Date(lease.LeaseBeginDate) : null;
+    const vacateDate = lease.VacateDate ? new Date(lease.VacateDate) : null;
+
+    // Check all conditions for 'Occupied'
+    if (
+      occupancyStatus === 'Current' &&
+      leaseBeginDate &&
+      leaseBeginDate <= now &&
+      (!vacateDate || vacateDate > now)
+    ) {
+      return 'Occupied';
+    }
+
+    return 'Vacant';
   }
 
   private delay(ms: number): Promise<void> {

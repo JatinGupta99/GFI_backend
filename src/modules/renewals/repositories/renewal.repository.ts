@@ -39,7 +39,7 @@ export class RenewalRepository implements RenewalReader {
 
     const queryBuilder = this.renewalModel
       .find(query)
-      .sort({ leaseEnd: 1, propertyId: 1 });
+      .sort({ leaseEnd: -1 });
 
     if (filters.limit) {
       queryBuilder.limit(filters.limit);
