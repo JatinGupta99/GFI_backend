@@ -34,7 +34,6 @@ export class ActivitiesController {
             role: string;
         }
     ) {
-        console.log(user, 'clnascknsca')
         return this.activitiesService.create(leadId, createActivityDto, user);
     }
 

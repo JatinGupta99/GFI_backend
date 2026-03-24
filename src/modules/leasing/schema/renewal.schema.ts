@@ -30,7 +30,6 @@ export class Renewal {
   @Prop({ type: Number, required: true })
   rentPerSf: number; // Calculated rent per square foot
 
-
   @Prop({ type: String, required: true }) // Changed from Number to String to match API
   budgetSf: string; // Budget square footage (comes as string like "4155.00")
 

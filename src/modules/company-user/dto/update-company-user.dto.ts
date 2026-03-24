@@ -19,7 +19,6 @@ export class UpdateCompanyUserDto {
   @IsOptional()
   avatar?: string;
 
-
   @ApiProperty({ example: 'John Doe' })
   @IsString({ message: 'Name must be a valid string' })
   @IsOptional({ message: 'Name is required' })

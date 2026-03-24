@@ -292,7 +292,6 @@ export class DocuSignService {
     }
   }
 
-
   /**
    * Send lease for signature via DocuSign
    * Creates an envelope with the lease PDF and sends it to the tenant

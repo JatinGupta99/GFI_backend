@@ -28,7 +28,6 @@ export class S3DocumentStorageService implements IDocumentStorage {
     try {
       const awsConfig = this.configService.get('aws');
       if (!awsConfig?.bucket || !awsConfig?.region) {
-        console.warn('AWS S3 configuration missing - some features may not work');
         // Set defaults to prevent crashes
         this.bucketName = 'default-bucket';
         this.defaultExpiresIn = 3600;
@@ -49,7 +48,6 @@ export class S3DocumentStorageService implements IDocumentStorage {
             : undefined,
       });
     } catch (error) {
-      console.error('Error initializing S3DocumentStorageService:', error);
       // Set defaults to prevent crashes
       this.bucketName = 'default-bucket';
       this.defaultExpiresIn = 3600;

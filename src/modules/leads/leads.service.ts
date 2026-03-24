@@ -156,7 +156,7 @@ export class LeadsService {
         { 'business.legalName': regex },
       ];
     }
-    console.log(filter,'caslnasclknacsl')
+
     const sort: FilterQuery<Lead> = {
       [sortBy]: sortOrder === SortOrder.ASC ? 1 : -1,
     };
@@ -985,7 +985,6 @@ export class LeadsService {
         user = result.user;
       }
     } catch (err) {
-      console.warn(`Could not fetch user ${userId} for email signature:`, err.message);
     }
 
     await this.mailService.send(EmailType.GENERAL as any, {
@@ -1034,10 +1033,6 @@ export class LeadsService {
       try {
         await this.companyUserService.findOne(user.userId);
       } catch (err: any) {
-        console.warn(
-          `Could not fetch user ${user.userId} for email signature:`,
-          err?.message,
-        );
       }
     }
 
@@ -1115,7 +1110,6 @@ export class LeadsService {
               path: url,
             });
           } catch (err) {
-            console.error(`Failed to resolve attachment ${fileId}:`, err);
           }
         }
       }
@@ -1319,7 +1313,6 @@ export class LeadsService {
     try {
       await this.mediaService.deleteFile(s3Key);
     } catch (error) {
-      console.log(error);
     }
 
     return {

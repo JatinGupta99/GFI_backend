@@ -56,7 +56,6 @@ export class DocumentValidatorService implements IDocumentValidator {
         scanForMalware: documentsConfig.scanForMalware || false,
       };
     } catch (error) {
-      console.error('Error initializing DocumentValidatorService:', error);
       // Set safe defaults
       this.config = {
         allowedContentTypes: ['application/pdf', 'image/jpeg', 'image/png'],

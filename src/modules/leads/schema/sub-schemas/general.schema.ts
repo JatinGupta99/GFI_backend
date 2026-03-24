@@ -33,7 +33,6 @@ export class GeneralDetails {
     @Prop({ default: '' })
     businessName: string;
 
-
     @Prop({ default: '' })
     spouseSsn: string;
     @Prop({ default: '' })

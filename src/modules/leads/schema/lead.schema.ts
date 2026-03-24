@@ -320,7 +320,6 @@ export class Lead {
     approval_status?: string;
 }
 
-
 export type LeadDocument = Lead & Document;
 export const LeadSchema = SchemaFactory.createForClass(Lead);
 LeadSchema.index({ status: 1 });

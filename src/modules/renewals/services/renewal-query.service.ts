@@ -264,7 +264,6 @@ export class RenewalQueryService {
     }
   }
 
-
   async clearPropertyCache(propertyId: string): Promise<void> {
     try {
       const cacheKey = `renewals:property:${propertyId}`;

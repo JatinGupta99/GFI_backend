@@ -42,12 +42,10 @@ export class MriRenewalProvider implements RenewalProvider {
     this.renewalWindowMonthsAfter = this.configService.get<number>('renewals.windowMonthsAfter', 6);
     this.includeAllActive = this.configService.get<boolean>('renewals.includeAllActive', false);
 
-    // Force console output to ensure we see configuration
-    console.log(`\n========== MRI RENEWAL PROVIDER INITIALIZED ==========`);
-    console.log(`Window Before: ${this.renewalWindowMonthsBefore} months`);
-    console.log(`Window After: ${this.renewalWindowMonthsAfter} months`);
-    console.log(`Include All Active: ${this.includeAllActive}`);
-    console.log(`======================================================\n`);
+    this.logger.log(`MRI RENEWAL PROVIDER INITIALIZED`);
+    this.logger.log(`Window Before: ${this.renewalWindowMonthsBefore} months`);
+    this.logger.log(`Window After: ${this.renewalWindowMonthsAfter} months`);
+    this.logger.log(`Include All Active: ${this.includeAllActive}`);
 
     this.logger.log(`🔧 Renewal window configured: ${this.renewalWindowMonthsAfter} months after to ${this.renewalWindowMonthsBefore} months before expiration`);
     if (this.includeAllActive) {
@@ -85,10 +83,9 @@ export class MriRenewalProvider implements RenewalProvider {
           await this.delay(index * 10);
           
           const renewalData = await this.fetchTenantRenewalData(lease, propertyId);
-          console.log(`✅ Created renewal data for tenant ${lease.LeaseID} (${lease.OccupantName})`);
+          this.logger.log(`Created renewal data for tenant ${lease.LeaseID} (${lease.OccupantName})`);
           return renewalData;
         } catch (error) {
-          console.error(`❌ Failed to fetch renewal for tenant ${lease.LeaseID}: ${error.message}`);
           this.logger.error(`Failed to fetch renewal for tenant ${lease.LeaseID}: ${error.message}`);
           return null;
         }
@@ -97,23 +94,12 @@ export class MriRenewalProvider implements RenewalProvider {
       // Wait for all parallel requests to complete
       const renewalResults = await Promise.allSettled(renewalPromises);
       
-      console.log(`\n📊 Promise.allSettled results:`);
-      renewalResults.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          console.log(`  [${index}] FULFILLED - value is ${result.value ? 'valid' : 'null'}`);
-        } else {
-          console.log(`  [${index}] REJECTED - ${result.reason}`);
-        }
-      });
-      
       // Process results
       const renewals = renewalResults
         .filter((result): result is PromiseFulfilledResult<RenewalData> => 
           result.status === 'fulfilled' && result.value !== null
         )
         .map(result => result.value);
-      
-      console.log(`\n📦 Filtered renewals array length: ${renewals.length}`);
 
       const errors = renewalResults
         .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
@@ -136,7 +122,7 @@ export class MriRenewalProvider implements RenewalProvider {
   }
 
   private async fetchTenantRenewalData(lease: any, propertyId: string): Promise<RenewalData> {
-    console.log(`\n🔍 Fetching renewal data for tenant ${lease.LeaseID} (${lease.OccupantName})`);
+    this.logger.log(`Fetching renewal data for tenant ${lease.LeaseID} (${lease.OccupantName})`);
 
     // Build the date range for TenantLedger: 12 months back → today
     const now = new Date();
@@ -151,15 +137,15 @@ export class MriRenewalProvider implements RenewalProvider {
         this.renewalOffersService.fetch(propertyId)
           .then(offers => {
             const offer = offers.find(o => o.LeaseID === lease.LeaseID);
-            console.log(`  📋 Renewal offer for ${lease.LeaseID}: ${offer ? 'found' : 'not found'}`);
+            this.logger.log(`Renewal offer for ${lease.LeaseID}: ${offer ? 'found' : 'not found'}`);
             return offer;
           })
           .catch(error => {
             if (error.message?.includes('400') || error.message?.includes('Bad Request')) {
-              console.log(`  ⚠️  Renewal offers not available for property ${propertyId} (likely commercial)`);
+              this.logger.log(`Renewal offers not available for property ${propertyId} (likely commercial)`);
               return undefined;
             }
-            console.error(`  ❌ Renewal offers error: ${error.message}`);
+            this.logger.error(`Renewal offers error: ${error.message}`);
             throw error;
           })
       ),
@@ -169,11 +155,11 @@ export class MriRenewalProvider implements RenewalProvider {
         this.emeaService.fetch(propertyId)
           .then(emea => {
             const emeaRecord = emea.find(e => e.LeaseId === lease.LeaseID);
-            console.log(`  📋 EMEA data for ${lease.LeaseID}: ${emeaRecord ? 'found' : 'not found'}`);
+            this.logger.log(`EMEA data for ${lease.LeaseID}: ${emeaRecord ? 'found' : 'not found'}`);
             return emeaRecord;
           })
           .catch(error => {
-            console.log(`  ⚠️  EMEA data not available: ${error.message}`);
+            this.logger.log(`EMEA data not available: ${error.message}`);
             return undefined;
           })
       ),
@@ -182,7 +168,7 @@ export class MriRenewalProvider implements RenewalProvider {
       this.rateLimiter.execute(() =>
         this.openChargesService.fetch(propertyId, lease.LeaseID)
           .catch(error => {
-            console.log(`  ⚠️  OpenCharges not available for ${lease.LeaseID}: ${error.message}`);
+            this.logger.log(`OpenCharges not available for ${lease.LeaseID}: ${error.message}`);
             return [];
           })
       ),
@@ -191,7 +177,7 @@ export class MriRenewalProvider implements RenewalProvider {
       this.rateLimiter.execute(() =>
         this.tenantLedgerService.fetch(propertyId, lease.LeaseID, startDate, endDate)
           .catch(error => {
-            console.log(`  ⚠️  TenantLedger not available for ${lease.LeaseID}: ${error.message}`);
+            this.logger.log(`TenantLedger not available for ${lease.LeaseID}: ${error.message}`);
             return [];
           })
       ),
@@ -200,7 +186,7 @@ export class MriRenewalProvider implements RenewalProvider {
       this.rateLimiter.execute(() =>
         this.currentDelinquenciesService.fetch(propertyId, lease.LeaseID)
           .catch(error => {
-            console.log(`  ⚠️  CurrentDelinquencies not available for ${lease.LeaseID}: ${error.message}`);
+            this.logger.log(`CurrentDelinquencies not available for ${lease.LeaseID}: ${error.message}`);
             return [];
           })
       ),
@@ -214,10 +200,8 @@ export class MriRenewalProvider implements RenewalProvider {
       lease.LeaseID,
     );
 
-    console.log(`  📊 MRI report fields for ${lease.LeaseID}:`, JSON.stringify(mriReportFields));
-
     const renewalData = this.transformToRenewalData(lease, offers, emeaData, propertyId, mriReportFields);
-    console.log(`  ✅ Transformed renewal data for ${lease.LeaseID}: tenantId=${renewalData.tenantId}, propertyId=${renewalData.propertyId}`);
+    this.logger.log(`Transformed renewal data for ${lease.LeaseID}: tenantId=${renewalData.tenantId}, propertyId=${renewalData.propertyId}`);
 
     return renewalData;
   }
@@ -250,7 +234,7 @@ export class MriRenewalProvider implements RenewalProvider {
     const expirationDate = lease.ExpirationDate || lease.LeaseExpirationDate;
     
     if (!expirationDate) {
-      console.log(`❌ Lease ${lease.LeaseID} has no expiration date, skipping`);
+      this.logger.debug(`Lease ${lease.LeaseID} has no expiration date, skipping`);
       this.logger.debug(`Lease ${lease.LeaseID} has no expiration date, skipping`);
       return false;
     }
@@ -262,10 +246,10 @@ export class MriRenewalProvider implements RenewalProvider {
     if (this.includeAllActive) {
       const isActive = leaseEndDate >= currentDate;
       if (!isActive) {
-        console.log(`❌ Lease ${lease.LeaseID} (${lease.OccupantName}) is expired, skipping`);
+        this.logger.debug(`Lease ${lease.LeaseID} (${lease.OccupantName}) is expired, skipping`);
         this.logger.debug(`Lease ${lease.LeaseID} (${lease.OccupantName}) is expired, skipping`);
       } else {
-        console.log(`✅ Lease ${lease.LeaseID} (${lease.OccupantName}) is ACTIVE - including`);
+        this.logger.debug(`Lease ${lease.LeaseID} (${lease.OccupantName}) is ACTIVE - including`);
       }
       return isActive;
     }
@@ -278,12 +262,11 @@ export class MriRenewalProvider implements RenewalProvider {
                         monthsUntilExpiry <= this.renewalWindowMonthsBefore;
     
     if (!isCandidate) {
-      console.log(`❌ Lease ${lease.LeaseID} (${lease.OccupantName}) expires in ${monthsUntilExpiry.toFixed(1)} months - outside window`);
       this.logger.debug(
         `Lease ${lease.LeaseID} (${lease.OccupantName}) expires in ${monthsUntilExpiry.toFixed(1)} months - outside renewal window (-${this.renewalWindowMonthsAfter} to +${this.renewalWindowMonthsBefore} months)`
       );
     } else {
-      console.log(`✅ Lease ${lease.LeaseID} (${lease.OccupantName}) expires in ${monthsUntilExpiry.toFixed(1)} months - INCLUDED`);
+      this.logger.debug(`Lease ${lease.LeaseID} (${lease.OccupantName}) expires in ${monthsUntilExpiry.toFixed(1)} months - INCLUDED`);
     }
     
     return isCandidate;

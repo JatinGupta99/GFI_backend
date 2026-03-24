@@ -38,13 +38,7 @@ export class SuiteRepository {
     }));
 
     if (bulkOps.length > 0) {
-      const result = await this.suiteModel.bulkWrite(bulkOps);
-      console.log('Bulk write result:', {
-        insertedCount: result.insertedCount,
-        modifiedCount: result.modifiedCount,
-        upsertedCount: result.upsertedCount,
-        matchedCount: result.matchedCount,
-      });
+      await this.suiteModel.bulkWrite(bulkOps);
     }
   }
 

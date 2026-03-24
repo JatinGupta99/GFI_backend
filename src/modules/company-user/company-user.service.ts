@@ -76,7 +76,6 @@ export class CompanyUserService {
     return null;
   }
 
-
   private ensureValidObjectId(id: string) {
     if (!isValidObjectId(id)) throw new BadRequestException('Invalid user ID');
   }
@@ -138,19 +137,16 @@ export class CompanyUserService {
   }
 
   async updateSignatureKey(userId: string, s3Key: string) {
-    console.log(`Service: Updating signature for user ${userId} with key: ${s3Key}`);
     
     // Validate the user ID
     this.ensureValidObjectId(userId);
     
     const result = await this.repo.updateSignatureKey(userId, s3Key);
-    console.log(`Service: Update result:`, result);
     
     return result;
   }
 
   async confirmSignature(userId: string, dto: SignatureConfirmDto) {
-    console.log(`Service: Confirming signature for user ${userId}`, dto);
     
     // Validate the user ID
     this.ensureValidObjectId(userId);
@@ -163,7 +159,6 @@ export class CompanyUserService {
     };
     
     const result = await this.repo.update(userId, updateData);
-    console.log(`Service: Signature confirmation result:`, result);
     
     return result;
   }

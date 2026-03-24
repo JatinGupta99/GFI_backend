@@ -26,7 +26,6 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { RenewalsModule } from './modules/renewals/renewals.module';
 import { ForeSightPdfExtractorModule } from './modules/foresight-pdf-extractor/foresight-pdf-extractor.module';
 
-
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),

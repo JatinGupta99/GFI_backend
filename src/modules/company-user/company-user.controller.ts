@@ -76,7 +76,6 @@ export class CompanyUserController {
     return this.service.remove(id);
   }
 
-
   @Post(':id/attachments/upload-url')
   @Public()
   @ResponseMessage('Upload URL generated successfully')
@@ -86,7 +85,6 @@ export class CompanyUserController {
   ) {
     return this.service.getUploadUrl(id, contentType);
   }
-
 
   
   @Post(':id/signature-upload-url')
@@ -113,8 +111,6 @@ export class CompanyUserController {
     @Body('key') key: string,
     @UserId() user: { userId: string; email: string; name: string; role: string },
   ) {
-    console.log(`Controller: Updating signature for user ${id} with key: ${key}`);
-    console.log(`Controller: Requesting user: ${user.userId}`);
     
     if (id !== user.userId) {
       throw new BadRequestException('Unauthorized to update signature for this user');
@@ -134,7 +130,6 @@ export class CompanyUserController {
     @Body() dto: SignatureConfirmDto,
     @UserId() user: { userId: string; email: string; name: string; role: string },
   ) {
-    console.log(`Controller: Confirming signature for user ${id}`, dto);
     
     if (id !== user.userId) {
       throw new BadRequestException('Unauthorized to update signature for this user');

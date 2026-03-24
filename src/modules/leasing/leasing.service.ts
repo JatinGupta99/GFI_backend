@@ -246,7 +246,6 @@ export class LeasingService {
             };
         }
 
-
     /**
      * Get status of all jobs in a batch
      */
@@ -1267,7 +1266,6 @@ export class LeasingService {
                 totalDueMonthly: totalDueMonthly,
             };
         }
-
 
     /* -------------------------------------------------------------------------- */
     /*                              CACHE UTILS                                    */

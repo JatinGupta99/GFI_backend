@@ -30,9 +30,7 @@ async function bootstrap() {
 
   // Run seeding in background, don't block app startup
   const propertySeeder = app.get(PropertySeeder);
-  console.log('🌱 Starting property seeding...');
   propertySeeder.seed().catch((error) => {
-    console.error('❌ Failed to seed properties:', error);
   });
 
   app.setGlobalPrefix('api', {

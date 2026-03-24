@@ -561,7 +561,6 @@ export class RenewalsController {
     };
   }
 
-
   /**
    * Get presigned S3 upload URL for renewal file
    */

@@ -82,7 +82,6 @@ export class CompanyUserRepository {
     return user;
   }
   async updateSignatureKey(userId: string, s3Key: string) {
-    console.log(`Updating signature for user ${userId} with key: ${s3Key}`);
     
     if (!isValidObjectId(userId)) {
       throw new BadRequestException('Invalid user ID');
@@ -95,15 +94,12 @@ export class CompanyUserRepository {
         { new: true, runValidators: true }
       ).select('-password');
       
-      console.log(`Update result:`, result);
-      
       if (!result) {
         throw new NotFoundException('User not found');
       }
       
       return result;
     } catch (error) {
-      console.error('Error updating signature:', error);
       throw error;
     }
   }

@@ -141,10 +141,10 @@ export class RenewalRepository implements RenewalReader {
   }
 
   async bulkUpsert(renewalsData: Partial<Renewal>[]): Promise<{ created: number; updated: number }> {
-    console.log(`\n💾 BulkUpsert called with ${renewalsData.length} records`);
+    this.logger.log(`BulkUpsert called with ${renewalsData.length} records`);
     
     if (renewalsData.length === 0) {
-      console.log(`  ⚠️  No records to upsert, returning early`);
+      this.logger.log('No records to upsert, returning early');
       return { created: 0, updated: 0 };
     }
     
@@ -162,14 +162,11 @@ export class RenewalRepository implements RenewalReader {
       },
     }));
     
-    console.log(`  📝 Created ${operations.length} bulk operations`);
-    console.log(`  Sample operation filter:`, operations[0]?.updateOne?.filter);
+    this.logger.log(`Created ${operations.length} bulk operations`);
 
     try {
       const result = await this.renewalModel.bulkWrite(operations);
-      console.log(`  ✅ BulkWrite result:`, {
-        upsertedCount: result.upsertedCount,
-        modifiedCount: result.modifiedCount,
+      this.logger.log(`BulkWrite result: upsertedCount=${result.upsertedCount}, modifiedCount=${result.modifiedCount}`);
         matchedCount: result.matchedCount,
         insertedCount: result.insertedCount,
       });
@@ -179,7 +176,7 @@ export class RenewalRepository implements RenewalReader {
         updated: result.modifiedCount,
       };
     } catch (error) {
-      console.error(`  ❌ BulkWrite error:`, error.message);
+      this.logger.error(`BulkWrite error: ${error.message}`);
       throw error;
     }
   }

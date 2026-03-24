@@ -180,7 +180,6 @@ export class LeadsController {
     return this.service.getFileDownloadUrl(key);
   }
 
-
   @Post(':id/tenant-form/send')
   sendTenantMagicLink(@Param('id') id: string, @Body() dto: SendTenantMagicLinkDto) {
     return this.service.sendTenantMagicLink(id, dto);

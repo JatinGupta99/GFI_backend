@@ -61,7 +61,6 @@ export class MriCoreService {
         }
     }
 
-
     /**
      * Generic GET wrapper for MRI RESTful path-based APIs
      */

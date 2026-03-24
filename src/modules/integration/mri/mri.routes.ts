@@ -1,6 +1,5 @@
 import { MriTenantLeaseMapper } from "./mapper/mri-tenant-lease.mapper";
 
-
 export enum MriApiRoute {
   TENANT_LEASE_DETAILS = 'TENANT_LEASE_DETAILS',
 }

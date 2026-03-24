@@ -6,7 +6,6 @@ export const mongooseConfig = async (configService: ConfigService) => {
 
   // Mask password in log for security
   const safeUri = uri?.replace(/:([^@]+)@/, ':****@');
-  console.log(`[MongoDB] Connecting to: ${safeUri} | DB: ${dbName}`);
 
   return {
     uri,

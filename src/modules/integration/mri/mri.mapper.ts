@@ -1,7 +1,6 @@
 import { MriTenantContact, MriTenantLease } from "./dto/create-mri.dto";
 import { LeaseDto, TenantDto } from "./dto/lease-mri.dto";
 
-
 export class MriLeaseMapper {
   static toLeaseDto(source: MriTenantLease): LeaseDto {
     return {

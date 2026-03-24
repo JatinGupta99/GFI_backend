@@ -48,33 +48,26 @@ export class SuitesService {
     this.logger.log(`Processing budget file: ${fileName}`);
 
     // VERY OBVIOUS DEBUG MARKER - THIS SHOULD APPEAR IN LOGS
-    console.log('🚨🚨🚨 NEW SERVICE CODE IS RUNNING 🚨🚨🚨');
-    console.log('🚨🚨🚨 ENHANCED PARSER SHOULD BE USED 🚨🚨🚨');
+    this.logger.log('NEW SERVICE CODE IS RUNNING');
+    this.logger.log('ENHANCED PARSER SHOULD BE USED');
 
     try {
       // Try enhanced extraction first
-      console.log('🔍 Attempting enhanced extraction...');
+      this.logger.log('Attempting enhanced extraction...');
       const enhancedResult = BudgetExcelParserUtil.extractEnhancedBudgetData(fileBuffer);
       
-      console.log(`📊 Enhanced extraction result:`, {
-        success: enhancedResult.success,
-        suitesCount: enhancedResult.suites.length,
-        errorsCount: enhancedResult.errors.length,
-        errors: enhancedResult.errors
-      });
+      this.logger.log(`Enhanced extraction result: success=${enhancedResult.success}, suitesCount=${enhancedResult.suites.length}, errorsCount=${enhancedResult.errors.length}`);
       
       if (enhancedResult.success && enhancedResult.suites.length > 0) {
         this.logger.log(`Enhanced extraction: ${enhancedResult.suites.length} suites found`);
-        console.log('✅ Using enhanced extraction');
-        console.log('📋 First suite data:', JSON.stringify(enhancedResult.suites[0], null, 2));
+        this.logger.log('Using enhanced extraction');
         return await this.processEnhancedBudgetData(enhancedResult, propertyId);
       }
 
       // Fallback to original extraction
-      console.log('⚠️ Enhanced extraction failed, falling back to original method');
+      this.logger.log('Enhanced extraction failed, falling back to original method');
       this.logger.log('Enhanced extraction failed, falling back to original method');
       const extractionResult = BudgetExcelParserUtil.extractBudgetData(fileBuffer);
-      console.log(extractionResult,'scanlsncl')
       // Use provided propertyId or extracted one
       const finalPropertyId = propertyId || extractionResult.propertyId;
       
@@ -110,7 +103,6 @@ export class SuitesService {
     budgetSuite: BudgetSuiteData,
     propertyId: string,
   ): BudgetSuiteUpdateDto {
-    console.log(budgetSuite,'lcsanslcakn')
     return {
       suiteId: budgetSuite.suiteId,
       propertyId,
@@ -150,19 +142,17 @@ export class SuitesService {
     extractionResult: ExcelExtractionResult,
     propertyId?: string,
   ): Promise<BudgetUploadResponseDto> {
-    console.log('🚀 Processing enhanced budget data...');
+    this.logger.log('Processing enhanced budget data...');
     
     // Use provided propertyId or extract from first suite
     const finalPropertyId = propertyId || extractionResult.suites[0]?.propertyId || 'UNKNOWN';
     
-    console.log(`📍 Final property ID: ${finalPropertyId}`);
+    this.logger.log(`Final property ID: ${finalPropertyId}`);
     
     // Convert enhanced data to suite update format
     const suiteUpdates: BudgetSuiteUpdateDto[] = extractionResult.suites.map(suite => 
       this.convertEnhancedSuiteToUpdate(suite)
     );
-
-    console.log('🔄 Converted suite updates:', JSON.stringify(suiteUpdates, null, 2));
 
     // Update suites in database
     await this.updateSuitesFromBudget(finalPropertyId, suiteUpdates);
@@ -281,23 +271,12 @@ export class SuitesService {
           status: suiteUpdate.status,
         };
 
-        // 🚨 DEBUG: Log the exact data being sent to database
-        console.log(`🔍 DEBUGGING SUITE ${suiteUpdate.suiteId} DATABASE UPDATE:`);
-        console.log(`📊 Original suiteUpdate.tiPerSf: ${suiteUpdate.tiPerSf} (type: ${typeof suiteUpdate.tiPerSf})`);
-        console.log(`📊 updateData.tiPerSf: ${updateData.tiPerSf} (type: ${typeof updateData.tiPerSf})`);
-        console.log(`📋 Full updateData:`, JSON.stringify(updateData, null, 2));
-
         // Upsert suite (create if doesn't exist, update if exists)
         const savedSuite = await this.suiteRepository.upsertSuite(
           propertyId,
           suiteUpdate.suiteId,
           updateData,
         );
-
-        // 🚨 DEBUG: Log what was actually saved
-        console.log(`💾 SAVED SUITE DATA:`);
-        console.log(`📊 Saved tiPerSf: ${savedSuite.tiPerSf} (type: ${typeof savedSuite.tiPerSf})`);
-        console.log(`📋 Full saved suite:`, JSON.stringify(savedSuite, null, 2));
 
         this.logger.log(
           `Updated suite ${suiteUpdate.suiteId}: TI/SF=${suiteUpdate.tiPerSf}, BaseRent/SF=${suiteUpdate.baseRentPerSf}`,

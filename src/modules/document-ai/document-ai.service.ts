@@ -26,7 +26,6 @@ export class DocumentAiService implements OnModuleInit {
     constructor(private configService: ConfigService) { }
 
     async onModuleInit() {
-        console.log('DocumentAiService: onModuleInit started');
 
         this.projectId = this.configService.get<string>('docAi.projectId') ||
             this.configService.get<string>('GOOGLE_DOCUMENT_AI_PROJECT_ID') ||
@@ -44,10 +43,7 @@ export class DocumentAiService implements OnModuleInit {
             this.configService.get<string>('GOOGLE_APPLICATION_CREDENTIALS') ||
             process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
-        console.log(`DocumentAiService: project: ${this.projectId}, location: ${this.location}, processor: ${this.processorId}`);
-
         if (!this.projectId || !this.processorId) {
-            console.error('DocumentAiService: Google Document AI configuration is incomplete');
             return;
         }
 
@@ -57,19 +53,14 @@ export class DocumentAiService implements OnModuleInit {
                 const credPath = path.isAbsolute(credentials)
                     ? credentials
                     : path.resolve(process.cwd(), credentials);
-
-                console.log(`DocumentAiService: Loading credentials from ${credPath}`);
                 if (fs.existsSync(credPath)) {
                     options.keyFilename = credPath;
                 } else {
-                    console.error(`DocumentAiService: Credentials file NOT FOUND at: ${credPath}`);
                 }
             }
 
             this.client = new DocumentProcessorServiceClient(options);
-            console.log('DocumentAiService: client successfully initialized');
         } catch (error) {
-            console.error('DocumentAiService: Failed to initialize client', error);
         }
     }
 

@@ -160,7 +160,6 @@ export class RenewalsProcessor extends WorkerHost {
       }
     }
 
-
   @OnWorkerEvent('completed')
   onCompleted(job: Job<RenewalsSyncJob, RenewalsSyncResult>) {
     const { propertyId, renewalsCount, renewalsSaved, duration } = job.returnvalue;

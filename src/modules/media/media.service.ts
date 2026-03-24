@@ -134,7 +134,6 @@ export class MediaService {
 
       return { key, url };
     } catch (error) {
-      console.error('Failed to upload file:', error);
       throw new InternalServerErrorException('Failed to upload file to S3');
     }
   }
@@ -149,7 +148,6 @@ export class MediaService {
     try {
       return await getSignedUrl(this.s3Client, command, { expiresIn: downloadUrlExpire });
     } catch (error) {
-      console.error('Failed to generate download URL:', error);
       throw new InternalServerErrorException('Failed to generate download URL');
     }
   }
@@ -165,7 +163,6 @@ export class MediaService {
       );
       await this.s3Client.send(new DeleteObjectCommand({ Bucket: this.bucketName, Key: oldKey }));
     } catch (error) {
-      console.error('Failed to move file:', error);
       throw new InternalServerErrorException('Failed to move file in S3');
     }
   }
@@ -174,7 +171,6 @@ export class MediaService {
     try {
       await this.s3Client.send(new DeleteObjectCommand({ Bucket: this.bucketName, Key: key }));
     } catch (error) {
-      console.error('Failed to delete file:', error);
       throw new InternalServerErrorException('Failed to delete file in S3');
     }
   }
@@ -193,7 +189,6 @@ export class MediaService {
       const byteArray = await response.Body.transformToByteArray();
       return Buffer.from(byteArray);
     } catch (error) {
-      console.error('Failed to get file buffer:', error);
       throw new InternalServerErrorException('Failed to retrieve file from S3');
     }
   }

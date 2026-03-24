@@ -16,12 +16,10 @@ export class PropertySeeder {
 
   async seed(): Promise<void> {
     try {
-      console.log("🌱 seeding properties...internally");
       // wait for mongoose connection to be ready (up to 30s)
       // await this.waitForMongooseConnection(30000);
       const count = await this.propertyModel.countDocuments();
       if (count > 0) {
-        console.log('⚠️ Properties already exist. Skipping seed.');
         this.logger.log('Properties already exist. Skipping seed.');
         return;
       }
@@ -49,8 +47,6 @@ export class PropertySeeder {
         { propertyId: 20, propertyName: PropertyName.RICHWOOD, region: 'TX' },
         { propertyId: 21, propertyName: PropertyName.GRAND_AVENUE_CENTER, region: 'FL' },
       ];
-      
-      console.log("📝 Inserting properties...");
       // Retry insertMany for transient connection issues
       const maxAttempts = 5;
       let attempt = 0;
@@ -59,12 +55,10 @@ export class PropertySeeder {
         try {
           attempt++;
           inserted = await this.propertyModel.insertMany(properties, { ordered: false });
-          console.log(`✅ Successfully inserted ${inserted.length} properties on attempt ${attempt}`);
           this.logger.log(`Properties seeded successfully - ${inserted.length} records inserted (attempt ${attempt})`);
           break;
         } catch (err) {
           this.logger.error(`Insert attempt ${attempt} failed: ${err.message}`);
-          console.error(`Insert attempt ${attempt} failed:`, err.message);
           if (attempt >= maxAttempts) {
             throw err;
           }
@@ -73,7 +67,6 @@ export class PropertySeeder {
         }
       }
     } catch (error) {
-      console.error('❌ Error seeding properties:', error.message);
       this.logger.error(`Error seeding properties: ${error.message}`, error.stack);
     }
   }

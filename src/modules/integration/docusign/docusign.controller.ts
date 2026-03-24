@@ -222,12 +222,11 @@ export class DocuSignController {
       
       const {Key,body}=dto;
       pdfSource=Key;
-      console.log(pdfSource,'acslacslknasc')
+
       if (pdfSource) {
         try {
           this.logger.log(`Attempting to download main PDF from: ${pdfSource.substring(0, 100)}...`);
           pdfBuffer = await this.downloadPdf(pdfSource);
-          console.log(pdfBuffer,'dnclsknclkd')
           if (!pdfBuffer || pdfBuffer.length === 0) {
             this.logger.error(`Downloaded PDF buffer is empty for lease ${leaseId}`);
             throw new BadRequestException('PDF document is empty or corrupted');

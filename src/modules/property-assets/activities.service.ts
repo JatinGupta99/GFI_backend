@@ -61,7 +61,6 @@ export class ActivitiesService {
         return activity;
     }
 
-
     async getUploadUrl(leadId:string,activityId:string,contentType:string) {
         if (!isValidObjectId(leadId)) throw new NotFoundException('Invalid lead ID');
         const fileKey = `leads/${leadId}/activities/${activityId}`;
