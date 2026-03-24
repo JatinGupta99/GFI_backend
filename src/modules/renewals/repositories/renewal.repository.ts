@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { RenewalFilters, RenewalReader } from '../interfaces/renewal-provider.interface';
 import { Renewal, RenewalDocument } from '../renewal.entity';
-import { RenewalReader, RenewalFilters } from '../interfaces/renewal-provider.interface';
 
 @Injectable()
 export class RenewalRepository implements RenewalReader {
@@ -167,9 +167,9 @@ export class RenewalRepository implements RenewalReader {
     try {
       const result = await this.renewalModel.bulkWrite(operations);
       this.logger.log(`BulkWrite result: upsertedCount=${result.upsertedCount}, modifiedCount=${result.modifiedCount}`);
-        matchedCount: result.matchedCount,
-        insertedCount: result.insertedCount,
-      });
+      //   matchedCount: result.matchedCount,
+      //   insertedCount: result.insertedCount,
+      // });
       
       return {
         created: result.upsertedCount,
