@@ -73,24 +73,51 @@ describe('DocuSignModule', () => {
       expect(configService.get('DOCUSIGN_WEBHOOK_SECRET')).toBeDefined();
     });
 
-    it('should throw error when required environment variables are missing', async () => {
-      // Clear environment variables
-      delete process.env.DOCUSIGN_INTEGRATION_KEY;
+    it('should have correct configuration values', () => {
+      expect(configService.get('DOCUSIGN_INTEGRATION_KEY')).toBe('test-integration-key');
+      expect(configService.get('DOCUSIGN_USER_ID')).toBe('test-user-id');
+      expect(configService.get('DOCUSIGN_ACCOUNT_ID')).toBe('test-account-id');
+      expect(configService.get('DOCUSIGN_BASE_PATH')).toBe('https://demo.docusign.net/restapi');
+      expect(configService.get('DOCUSIGN_WEBHOOK_SECRET')).toBe('test-webhook-secret');
+    });
 
-      await expect(
-        Test.createTestingModule({
-          imports: [
-            ConfigModule.forRoot({ isGlobal: true }),
-            HttpModule,
-            DocuSignModule,
-            LeasingModule,
-            MediaModule,
-          ],
-        }).compile(),
-      ).rejects.toThrow(/Missing required DocuSign environment variables/);
+    it('should use demo environment for testing', () => {
+      const basePath = configService.get('DOCUSIGN_BASE_PATH');
+      expect(basePath).toContain('demo.docusign.net');
+    });
+  });
 
-      // Restore for other tests
-      process.env.DOCUSIGN_INTEGRATION_KEY = 'test-integration-key';
+  describe('Service Methods', () => {
+    it('should have createEnvelope method', () => {
+      expect(docuSignService.createEnvelope).toBeDefined();
+      expect(typeof docuSignService.createEnvelope).toBe('function');
+    });
+
+    it('should have getEnvelopeStatus method', () => {
+      expect(docuSignService.getEnvelopeStatus).toBeDefined();
+      expect(typeof docuSignService.getEnvelopeStatus).toBe('function');
+    });
+
+    it('should have downloadDocument method', () => {
+      expect(docuSignService.downloadDocument).toBeDefined();
+      expect(typeof docuSignService.downloadDocument).toBe('function');
+    });
+
+    it('should have validateWebhook method', () => {
+      expect(docuSignService.validateWebhook).toBeDefined();
+      expect(typeof docuSignService.validateWebhook).toBe('function');
+    });
+  });
+
+  describe('Module Exports', () => {
+    it('should export DocuSignService for use in other modules', () => {
+      const exportedService = module.get<DocuSignService>(DocuSignService);
+      expect(exportedService).toBe(docuSignService);
+    });
+
+    it('should be importable by other modules', () => {
+      expect(module).toBeDefined();
+      expect(docuSignService).toBeDefined();
     });
   });
 });

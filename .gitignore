@@ -4,6 +4,7 @@
 /build
 /credentials
 *.json
+
 # Logs
 logs
 *.log
@@ -36,12 +37,37 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# dotenv environment variable files
+# =============================
+# SECURITY: Environment Files
+# =============================
 .env
+.env.*
+!.env.example
+.env.local
 .env.development.local
 .env.test.local
 .env.production.local
-.env.local
+
+# =============================
+# SECURITY: Credentials & Keys
+# =============================
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+*.cer
+*.crt
+id_rsa*
+*.ppk
+
+# =============================
+# SECURITY: Sensitive Data
+# =============================
+secrets/
+private/
+*.secret
+*.token
 
 # temp directory
 .temp
@@ -55,3 +81,8 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Backup files
+backup-*/
+*.backup
+*.bak
