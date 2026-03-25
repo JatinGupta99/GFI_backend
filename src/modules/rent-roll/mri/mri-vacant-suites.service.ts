@@ -9,9 +9,15 @@ export interface MriVacantSuiteRaw {
     SuiteNumber?: string;
 }
 
+interface MriSuiteSquareFootage {
+    LeasableSquareFeet: string;
+}
+
 interface MriSuiteDetail {
     SuiteID: string;
     SuiteNumber: string;
+    SuiteSquareFeet: string;
+    SuiteSquareFootage: MriSuiteSquareFootage[];
 }
 
 interface MriBuildingWithSuites {
@@ -22,35 +28,37 @@ interface MriBuildingWithSuites {
 export class MriVacantSuitesService {
     constructor(private readonly mri: MriCoreService) { }
 
+    /**
+     * Fetch all suites for a building with their square footage
+     * Uses MRI_S-PMCM_CommercialBuildingWithSuitesByBLDGID API
+     * 
+     * @param buildingId - The building ID to fetch suites for
+     * @returns Array of suites with SuiteID and square footage
+     */
     async fetch(buildingId: string, afterDate?: string): Promise<MriVacantSuiteRaw[]> {
-        const currentDate = new Date().toISOString().split('T')[0];
-
-        // 1. Fetch vacant suites (basic info)
-        const vacantSuites = await this.mri.get<MriVacantSuiteRaw[]>('MRI_S-PMCM_VacantSuites', {
-            BuildingID: buildingId,
-            AfterDate: afterDate || currentDate,
+        // Fetch building with all suites using the comprehensive API
+        const buildingDetails = await this.mri.get<MriBuildingWithSuites[]>('MRI_S-PMCM_CommercialBuildingWithSuitesByBLDGID', {
+            BLDGID: buildingId
         });
-        // // 2. Fetch building details to get SuiteNumber mapping
-        // // The API returns an array, we expect one building entry since we filter by BLDGID
-        // const buildingDetails = await this.mri.get<MriBuildingWithSuites[]>('MRI_S-PMCM_CommercialBuildingWithSuitesByBLDGID', {
-        //     BLDGID: buildingId
-        // });
-        // console.log(JSON.stringify(buildingDetails, null, 2), 'acs;mcs;am');
-        // // Create a lookup map for SuiteID -> SuiteNumber
-        // const suiteNumberMap = new Map<string, string>();
 
-        // if (buildingDetails && buildingDetails.length > 0 && buildingDetails[0].Suites) {
-        //     buildingDetails[0].Suites.forEach(suite => {
-        //         suiteNumberMap.set(suite.SuiteID, suite.SuiteNumber);
-        //     });
-        // }
+        if (!buildingDetails || buildingDetails.length === 0 || !buildingDetails[0].Suites) {
+            return [];
+        }
 
-        // 3. Merge SuiteNumber into vacant suites
-        const result = vacantSuites.map(suite => ({
-            ...suite,
-            SuiteNumber: suite.SuiteID
-        }));
+        // Extract all suites with their square footage
+        const allSuites = buildingDetails[0].Suites.map(suite => {
+            // Get square footage - prioritize LeasableSquareFeet from SuiteSquareFootage
+            const squareFootage = suite.SuiteSquareFootage?.[0]?.LeasableSquareFeet || suite.SuiteSquareFeet || '0';
+            
+            return {
+                BuildingID: buildingId,
+                SuiteID: suite.SuiteID,
+                SuiteNumber: suite.SuiteNumber || suite.SuiteID,
+                SuiteSquareFeet: squareFootage,
+                BasesuiteOfMeasure: null,
+            };
+        });
 
-        return result;
+        return allSuites;
     }
 }

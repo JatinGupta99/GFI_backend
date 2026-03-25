@@ -6,14 +6,14 @@ export interface ExcelSuiteData {
   propertyId: string;
   suiteId: string;
   status: 'Vacant' | 'Occupied' | 'Unknown' | 'Proposed';
-  squareFootage: number;
-  baseRentMonth: number;
-  baseRentPerSf: number;
-  camMonth: number;
-  insMonth: number;
-  taxMonth: number;
-  totalDueMonth: number;
-  tiPerSf: number;
+  squareFootage: string;
+  baseRentMonth: string;
+  baseRentPerSf: string;
+  camMonth: string;
+  insMonth: string;
+  taxMonth: string;
+  totalDueMonth: string;
+  tiPerSf: string;
   rcd: string | null;
   monthlyPayments: {
     jan: number;
@@ -35,11 +35,11 @@ export interface ExcelSuiteData {
 export interface BudgetSuiteData {
   suiteId: string;
   squareFootage: number;
-  tiPerSf: number;
-  baseRentPerSf: number;
-  camPerSf: number;
-  insPerSf: number;
-  taxPerSf: number;
+  tiPerSf: string;
+  baseRentPerSf: string;
+  camPerSf: string;
+  insPerSf: string;
+  taxPerSf: string;
   proposedValues: {
     baseRent: number;
     cam: number;
@@ -294,11 +294,11 @@ export class BudgetExcelParserUtil {
           suitesMap.set(suiteId, {
             suiteId,
             squareFootage,
-            tiPerSf: 0,
-            baseRentPerSf: 0,
-            camPerSf: 0,
-            insPerSf: 0,
-            taxPerSf: 0,
+            tiPerSf: '0',
+            baseRentPerSf: '0',
+            camPerSf: '0',
+            insPerSf: '0',
+            taxPerSf: '0',
             proposedValues: {
               baseRent: 0,
               cam: 0,
@@ -402,9 +402,9 @@ export class BudgetExcelParserUtil {
       const firstTwoMonths = [suite.monthlyPayments.jan, suite.monthlyPayments.feb];
       if (firstTwoMonths.every(val => val === 0)) {
         logs.push(`Suite ${suiteId} appears to be on second floor - setting CAM/Tax/Insurance to 0`);
-        suite.camPerSf = 0;
-        suite.insPerSf = 0;
-        suite.taxPerSf = 0;
+        suite.camPerSf = '0';
+        suite.insPerSf = '0';
+        suite.taxPerSf = '0';
         suite.proposedValues.cam = 0;
         suite.proposedValues.insurance = 0;
         suite.proposedValues.tax = 0;
@@ -626,11 +626,11 @@ export class BudgetExcelParserUtil {
     return payments;
   }
 
-  private static calculatePerSf(proposedValue: number, squareFootage: number, multiplier: number = 1): number {
-    if (squareFootage === 0) return 0;
+  private static calculatePerSf(proposedValue: number, squareFootage: number, multiplier: number = 1): string {
+    if (squareFootage === 0) return '0';
     
     const perSf = (proposedValue * multiplier) / squareFootage;
-    return Math.round(perSf * 100) / 100; // Round to 2 decimal places
+    return (Math.round(perSf * 100) / 100).toFixed(2); // Round to 2 decimal places and return as string
   }
 
   // New methods for enhanced Excel parsing
@@ -982,29 +982,29 @@ export class BudgetExcelParserUtil {
   /**
    * Calculate base rent per square foot (annual)
    */
-  private static calculateBaseRentPerSf(baseRentMonth: number, squareFootage: number): number {
-    if (squareFootage === 0 || baseRentMonth === 0) return 0;
+  private static calculateBaseRentPerSf(baseRentMonth: number, squareFootage: number): string {
+    if (squareFootage === 0 || baseRentMonth === 0) return '0';
     
     const baseRentPerSf = (baseRentMonth * 12) / squareFootage;
-    return Math.round(baseRentPerSf * 100) / 100; // Round to 2 decimal places
+    return (Math.round(baseRentPerSf * 100) / 100).toFixed(2); // Round to 2 decimal places and return as string
   }
 
   /**
    * Calculate total due per month
    */
-  private static calculateTotalDueMonth(baseRent: number, cam: number, ins: number, tax: number): number {
+  private static calculateTotalDueMonth(baseRent: number, cam: number, ins: number, tax: number): string {
     const total = (baseRent || 0) + (cam || 0) + (ins || 0) + (tax || 0);
-    return Math.round(total * 100) / 100; // Round to 2 decimal places
+    return (Math.round(total * 100) / 100).toString(); // Round to 2 decimal places and return as string
   }
 
   /**
    * Calculate TI per square foot
    */
-  private static calculateTiPerSf(tiAmount: number, squareFootage: number): number {
-    if (squareFootage === 0 || tiAmount === 0) return 0;
+  private static calculateTiPerSf(tiAmount: number, squareFootage: number): string {
+    if (squareFootage === 0 || tiAmount === 0) return '0';
     
     const tiPerSf = tiAmount / squareFootage;
-    return Math.round(tiPerSf * 100) / 100; // Round to 2 decimal places
+    return (Math.round(tiPerSf * 100) / 100).toFixed(2); // Round to 2 decimal places and return as string
   }
 
   /**
@@ -1036,15 +1036,18 @@ export class BudgetExcelParserUtil {
     }
     
     // Range validation with warnings
-    if (suiteData.squareFootage > 0 && suiteData.squareFootage < 100) {
+    const squareFootageNum = typeof suiteData.squareFootage === 'string' ? parseFloat(suiteData.squareFootage) : suiteData.squareFootage;
+    if (squareFootageNum > 0 && squareFootageNum < 100) {
       logs.push(`Warning: Unusually small square footage: ${suiteData.squareFootage}`);
     }
     
-    if (suiteData.baseRentPerSf > 50) {
+    const baseRentPerSfNum = typeof suiteData.baseRentPerSf === 'string' ? parseFloat(suiteData.baseRentPerSf) : suiteData.baseRentPerSf;
+    if (baseRentPerSfNum > 50) {
       logs.push(`Warning: Unusually high base rent per SF: ${suiteData.baseRentPerSf}`);
     }
     
-    if (suiteData.tiPerSf > 100) {
+    const tiPerSfNum = typeof suiteData.tiPerSf === 'string' ? parseFloat(suiteData.tiPerSf) : suiteData.tiPerSf;
+    if (tiPerSfNum > 100) {
       logs.push(`Warning: Unusually high TI per SF: ${suiteData.tiPerSf}`);
     }
     
@@ -1166,17 +1169,25 @@ export class BudgetExcelParserUtil {
           const totalDueMonth = this.calculateTotalDueMonth(rentalData.baseRentMonth, camMonth, insMonth, taxMonth);
           const tiPerSf = this.calculateTiPerSf(tiAmount, rentalData.squareFootage);
 
+          logs.push(`Suite ${suiteId} Calculation Details:`);
+          logs.push(`  - baseRentMonth: ${rentalData.baseRentMonth}`);
+          logs.push(`  - squareFootage: ${rentalData.squareFootage}`);
+          logs.push(`  - Formula: (${rentalData.baseRentMonth} * 12) / ${rentalData.squareFootage} = ${baseRentPerSf}`);
+          logs.push(`  - baseRentPerSf: ${baseRentPerSf}`);
+          logs.push(`  - tiAmount: ${tiAmount}, tiPerSf: ${tiPerSf}`);
+          logs.push(`  - rcd: ${rentalData.rcd}`);
+
           const suiteData: ExcelSuiteData = {
             propertyId: tenant.propertyId,
             suiteId: tenant.suiteId,
             status: 'Proposed',
-            squareFootage: rentalData.squareFootage,
-            baseRentMonth: rentalData.baseRentMonth,
+            squareFootage: rentalData.squareFootage.toString(),
+            baseRentMonth: rentalData.baseRentMonth.toString(),
             baseRentPerSf,
-            camMonth,
-            insMonth,
-            taxMonth,
-            totalDueMonth,
+            camMonth: camMonth.toString(),
+            insMonth: insMonth.toString(),
+            taxMonth: taxMonth.toString(),
+            totalDueMonth: totalDueMonth.toString(),
             tiPerSf,
             rcd: rentalData.rcd ?? null,
             monthlyPayments: rentalData.monthlyPayments,

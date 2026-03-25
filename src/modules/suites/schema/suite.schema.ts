@@ -3,20 +3,20 @@ import { Types } from 'mongoose';
 
 @Schema({ _id: false })
 export class Charges {
-  @Prop({ default: 0 })
-  baseRentMonth: number;
+  @Prop({ type: String, default: '0' })
+  baseRentMonth: string;
 
-  @Prop({ default: 0 })
-  camMonth: number;
+  @Prop({ type: String, default: '0' })
+  camMonth: string;
 
-  @Prop({ default: 0 })
-  insMonth: number;
+  @Prop({ type: String, default: '0' })
+  insMonth: string;
 
-  @Prop({ default: 0 })
-  taxMonth: number;
+  @Prop({ type: String, default: '0' })
+  taxMonth: string;
 
-  @Prop({ default: 0 })
-  totalDueMonth: number;
+  @Prop({ type: String, default: '0' })
+  totalDueMonth: string;
 }
 
 @Schema({ _id: false })

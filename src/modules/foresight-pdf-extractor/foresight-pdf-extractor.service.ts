@@ -409,11 +409,11 @@ export class ForeSightPdfExtractorService {
     const suiteData = {
       suiteId: suiteId,
       charges: {
-        baseRentMonth: baseRent,
-        camMonth: cam,
-        insMonth: ins,
-        taxMonth: tax,
-        totalDueMonth: totalDueMonth,
+        baseRentMonth: baseRent.toString(),
+        camMonth: cam.toString(),
+        insMonth: ins.toString(),
+        taxMonth: tax.toString(),
+        totalDueMonth: totalDueMonth.toString(),
       },
       balanceDue: 0, // Default value as per requirement 10.1
       leaseTerms: {

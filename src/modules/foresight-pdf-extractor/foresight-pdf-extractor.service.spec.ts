@@ -890,11 +890,11 @@ describe('ForeSightPdfExtractorService', () => {
       const result = service['extractSuiteData'](text, identifier, logs);
       
       expect(result.suiteId).toBe('001');
-      expect(result.charges.baseRentMonth).toBe(1500);
-      expect(result.charges.camMonth).toBe(300);
-      expect(result.charges.insMonth).toBe(150);
-      expect(result.charges.taxMonth).toBe(250);
-      expect(result.charges.totalDueMonth).toBe(2200);
+      expect(result.charges.baseRentMonth).toBe('1500');
+      expect(result.charges.camMonth).toBe('300');
+      expect(result.charges.insMonth).toBe('150');
+      expect(result.charges.taxMonth).toBe('250');
+      expect(result.charges.totalDueMonth).toBe('2200');
       expect(result.balanceDue).toBe(0);
       expect(result.leaseTerms.rentDueDate).toBeNull();
       expect(result.leaseTerms.lateAfter).toBeNull();
@@ -915,11 +915,11 @@ describe('ForeSightPdfExtractorService', () => {
       const result = service['extractSuiteData'](text, identifier, logs);
       
       expect(result.suiteId).toBe('002');
-      expect(result.charges.baseRentMonth).toBe(2000);
-      expect(result.charges.camMonth).toBe(0);
-      expect(result.charges.insMonth).toBe(0);
-      expect(result.charges.taxMonth).toBe(0);
-      expect(result.charges.totalDueMonth).toBe(2000);
+      expect(result.charges.baseRentMonth).toBe('2000');
+      expect(result.charges.camMonth).toBe('0');
+      expect(result.charges.insMonth).toBe('0');
+      expect(result.charges.taxMonth).toBe('0');
+      expect(result.charges.totalDueMonth).toBe('2000');
       expect(result.balanceDue).toBe(0);
       expect(result.leaseTerms.rentDueDate).toBeNull();
       expect(result.leaseTerms.lateAfter).toBeNull();
@@ -1028,7 +1028,7 @@ describe('ForeSightPdfExtractorService', () => {
       
       const result = service['extractSuiteData'](text, identifier, logs);
       
-      expect(result.charges.totalDueMonth).toBe(1450);
+      expect(result.charges.totalDueMonth).toBe('1450');
       expect(logs.some(log => log.includes('Calculated Total Due/Month for suite 123456-001: 1450'))).toBe(true);
     });
   });
@@ -1070,11 +1070,11 @@ describe('ForeSightPdfExtractorService', () => {
       expect(result.region).toBe('CA');
       expect(result.suites).toHaveLength(1);
       expect(result.suites[0].suiteId).toBe('001');
-      expect(result.suites[0].charges.baseRentMonth).toBe(1000);
-      expect(result.suites[0].charges.camMonth).toBe(200);
-      expect(result.suites[0].charges.insMonth).toBe(100);
-      expect(result.suites[0].charges.taxMonth).toBe(150);
-      expect(result.suites[0].charges.totalDueMonth).toBe(1450);
+      expect(result.suites[0].charges.baseRentMonth).toBe('1000');
+      expect(result.suites[0].charges.camMonth).toBe('200');
+      expect(result.suites[0].charges.insMonth).toBe('100');
+      expect(result.suites[0].charges.taxMonth).toBe('150');
+      expect(result.suites[0].charges.totalDueMonth).toBe('1450');
       expect(result.createdAt).toBeDefined();
       expect(result.updatedAt).toBeDefined();
       expect(result.extractionLogs).toContain('PDF parsed successfully');

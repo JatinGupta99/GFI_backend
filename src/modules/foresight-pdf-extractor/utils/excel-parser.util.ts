@@ -187,11 +187,11 @@ export class ExcelParserUtil {
           suitesMap.set(suiteId, {
             suiteId,
             charges: {
-              baseRentMonth: 0,
-              camMonth: 0,
-              insMonth: 0,
-              taxMonth: 0,
-              totalDueMonth: 0,
+              baseRentMonth: '0',
+              camMonth: '0',
+              insMonth: '0',
+              taxMonth: '0',
+              totalDueMonth: '0',
             },
             balanceDue: 0,
             leaseTerms: {
@@ -227,16 +227,16 @@ export class ExcelParserUtil {
 
         // Update charges based on row type
         if (rowType === 'BRR') {
-          suiteData.charges.baseRentMonth = firstMonthValue;
+          suiteData.charges.baseRentMonth = firstMonthValue.toString();
           logs.push(`Suite ${suiteId} - Base Rent: ${firstMonthValue}`);
         } else if (rowType === 'CAM') {
-          suiteData.charges.camMonth = firstMonthValue;
+          suiteData.charges.camMonth = firstMonthValue.toString();
           logs.push(`Suite ${suiteId} - CAM: ${firstMonthValue}`);
         } else if (rowType === 'INS') {
-          suiteData.charges.insMonth = firstMonthValue;
+          suiteData.charges.insMonth = firstMonthValue.toString();
           logs.push(`Suite ${suiteId} - Insurance: ${firstMonthValue}`);
         } else if (rowType === 'RET') {
-          suiteData.charges.taxMonth = firstMonthValue;
+          suiteData.charges.taxMonth = firstMonthValue.toString();
           logs.push(`Suite ${suiteId} - Tax: ${firstMonthValue}`);
         }
 
@@ -254,11 +254,12 @@ export class ExcelParserUtil {
     // Calculate total due for each suite
     const suites = Array.from(suitesMap.values());
     suites.forEach((suite) => {
-      suite.charges.totalDueMonth =
-        suite.charges.baseRentMonth +
-        suite.charges.camMonth +
-        suite.charges.insMonth +
-        suite.charges.taxMonth;
+      const baseRent = typeof suite.charges.baseRentMonth === 'string' ? parseFloat(suite.charges.baseRentMonth) : suite.charges.baseRentMonth;
+      const cam = typeof suite.charges.camMonth === 'string' ? parseFloat(suite.charges.camMonth) : suite.charges.camMonth;
+      const ins = typeof suite.charges.insMonth === 'string' ? parseFloat(suite.charges.insMonth) : suite.charges.insMonth;
+      const tax = typeof suite.charges.taxMonth === 'string' ? parseFloat(suite.charges.taxMonth) : suite.charges.taxMonth;
+      
+      suite.charges.totalDueMonth = (baseRent + cam + ins + tax).toString();
       logs.push(
         `Suite ${suite.suiteId} - Total Due: ${suite.charges.totalDueMonth}`,
       );

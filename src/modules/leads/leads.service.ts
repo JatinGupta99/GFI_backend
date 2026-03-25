@@ -15,6 +15,7 @@ import { PropertiesService } from '../properties/properties.service';
 import { ActivitiesService } from '../property-assets/activities.service';
 import { RenewalRepository } from '../renewals/repositories/renewal.repository';
 import { SuiteRepository } from '../suites/repository/suite.repository';
+import { TaskPriority } from '../tasks/schema/task.schema';
 import { TasksService } from '../tasks/tasks.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { SendAppEmailDto, SendApprovalEmailDto, SendLoiEmailDto, SendRenewalLetterDto, SendTenantMagicLinkDto } from './dto/send-email.dto';
@@ -25,7 +26,6 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import { LeadsRepository } from './repository/lead.repository';
 import { Lead } from './schema/lead.schema';
 import { TenantFormProgress, TenantFormProgressDocument } from './schema/tenant-form-progress.schema';
-import { TaskPriority } from '../tasks/schema/task.schema';
 
 export const COMPANY = {
   NAME: 'Global Fund Investments',
@@ -399,8 +399,13 @@ export class LeadsService {
       if (suite) {
         // Suite found — budget file was uploaded, populate from suite data
         this.logger.log(`Budget file data found for suite ${suiteId} — populating budget_negotiation`);
+        this.logger.log(`Suite data: baseRentPerSf="${suite.baseRentPerSf}", tiPerSf="${suite.tiPerSf}", rcd="${suite.rcd}"`);
+        
+        const parsedRentPerSf = suite.baseRentPerSf ? parseFloat(suite.baseRentPerSf) : 0;
+        this.logger.log(`Parsed rentPerSf: ${parsedRentPerSf} (from baseRentPerSf: "${suite.baseRentPerSf}")`);
+        
         normalizedData.budget_negotiation = {
-          rentPerSf: suite.baseRentPerSf ? parseFloat(suite.baseRentPerSf) : 0,
+          rentPerSf: parsedRentPerSf,
           annInc: normalizedData.budget_negotiation?.annInc ?? 3,
           freeMonths: normalizedData.budget_negotiation?.freeMonths ?? 0,
           term: normalizedData.budget_negotiation?.term ?? 0,
@@ -1864,7 +1869,10 @@ export class LeadsService {
           return m ? m[1].replace(',', '') : null;
         })()
       : null;
-    const rentPerSf = getValue(data.rent_psf) || getValue(data.rent_per_sf) || getValue(data.base_rent_per_sf) || parsedBaseRent;
+    
+    // Priority order: base_rent (primary) > rent_psf > rent_per_sf > base_rent_per_sf
+    const rentPerSf = parsedBaseRent || getValue(data.rent_psf) || getValue(data.rent_per_sf) || getValue(data.base_rent_per_sf);
+    
     // annual_increase may return multiple values like "10% 12.5%" - take the first number only
     const annInc = getAnnIncValue(data.annual_increase) || getAnnIncValue(data.ann_inc) || getAnnIncValue(data.rent_increase);
     const freeMonths = getValue(data.free_rent_months) || getValue(data.free_months);
@@ -1882,7 +1890,7 @@ export class LeadsService {
       } else {
         lead.current_negotiation.rentPerSf = numericRentPerSf;
         hasUpdates = true;
-        this.logger.debug(`Extracted rentPerSf: ${rentPerSf} -> ${numericRentPerSf}`);
+        this.logger.debug(`Extracted rentPerSf from ${rawBaseRent ? 'base_rent' : 'rent_psf'}: ${rentPerSf} -> ${numericRentPerSf}`);
       }
     }
 
@@ -1959,6 +1967,13 @@ export class LeadsService {
       this.logger.debug(`Extracted use: ${use}`);
     }
 
+    const suite = getValue(data.suite) || getValue(data.suite_number) || getValue(data.suite_id);
+    if (suite && !lead.general.suite) {
+      lead.general.suite = suite;
+      generalUpdated = true;
+      this.logger.debug(`Extracted suite: ${suite}`);
+    }
+
     // Normalize tenant_name / tenantName — prefer the longer/more complete value
     // Also overwrite placeholder values set by frontend ("File", "Upload")
     const PLACEHOLDER_NAMES = ['file', 'upload', ''];
@@ -1972,14 +1987,28 @@ export class LeadsService {
       this.logger.debug(`Extracted businessName: ${resolvedTenant}`);
     }
 
-    // Also split tenantName into firstName/lastName if they are placeholders
+    // Split tenantName into firstName/lastName - always update if tenant name is extracted
     const isPlaceholderFirst = PLACEHOLDER_NAMES.includes((lead.general.firstName || '').toLowerCase());
     const isPlaceholderLast = PLACEHOLDER_NAMES.includes((lead.general.lastName || '').toLowerCase());
-    if (resolvedTenant && (isPlaceholderFirst || isPlaceholderLast)) {
+    if (resolvedTenant && (isPlaceholderFirst || isPlaceholderLast || !lead.general.firstName || !lead.general.lastName)) {
       const parts = resolvedTenant.trim().split(/\s+/);
-      if (isPlaceholderFirst) { lead.general.firstName = parts[0] || ''; generalUpdated = true; }
-      if (isPlaceholderLast) { lead.general.lastName = parts.slice(1).join(' ') || ''; generalUpdated = true; }
-      this.logger.debug(`Split tenantName into firstName: "${lead.general.firstName}", lastName: "${lead.general.lastName}"`);
+      if (!lead.general.firstName || isPlaceholderFirst) { 
+        lead.general.firstName = parts[0] || ''; 
+        generalUpdated = true; 
+      }
+      if (!lead.general.lastName || isPlaceholderLast) { 
+        lead.general.lastName = parts.slice(1).join(' ') || ''; 
+        generalUpdated = true; 
+      }
+      this.logger.debug(`Split tenantName "${resolvedTenant}" into firstName: "${lead.general.firstName}", lastName: "${lead.general.lastName}"`);
+    }
+
+    // Extract email from LOI document
+    const email = getValue(data.email) || getValue(data.tenant_email) || getValue(data.contact_email);
+    if (email && (!lead.general.email || PLACEHOLDER_NAMES.includes((lead.general.email || '').toLowerCase()))) {
+      lead.general.email = email;
+      generalUpdated = true;
+      this.logger.debug(`Extracted email: ${email}`);
     }
 
     // Lookup property by extracted property_name, save name in general and propertyId at root

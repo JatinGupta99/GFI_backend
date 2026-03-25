@@ -114,15 +114,16 @@ export class SuitesService {
       taxPerSf: this.formatDecimalToString(budgetSuite.taxPerSf),
       rcd: null,
       charges: {
-        baseRentMonth: budgetSuite.proposedValues.baseRent,
-        camMonth: budgetSuite.proposedValues.cam,
-        insMonth: budgetSuite.proposedValues.insurance,
-        taxMonth: budgetSuite.proposedValues.tax,
-        totalDueMonth: 
+        baseRentMonth: budgetSuite.proposedValues.baseRent.toString(),
+        camMonth: budgetSuite.proposedValues.cam.toString(),
+        insMonth: budgetSuite.proposedValues.insurance.toString(),
+        taxMonth: budgetSuite.proposedValues.tax.toString(),
+        totalDueMonth: (
           budgetSuite.proposedValues.baseRent +
           budgetSuite.proposedValues.cam +
           budgetSuite.proposedValues.insurance +
-          budgetSuite.proposedValues.tax,
+          budgetSuite.proposedValues.tax
+        ).toString(),
       },
       balanceDue: 0, // Default value, can be calculated if needed
       leaseTerms: {
@@ -171,15 +172,20 @@ export class SuitesService {
    * Convert ExcelSuiteData to BudgetSuiteUpdateDto format
    */
   private convertEnhancedSuiteToUpdate(suite: ExcelSuiteData): BudgetSuiteUpdateDto {
+    const squareFootage = typeof suite.squareFootage === 'string' ? parseFloat(suite.squareFootage) : suite.squareFootage;
+    const camMonth = typeof suite.camMonth === 'string' ? parseFloat(suite.camMonth) : suite.camMonth;
+    const insMonth = typeof suite.insMonth === 'string' ? parseFloat(suite.insMonth) : suite.insMonth;
+    const taxMonth = typeof suite.taxMonth === 'string' ? parseFloat(suite.taxMonth) : suite.taxMonth;
+    
     return {
       suiteId: suite.suiteId,
       propertyId: suite.propertyId,
-      squareFootage: suite.squareFootage,
-      tiPerSf: this.formatDecimalToString(suite.tiPerSf),
-      baseRentPerSf: this.formatDecimalToString(suite.baseRentPerSf),
-      camPerSf: this.formatDecimalToString(suite.squareFootage > 0 ? (suite.camMonth * 12) / suite.squareFootage : 0),
-      insPerSf: this.formatDecimalToString(suite.squareFootage > 0 ? (suite.insMonth * 12) / suite.squareFootage : 0),
-      taxPerSf: this.formatDecimalToString(suite.squareFootage > 0 ? (suite.taxMonth * 12) / suite.squareFootage : 0),
+      squareFootage,
+      tiPerSf: suite.tiPerSf,
+      baseRentPerSf: suite.baseRentPerSf,
+      camPerSf: this.formatDecimalToString(squareFootage > 0 ? (camMonth * 12) / squareFootage : 0),
+      insPerSf: this.formatDecimalToString(squareFootage > 0 ? (insMonth * 12) / squareFootage : 0),
+      taxPerSf: this.formatDecimalToString(squareFootage > 0 ? (taxMonth * 12) / squareFootage : 0),
       rcd: suite.rcd ?? null,
       charges: {
         baseRentMonth: suite.baseRentMonth,
@@ -208,10 +214,18 @@ export class SuitesService {
   ): BudgetSuiteUpdateDto {
     // Calculate per SF values from ForeSight data
     const squareFootage = 1000; // Default, should be extracted from suite data if available
-    const baseRentMonth = foreSightSuite.charges?.baseRentMonth || 0;
-    const camMonth = foreSightSuite.charges?.camMonth || 0;
-    const insMonth = foreSightSuite.charges?.insMonth || 0;
-    const taxMonth = foreSightSuite.charges?.taxMonth || 0;
+    const baseRentMonth = typeof foreSightSuite.charges?.baseRentMonth === 'string' 
+      ? parseFloat(foreSightSuite.charges.baseRentMonth) 
+      : (foreSightSuite.charges?.baseRentMonth || 0);
+    const camMonth = typeof foreSightSuite.charges?.camMonth === 'string'
+      ? parseFloat(foreSightSuite.charges.camMonth)
+      : (foreSightSuite.charges?.camMonth || 0);
+    const insMonth = typeof foreSightSuite.charges?.insMonth === 'string'
+      ? parseFloat(foreSightSuite.charges.insMonth)
+      : (foreSightSuite.charges?.insMonth || 0);
+    const taxMonth = typeof foreSightSuite.charges?.taxMonth === 'string'
+      ? parseFloat(foreSightSuite.charges.taxMonth)
+      : (foreSightSuite.charges?.taxMonth || 0);
 
     return {
       suiteId: foreSightSuite.suiteId,
@@ -224,11 +238,11 @@ export class SuitesService {
       taxPerSf: this.formatDecimalToString(taxMonth > 0 ? (taxMonth * 12) / squareFootage : 0),
       rcd: null,
       charges: {
-        baseRentMonth,
-        camMonth,
-        insMonth,
-        taxMonth,
-        totalDueMonth: baseRentMonth + camMonth + insMonth + taxMonth,
+        baseRentMonth: baseRentMonth.toString(),
+        camMonth: camMonth.toString(),
+        insMonth: insMonth.toString(),
+        taxMonth: taxMonth.toString(),
+        totalDueMonth: (baseRentMonth + camMonth + insMonth + taxMonth).toString(),
       },
       balanceDue: foreSightSuite.balanceDue || 0,
       leaseTerms: foreSightSuite.leaseTerms || {
@@ -293,9 +307,12 @@ export class SuitesService {
   }
 
   /**
-   * Format decimal number to string with exactly 2 decimal places
+   * Format decimal number or string to string with exactly 2 decimal places
    */
-  private formatDecimalToString(value: number): string {
+  private formatDecimalToString(value: number | string): string {
+    if (typeof value === 'string') {
+      return value; // Already a string, return as-is
+    }
     if (typeof value !== 'number' || isNaN(value)) {
       return '0.00';
     }
@@ -316,7 +333,13 @@ export class SuitesService {
     const suitesToUpsert = suites.map((suite) => ({
       suiteId: suite.suiteId,
       data: {
-        charges: suite.charges,
+        charges: {
+          baseRentMonth: suite.charges.baseRentMonth.toString(),
+          camMonth: suite.charges.camMonth.toString(),
+          insMonth: suite.charges.insMonth.toString(),
+          taxMonth: suite.charges.taxMonth.toString(),
+          totalDueMonth: suite.charges.totalDueMonth.toString(),
+        },
         balanceDue: suite.balanceDue,
         leaseTerms: suite.leaseTerms,
         monthlyPayments: suite.monthlyPayments,

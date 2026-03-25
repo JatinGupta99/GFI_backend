@@ -30,11 +30,11 @@ export class BudgetSuiteUpdateDto {
   taxPerSf: string;
   rcd: string | null;
   charges: {
-    baseRentMonth: number;
-    camMonth: number;
-    insMonth: number;
-    taxMonth: number;
-    totalDueMonth: number;
+    baseRentMonth: string;
+    camMonth: string;
+    insMonth: string;
+    taxMonth: string;
+    totalDueMonth: string;
   };
   balanceDue: number;
   leaseTerms: {

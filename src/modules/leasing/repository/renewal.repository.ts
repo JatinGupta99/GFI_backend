@@ -62,8 +62,9 @@ export class RenewalRepository {
                 rentPerSf: renewal.rentPerSf || 0,
                 currentRentPerSf: (() => {
                     const monthRent = suiteCharges?.baseRentMonth || renewal.monthlyRent || 0;
+                    const monthRentNum = typeof monthRent === 'string' ? parseFloat(monthRent) : monthRent;
                     const sqFt = parseFloat(renewal.sf) || 0;
-                    return sqFt > 0 ? Number((monthRent / sqFt).toFixed(2)) : 0;
+                    return sqFt > 0 ? Number((monthRentNum / sqFt).toFixed(2)) : 0;
                 })(),
                 budget_negotiation: {
                     tiPerSf: suite?.tiPerSf ? parseFloat(suite.tiPerSf) : 0,

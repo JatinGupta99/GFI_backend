@@ -1,7 +1,7 @@
 export interface FinancialChargesInterface {
-  baseRentMonth: number;
-  camMonth: number;
-  insMonth: number;
-  taxMonth: number;
-  totalDueMonth: number;
+  baseRentMonth: string;
+  camMonth: string;
+  insMonth: string;
+  taxMonth: string;
+  totalDueMonth: string;
 }

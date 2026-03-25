@@ -1,40 +1,40 @@
-import { IsNumber } from 'class-validator';
+import { IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { FinancialChargesInterface } from '../interfaces/financial-charges.interface';
 
 export class FinancialChargesDto implements FinancialChargesInterface {
   @ApiProperty({
     description: 'Base rent amount per month',
-    example: 1500.0,
+    example: '1500.00',
   })
-  @IsNumber()
-  baseRentMonth: number;
+  @IsString()
+  baseRentMonth: string;
 
   @ApiProperty({
     description: 'Common Area Maintenance (CAM) amount per month',
-    example: 200.0,
+    example: '200.00',
   })
-  @IsNumber()
-  camMonth: number;
+  @IsString()
+  camMonth: string;
 
   @ApiProperty({
     description: 'Insurance recovery amount per month',
-    example: 50.0,
+    example: '50.00',
   })
-  @IsNumber()
-  insMonth: number;
+  @IsString()
+  insMonth: string;
 
   @ApiProperty({
     description: 'Tax recovery amount per month',
-    example: 100.0,
+    example: '100.00',
   })
-  @IsNumber()
-  taxMonth: number;
+  @IsString()
+  taxMonth: string;
 
   @ApiProperty({
     description: 'Total amount due per month (sum of all charges)',
-    example: 1850.0,
+    example: '1850.00',
   })
-  @IsNumber()
-  totalDueMonth: number;
+  @IsString()
+  totalDueMonth: string;
 }
