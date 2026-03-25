@@ -61,4 +61,13 @@ export class PaginationQueryDto {
   @IsString({ each: true })
   propertyIds?: string | string[];
 
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    if (value === 'null') return null;
+    return value;
+  })
+  approved?: boolean | null;
+
 }

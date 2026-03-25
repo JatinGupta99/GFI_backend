@@ -13,5 +13,20 @@ export class LeaseInfo {
 
   @Prop({ type: Date })
   approvedDate?: Date;
+
+  @Prop({ type: Date })
+  dateSubmitted?: Date;
+
+  @Prop({ type: Date })
+  dateApproved?: Date;
+
+  @Prop({ type: Number })
+  daysWaiting?: number;
+
+  @Prop({ type: Number })
+  daysToApprove?: number;
+
+  @Prop({ type: Boolean, default: null })
+  approved?: boolean | null;
 }
 export const LeaseInfoSchema = SchemaFactory.createForClass(LeaseInfo);

@@ -62,6 +62,7 @@ export class LeadsService {
       approval_status,
       property,
       propertyIds,
+      approved,
     } = query;
 
     // Parse propertyIds - handle both array and comma-separated string
@@ -134,6 +135,13 @@ export class LeadsService {
     // -------------------------
     if (use) {
       filter['general.use'] = use;
+    }
+
+    // -------------------------
+    // Approved Filter
+    // -------------------------
+    if (typeof approved === 'boolean') {
+      filter.approved = approved;
     }
 
     // -------------------------
@@ -537,6 +545,77 @@ export class LeadsService {
     if (!updated) throw new NotFoundException('Lead not found');
 
     return updated;
+  }
+
+  async submitForApproval(id: string, submittedBy: string, submittedTo: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    const lead = await this.repo.findById(id);
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    const dateSubmitted = new Date();
+    
+    const updateData = {
+      lease: {
+        ...(lead.lease || {}),
+        submittedBy,
+        submittedTo,
+        dateSubmitted,
+        daysWaiting: 0,
+        approved: null,
+      },
+    } as any;
+
+    const updated = await this.repo.update(id, updateData);
+    if (!updated) throw new NotFoundException('Failed to submit for approval');
+
+    return {
+      success: true,
+      message: 'Lead submitted for approval successfully',
+      data: updated,
+    };
+  }
+
+  async approveOrReject(id: string, approved: boolean, approvedBy: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    const lead = await this.repo.findById(id);
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    if (!lead.lease?.dateSubmitted) {
+      throw new BadRequestException('Lead has not been submitted for approval yet');
+    }
+
+    const dateApproved = new Date();
+    const dateSubmitted = new Date(lead.lease.dateSubmitted);
+    
+    // Calculate days to approve (difference in days)
+    const daysToApprove = Math.floor(
+      (dateApproved.getTime() - dateSubmitted.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    const updateData = {
+      lease: {
+        ...(lead.lease || {}),
+        approved,
+        dateApproved,
+        daysToApprove,
+        daysWaiting: daysToApprove,
+      },
+    } as any;
+
+    const updated = await this.repo.update(id, updateData);
+    if (!updated) throw new NotFoundException('Failed to update approval status');
+
+    return {
+      success: true,
+      message: approved ? 'Lead approved successfully' : 'Lead rejected successfully',
+      data: updated,
+    };
   }
 
   async remove(id: string) {

@@ -485,22 +485,6 @@ export class RenewalsController {
     };
   }
   /**
-   * Clear renewal cache
-   */
-  @Post('cache/clear')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Clear renewal cache' })
-  @ApiResponse({ status: 200, description: 'Cache cleared successfully' })
-  async clearCache() {
-    await this.queryService.clearCache();
-
-    return {
-      success: true,
-      message: 'Renewal cache cleared successfully',
-    };
-  }
-
-  /**
    * Update renewal notes
    */
   @Patch(':id/notes')

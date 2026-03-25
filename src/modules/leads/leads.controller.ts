@@ -74,6 +74,24 @@ export class LeadsController {
     return this.service.update(id, dto);
   }
 
+  @Patch(':id/submit-approval')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  submitForApproval(
+    @Param('id') id: string,
+    @Body() dto: { submittedBy: string; submittedTo: string },
+  ) {
+    return this.service.submitForApproval(id, dto.submittedBy, dto.submittedTo);
+  }
+
+  @Patch(':id/approve-reject')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  approveOrReject(
+    @Param('id') id: string,
+    @Body() dto: { approved: boolean; approvedBy: string },
+  ) {
+    return this.service.approveOrReject(id, dto.approved, dto.approvedBy);
+  }
+
   @Patch(':id/deal-terms')
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   updateDealTerms(@Param('id') id: string, @Body() dto: UpdateDealTermsDto) {

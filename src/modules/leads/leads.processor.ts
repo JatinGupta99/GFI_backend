@@ -32,20 +32,29 @@ function detectMimeFromBuffer(buf: Buffer): string | null {
 
 /** Convert docx buffer → PDF buffer using mammoth (text extraction) + pdfkit */
 async function convertDocxToPdf(docxBuffer: Buffer): Promise<Buffer> {
-  const { value: text } = await mammoth.extractRawText({ buffer: docxBuffer });
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50 });
-    const chunks: Buffer[] = [];
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-    // Write text in chunks to avoid single-line overflow
-    const lines = text.split('\n');
-    for (const line of lines) {
-      doc.fontSize(11).text(line || ' ', { lineBreak: true });
+  try {
+    const { value: text } = await mammoth.extractRawText({ buffer: docxBuffer });
+    
+    if (!text || text.trim().length === 0) {
+      throw new Error('No text content extracted from Word document');
     }
-    doc.end();
-  });
+    
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50 });
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+      // Write text in chunks to avoid single-line overflow
+      const lines = text.split('\n');
+      for (const line of lines) {
+        doc.fontSize(11).text(line || ' ', { lineBreak: true });
+      }
+      doc.end();
+    });
+  } catch (error) {
+    throw new Error(`Failed to convert Word document to PDF: ${error.message}`);
+  }
 }
 
 const DOC_AI_SUPPORTED = new Set([
@@ -105,8 +114,9 @@ export class LeadsProcessor extends WorkerHost {
                     buffer = await convertDocxToPdf(buffer);
                     resolvedMime = 'application/pdf';
                     this.logger.log(`Fallback conversion succeeded (${buffer.length} bytes)`);
-                  } catch {
-                    throw new Error(`Unrecognized file format (hex: ${firstHex}). Please upload a PDF, Word (.doc/.docx), or image file.`);
+                  } catch (fallbackError) {
+                    this.logger.error(`Fallback conversion failed: ${fallbackError.message}`);
+                    throw new Error(`Unrecognized file format. Supported formats: PDF (.pdf), Word (.doc, .docx), Images (.jpg, .png, .tiff, .gif, .bmp, .webp). Please ensure your file is not corrupted and try again.`);
                   }
                 }
 
@@ -114,9 +124,14 @@ export class LeadsProcessor extends WorkerHost {
                 if (resolvedMime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
                     resolvedMime === 'application/msword') {
                   this.logger.log(`Converting Word document (${resolvedMime}) to PDF for Document AI`);
-                  buffer = await convertDocxToPdf(buffer);
-                  resolvedMime = 'application/pdf';
-                  this.logger.log(`Word → PDF conversion complete (${buffer.length} bytes)`);
+                  try {
+                    buffer = await convertDocxToPdf(buffer);
+                    resolvedMime = 'application/pdf';
+                    this.logger.log(`Word → PDF conversion complete (${buffer.length} bytes)`);
+                  } catch (conversionError) {
+                    this.logger.error(`Word to PDF conversion failed: ${conversionError.message}`);
+                    throw new Error(`Unable to process Word document. The file may be corrupted or in an unsupported format. Please try: 1) Re-saving the document in Word, 2) Converting to PDF manually, or 3) Uploading a different file.`);
+                  }
                 }
 
                 if (!DOC_AI_SUPPORTED.has(resolvedMime)) {
