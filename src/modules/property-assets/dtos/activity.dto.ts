@@ -31,6 +31,10 @@ export class CreateActivityDto {
     @IsOptional()
     @IsString()
     followUpType?: string;
+
+    @IsOptional()
+    @IsString()
+    fileKey?: string;
 }
 
 export class UpdateActivityDto extends PartialType((CreateActivityDto)) {

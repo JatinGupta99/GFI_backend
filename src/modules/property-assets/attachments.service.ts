@@ -5,6 +5,7 @@ import { Attachment } from './schemas/attachment.schema';
 import { CreateAttachmentDto, GetUploadUrlDto } from './dtos/attachment.dto';
 import { MediaService } from '../media/media.service';
 import { CompanyUserService } from '../company-user/company-user.service';
+import { PaginationHelper } from '../../common/helpers/pagination.helper';
 
 @Injectable()
 export class AttachmentsService {
@@ -37,12 +38,26 @@ export class AttachmentsService {
         return attachment.save();
     }
 
-    async findAllByProperty(propertyId: string): Promise<any[]> {
-        return await this.attachmentModel
-            .find({ propertyId })
-            .sort({ createdAt: -1 })
-            .lean()
-            .exec();
+    async findAllByProperty(propertyId: string, page: number = 1, limit: number = 10): Promise<any> {
+        const skip = (page - 1) * limit;
+        
+        const [data, total] = await Promise.all([
+            this.attachmentModel
+                .find({ propertyId })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean()
+                .exec(),
+            this.attachmentModel.countDocuments({ propertyId }).exec(),
+        ]);
+
+        const meta = PaginationHelper.buildMetaFromPage(total, page, limit);
+
+        return {
+            data,
+            meta,
+        };
     }
 
     async getDownloadUrl(key: string) {

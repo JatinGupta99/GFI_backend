@@ -5,6 +5,7 @@ import { Activity } from './schemas/activity.schema';
 import { CreateActivityDto, UpdateActivityDto } from './dtos/activity.dto';
 import { GetUploadUrlDto } from './dtos/attachment.dto';
 import { MediaService } from '../media/media.service';
+import { PaginationHelper } from '../../common/helpers/pagination.helper';
 
 @Injectable()
 export class ActivitiesService {
@@ -35,14 +36,11 @@ export class ActivitiesService {
             this.activityModel.countDocuments({ leadId }).exec(),
         ]);
 
+        const meta = PaginationHelper.buildMetaFromPage(total, page, limit);
+
         return {
             data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
+            meta,
         };
     }
 

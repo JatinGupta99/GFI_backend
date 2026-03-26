@@ -71,8 +71,8 @@ export class ActivitiesController {
     }
 
     @Post(':activityId/upload-url')
-    getUploadUrl(@Param(':id')leadId:string,@Param('activityId')activityId:string,@Body() contentType:string) {
-        return this.activitiesService.getUploadUrl(leadId,activityId,contentType);
+    getUploadUrl(@Param('id')leadId:string,@Param('activityId')activityId:string,@Body() body: GetUploadUrlDto) {
+        return this.activitiesService.getUploadUrl(leadId,activityId,body.contentType);
     }
 
     @Get(':activityId/download-url')

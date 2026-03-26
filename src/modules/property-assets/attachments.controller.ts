@@ -14,6 +14,7 @@ import { CreateAttachmentDto, GetUploadUrlDto } from './dtos/attachment.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { User } from '../../common/decorators/user.decorator';
 import { UserId } from '../../common/decorators/user-id.decorator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 @Controller('attachments')
 @UseGuards(JwtAuthGuard)
@@ -31,8 +32,12 @@ export class AttachmentsController {
     }
 
     @Get('property/:id')
-    findAllByProperty(@Param('id') propertyId: string) {
-        return this.attachmentsService.findAllByProperty(propertyId);
+    findAllByProperty(
+        @Param('id') propertyId: string,
+        @Query() query: PaginationQueryDto
+    ) {
+        const { page = 1, limit = 10 } = query;
+        return this.attachmentsService.findAllByProperty(propertyId, page, limit);
     }
 
     @Get('download-url')
