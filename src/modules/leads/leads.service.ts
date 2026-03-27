@@ -1710,7 +1710,7 @@ export class LeadsService {
 
     // Helper for TI values
     const getTIValue = (field: any) => {
-      const TI_CONFIDENCE_THRESHOLD = 0.40;
+      const TI_CONFIDENCE_THRESHOLD = 0.35;
       if (field && field.value && field.confidence >= TI_CONFIDENCE_THRESHOLD) {
         const value = field.value;
         // Skip empty strings, null, undefined, or 0
@@ -1829,12 +1829,12 @@ export class LeadsService {
           }
         }
         
-        // Convert to YY/MM/DD format
+        // Convert to MM/DD/YY format
         const year = date.getFullYear().toString().slice(-2); // Last 2 digits of year
         const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Month with leading zero
         const day = date.getDate().toString().padStart(2, '0'); // Day with leading zero
         
-        return `${year}/${month}/${day}`;
+        return `${day}/${month}/${year}`;
       } catch (error) {
         this.logger.warn(`Error converting date ${dateString}:`, error);
         return dateString; // Return original if error
@@ -1878,7 +1878,8 @@ export class LeadsService {
     const freeMonths = getValue(data.free_rent_months) || getValue(data.free_months);
     const term = getValue(data.term) || getValue(data.lease_term);
     // Use special TI helper with lower confidence threshold
-    const tiPerSf = getTIValue(data.tenant_improvement_psf) || getTIValue(data.ti_per_sf) || getTIValue(data.tenant_improvement_per_sf);
+    const tiPerSf = getTIValue(data.tenant_improvement_psf)
+    this.logger.debug(`TI field values from Doc AI — tenant_improvement_psf: ${JSON.stringify(data.tenant_improvement_psf)}, ti_per_sf: ${JSON.stringify(data.ti_per_sf)}, ti_allowance: ${JSON.stringify(data.ti_allowance)}, ti_psf: ${JSON.stringify(data.ti_psf)} => resolved tiPerSf: ${tiPerSf}`);
     // Use special RCD helper with lower confidence threshold
     const rcd = getRCDValue(data.rent_commencement_date) || getRCDValue(data.rcd);
 
@@ -1916,9 +1917,8 @@ export class LeadsService {
 
     if (term !== null) {
       lead.current_negotiation.term = term;
-      lead.budget_negotiation.term = term;
       hasUpdates = true;
-      this.logger.debug(`Extracted term: ${term} (updated both objects)`);
+      this.logger.debug(`Extracted term: ${term} (updated current_negotiation only)`);
     }
 
     if (tiPerSf !== null) {
@@ -1936,9 +1936,8 @@ export class LeadsService {
       // Convert date to YY/MM/DD format
       const formattedRcd = convertDateToYYMMDD(rcd);
       lead.current_negotiation.rcd = formattedRcd;
-      lead.budget_negotiation.rcd = formattedRcd;
       hasUpdates = true;
-      this.logger.debug(`Extracted rcd: ${rcd} -> ${formattedRcd} (updated both objects) [confidence: ${data.rent_commencement_date?.confidence?.toFixed(2)}]`);
+      this.logger.debug(`Extracted rcd: ${rcd} -> ${formattedRcd} (updated current_negotiation only) [confidence: ${data.rent_commencement_date?.confidence?.toFixed(2)}]`);
     } else {
       this.logger.debug(`rcd not extracted - confidence too low: ${data.rent_commencement_date?.confidence?.toFixed(2)} (threshold: 0.6)`);
     }
@@ -2011,27 +2010,7 @@ export class LeadsService {
       this.logger.debug(`Extracted email: ${email}`);
     }
 
-    // Lookup property by extracted property_name, save name in general and propertyId at root
-    const extractedPropertyName = getValue(data.property_name);
-    if (extractedPropertyName) {
-      this.logger.debug(`Looking up property by name: "${extractedPropertyName}"`);
-      try {
-        const matchedProperty = await this.propertiesService.findByNameFuzzy(extractedPropertyName);
-        if (matchedProperty) {
-          lead.general.property = matchedProperty.propertyName;
-          generalUpdated = true;
-          updatePayload.propertyId = matchedProperty.propertyId;
-          this.logger.log(`Matched property: "${matchedProperty.propertyName}" (${matchedProperty.propertyId})`);
-        } else {
-          // No match — still save the raw extracted name so it's not lost
-          lead.general.property = extractedPropertyName;
-          generalUpdated = true;
-          this.logger.warn(`No property matched for: "${extractedPropertyName}" — saved raw name only`);
-        }
-      } catch (err) {
-        this.logger.warn(`Property lookup failed for "${extractedPropertyName}": ${err.message}`);
-      }
-    }
+    // Property update intentionally skipped during LOI extraction
 
     if (generalUpdated) {
       updatePayload.general = lead.general;
