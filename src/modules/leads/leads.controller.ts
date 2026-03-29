@@ -119,13 +119,23 @@ export class LeadsController {
   }
 
   @Post(':id/send')
-  sendLoiEmail(@Param('id') id: string, @Body() dto: SendLoiEmailDto) {
-    return this.service.sendLoiEmail(id, dto);
+  sendLoiEmail(@Param('id') id: string, @Body() dto: SendLoiEmailDto, @UserId() user: {
+    userId: string;
+    email: string;
+    name: string;
+    role: string;
+  }) {
+    return this.service.sendLoiEmail(id, dto, user);
   }
 
   @Post('send/generic')
-  sendGenericEmail(@Body() dto: SendGenericEmailDto) {
-    return this.service.sendGenericEmail(dto);
+  sendGenericEmail(@Body() dto: SendGenericEmailDto, @UserId() user: {
+    userId: string;
+    email: string;
+    name: string;
+    role: string;
+  }) {
+    return this.service.sendGenericEmail(dto, user);
   }
 
   @Post(':id/app/send')

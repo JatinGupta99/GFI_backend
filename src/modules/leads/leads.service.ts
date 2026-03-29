@@ -83,11 +83,11 @@ export class LeadsService {
     // Status Group Definitions
     // -------------------------
     const STATUS_GROUPS = {
-      LEAD_ALL: ['LOI_NEGOTIATION', 'QUALIFYING','LEASE_NEGOTIATION','LEASE_EXECUTED', 'OUT_FOR_EXECUTION','DRAFTING_LEASE','DEAD'],
+      LEAD_ALL: ['LOI_NEGOTIATION', 'QUALIFYING', 'LEASE_NEGOTIATION', 'LEASE_EXECUTED', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE', 'DEAD'],
       APPROVAL_ALL: ['IN_REVIEW', 'PENDING'],
       TENANT_AR_ALL: ['SEND_ATTORNEY_NOTICE', 'SEND_COURTESY_NOTICE', 'SEND_THREE_DAY_NOTICE'],
       LEASE_ALL: ['LEASE_NEGOTIATION', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE'],
-      RENEWAL_ALL: ['DRAFTING_AMENDMENT', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE','DEAD','NO_CONTACT','AMENDMENT_EXECUTED'],
+      RENEWAL_ALL: ['DRAFTING_AMENDMENT', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE', 'DEAD', 'NO_CONTACT', 'AMENDMENT_EXECUTED'],
     };
 
     // -------------------------
@@ -190,15 +190,15 @@ export class LeadsService {
    */
   private extractFilenameFromKey(key: string): string | null {
     if (!key) return null;
-    
+
     const parts = key.split('/');
     const filename = parts[parts.length - 1];
-    
+
     // If filename has no extension, add .pdf
     if (filename && !filename.includes('.')) {
       return `${filename}.pdf`;
     }
-    
+
     return filename || null;
   }
 
@@ -373,17 +373,17 @@ export class LeadsService {
     // Convert property name to propertyId
     if (dto.general?.property) {
       const propertyInput = dto.general.property as string;
-      
+
       // Look up property by name
       const property = await this.propertiesService.findByName(propertyInput);
-      
+
       if (property) {
         // Store property NAME in general.property (e.g., "Richwood")
         normalizedData['general.property'] = property.propertyName;
-        
+
         // Store propertyId at root level (e.g., "008400")
         normalizedData.propertyId = property.propertyId;
-        
+
         this.logger.log(`Property "${propertyInput}" → propertyId: ${property.propertyId}, propertyName: ${property.propertyName}`);
       } else {
         this.logger.warn(`Property not found: ${propertyInput}`);
@@ -400,10 +400,10 @@ export class LeadsService {
         // Suite found — budget file was uploaded, populate from suite data
         this.logger.log(`Budget file data found for suite ${suiteId} — populating budget_negotiation`);
         this.logger.log(`Suite data: baseRentPerSf="${suite.baseRentPerSf}", tiPerSf="${suite.tiPerSf}", rcd="${suite.rcd}"`);
-        
+
         const parsedRentPerSf = suite.baseRentPerSf ? parseFloat(suite.baseRentPerSf) : 0;
         this.logger.log(`Parsed rentPerSf: ${parsedRentPerSf} (from baseRentPerSf: "${suite.baseRentPerSf}")`);
-        
+
         normalizedData.budget_negotiation = {
           rentPerSf: parsedRentPerSf,
           annInc: normalizedData.budget_negotiation?.annInc ?? 3,
@@ -450,7 +450,7 @@ export class LeadsService {
         this.logger.warn(`Property not found: ${dto.general.property}`);
       }
     }
-    
+
     // Handle budget_negotiation defaults
     if (normalizedData.budget_negotiation) {
       normalizedData.budget_negotiation = {
@@ -483,11 +483,11 @@ export class LeadsService {
       }
       // else: no suite in DB, no budget file uploaded — keep DTO values unchanged
     }
-    
+
     // Map budget_sheet to accounting if present
     if ((dto as any).budget_sheet) {
       const budgetSheet = (dto as any).budget_sheet;
-      
+
       normalizedData.accounting = {
         ...(normalizedData.accounting || {}),
         // Map charges
@@ -517,11 +517,11 @@ export class LeadsService {
           decPmt: budgetSheet.monthlyPayments?.dec || 0,
         },
       };
-      
+
       // Remove budget_sheet from normalized data so it doesn't get saved
       delete (normalizedData as any).budget_sheet;
     }
-    
+
     // Handle references conversion - support both array and object formats
     if (normalizedData.references) {
       if (Array.isArray(normalizedData.references)) {
@@ -533,7 +533,7 @@ export class LeadsService {
         const numericKeys = Object.keys(referencesObj)
           .filter(key => !isNaN(Number(key))) // Only numeric keys like "0", "1", etc.
           .sort((a, b) => Number(a) - Number(b));
-        
+
         if (numericKeys.length > 0) {
           // Object with numeric keys - convert to array
           normalizedData.references = numericKeys.map(key => referencesObj[key]);
@@ -543,7 +543,7 @@ export class LeadsService {
         }
       }
     }
-    
+
     const updateQuery = this.flattenObject(normalizedData);
 
     const updated = await this.repo.update(id, updateQuery);
@@ -561,7 +561,7 @@ export class LeadsService {
     if (!lead) throw new NotFoundException('Lead not found');
 
     const dateSubmitted = new Date();
-    
+
     const updateData = {
       lease: {
         ...(lead.lease || {}),
@@ -597,7 +597,7 @@ export class LeadsService {
 
     const dateApproved = new Date();
     const dateSubmitted = new Date(lead.lease.dateSubmitted);
-    
+
     // Calculate days to approve (difference in days)
     const daysToApprove = Math.floor(
       (dateApproved.getTime() - dateSubmitted.getTime()) / (1000 * 60 * 60 * 24)
@@ -653,7 +653,7 @@ export class LeadsService {
 
     return {
       landlord: 'Global Realty & Management FL',
-      tenant: lead.general?.firstName +''+lead.general.lastName|| '',
+      tenant: lead.general?.firstName + '' + lead.general.lastName || '',
       guarantor: (lead.financial as any)?.guarantor || lead.general?.firstName || '',
       property: lead.general?.property || '',
       suite: lead.general?.suite || '',
@@ -695,12 +695,12 @@ export class LeadsService {
     }));
   }
 
-  async sendLoiEmail(id: string, dto: SendLoiEmailDto) {
+  async sendLoiEmail(id: string, dto: SendLoiEmailDto, user?: { userId: string; name: string; email: string; role: string }) {
     const lead = await this.findOne(id);
 
     // Resolve attachment symbols to signed URLs
     const resolvedAttachments: any[] = [];
-    
+
     // Handle regular attachments from lead files
     if (dto.attachments && dto.attachments.length > 0) {
       for (const fileId of dto.attachments) {
@@ -708,11 +708,11 @@ export class LeadsService {
         const file = lead.files?.find((f: any) => f.id === fileId);
         if (file) {
           try {
-            // Download the file buffer instead of using signed URL
-            const fileBuffer = await this.mediaService.getFileBuffer(file.id);
+            // Use signed URL for faster attachment handling
+            const url = await this.mediaService.generateDownloadUrl(file.id);
             resolvedAttachments.push({
               filename: file.fileName,
-              content: fileBuffer,
+              path: url,
               contentType: file.fileType || 'application/octet-stream',
             });
           } catch (err) {
@@ -726,31 +726,31 @@ export class LeadsService {
     if (dto.Key) {
       try {
         this.logger.log(`Processing PDF key attachment: ${dto.Key}`);
-        
+
         // Validate the key format
         if (!dto.Key.trim()) {
           throw new Error('PDF key is empty');
         }
-        
-        // Download the PDF buffer for email attachment
-        const pdfBuffer = await this.mediaService.getFileBuffer(dto.Key);
-        
-        if (!pdfBuffer || pdfBuffer.length === 0) {
-          throw new Error('PDF buffer is empty');
+
+        // Generate signed URL instead of downloading buffer
+        const url = await this.mediaService.generateDownloadUrl(dto.Key);
+
+        if (!url) {
+          throw new Error('Failed to generate presigned URL');
         }
-        
+
         // Extract filename from S3 key or use default
         const filename = this.extractFilenameFromKey(dto.Key) || 'LOI-Document.pdf';
-        
-        // Add PDF as attachment with buffer (for direct email attachment)
+
+        // Add PDF as attachment with path URL
         resolvedAttachments.push({
           filename: filename,
-          content: pdfBuffer,
+          path: url,
           contentType: 'application/pdf',
         });
 
-        this.logger.log(`Successfully added PDF attachment: ${filename} (${pdfBuffer.length} bytes)`);
-        
+        this.logger.log(`Successfully added PDF attachment URL: ${filename}`);
+
       } catch (err) {
         this.logger.error(`Failed to process PDF key ${dto.Key}:`, {
           error: err.message,
@@ -776,13 +776,16 @@ export class LeadsService {
       }))
     });
 
-    await this.mailService.send(EmailType.GENERAL as any, {
+    // Send the email asynchronously in the background so it doesn't block the HTTP response
+    this.mailService.send(EmailType.GENERAL as any, {
       email: dto.to,
       cc: dto.cc,
       subject: dto.subject,
       body: dto.body,
       firstName: lead.general?.firstName?.split(' ')[0] || '',
       attachments: resolvedAttachments,
+    }).catch(err => {
+      this.logger.error(`Background email send failed for lead ${id}:`, err);
     });
 
     // Create follow-up activity if followUpDays is provided
@@ -790,11 +793,11 @@ export class LeadsService {
     if (dto.followUpDays && dto.followUpDays > 0) {
       try {
         this.logger.log(`Creating follow-up activity for lead ${id} in ${dto.followUpDays} days`);
-        
+
         // Calculate follow-up date
         const followUpDate = new Date();
         followUpDate.setDate(followUpDate.getDate() + dto.followUpDays);
-        
+
         // Create follow-up activity with scheduling information
         const followUpActivity = await this.activitiesService.create(
           id,
@@ -808,24 +811,24 @@ export class LeadsService {
             followUpType: 'email', // Default to email follow-up
           },
           {
-            userId: 'system', // System-generated activity
-            name: 'System',
-            email: 'system@company.com',
-            role: 'SYSTEM'
+            userId: user?.userId || 'system',
+            name: user?.name || 'System',
+            email: user?.email || 'system@company.com',
+            role: user?.role || 'SYSTEM'
           }
         );
 
         followUpActivityId = String(followUpActivity._id) || followUpActivity.id;
-        
+
         this.logger.log(`Created follow-up activity ${followUpActivityId} for lead ${id}, scheduled for ${followUpDate.toISOString()}`);
-        
+
       } catch (err) {
         this.logger.error(`Failed to create follow-up activity for lead ${id}:`, err);
         // Don't fail the email sending if activity creation fails
       }
     }
 
-    return { 
+    return {
       success: true,
       attachmentCount: resolvedAttachments.length,
       message: `Email sent successfully with ${resolvedAttachments.length} attachment(s)`,
@@ -834,28 +837,30 @@ export class LeadsService {
     };
   }
 
-  async sendGenericEmail(dto: SendGenericEmailDto) {
+  async sendGenericEmail(dto: SendGenericEmailDto, user?: { userId: string; name: string; email: string; role: string }) {
     // Validate and fetch record (Lead or Renewal)
     const record = await this.validateAndFetchRecord(dto.leadId, dto.recordType);
-    
+
     // Update status based on email type
     await this.updateRecordStatusByEmailType(dto.leadId, dto.emailType, dto.recordType);
-    
+
     // Resolve all attachments
     const resolvedAttachments = await this.resolveEmailAttachments(dto.Key, dto.attachments);
-    
-    // Send the email
-    await this.mailService.send(EmailType.GENERAL as any, {
+
+    // Send the email asynchronously in the background so it doesn't block the HTTP response
+    this.mailService.send(EmailType.GENERAL as any, {
       email: dto.to,
       cc: dto.cc || [],
       subject: dto.subject,
       body: dto.body,
       firstName: `${dto.firstName || ''} ${dto.lastName || ''}`.trim(),
       attachments: resolvedAttachments,
+    }).catch(err => {
+      this.logger.error(`Background email send failed for lead ${dto.leadId}:`, err);
     });
 
     // Create follow-up activity if requested
-    const followUpActivityId = await this.createFollowUpActivity(dto);
+    const followUpActivityId = await this.createFollowUpActivity(dto, user);
 
     return {
       success: true,
@@ -908,7 +913,7 @@ export class LeadsService {
     if (!emailType) return;
 
     const type = recordType || 'LEAD';
-    
+
     // Map email types to status values
     const emailTypeToStatusMap: Record<string, string> = {
       COURTESY_NOTICE: 'SEND_COURTESY_NOTICE',
@@ -939,33 +944,43 @@ export class LeadsService {
   }
 
   /**
-   * Resolve all email attachments (Key + attachments array)
+   * Resolve all email attachments (Key + attachments array).
+   * Deduplicates keys so the same S3 file is never downloaded more than once.
+   * All downloads run in parallel via Promise.all for maximum speed.
    */
   private async resolveEmailAttachments(
     mainKey?: string,
     attachmentKeys?: string[],
   ): Promise<any[]> {
-    const resolvedAttachments: any[] = [];
+    // Build a deduplicated list: mainKey first, then any additional keys
+    // that are NOT the same as mainKey (avoids double-downloading the same file).
+    const seen = new Set<string>();
+    const jobs: Array<{ key: string; contentType: string }> = [];
 
-    // Handle main PDF attachment (Key field)
-    if (mainKey) {
-      const mainAttachment = await this.resolveAttachment(mainKey, 'application/pdf');
-      if (mainAttachment) {
-        resolvedAttachments.push(mainAttachment);
-      }
+    if (mainKey?.trim()) {
+      seen.add(mainKey);
+      jobs.push({ key: mainKey, contentType: 'application/pdf' });
     }
 
-    // Handle additional attachments
     if (attachmentKeys && attachmentKeys.length > 0) {
       for (const fileKey of attachmentKeys) {
-        const attachment = await this.resolveAttachment(fileKey);
-        if (attachment) {
-          resolvedAttachments.push(attachment);
+        if (fileKey?.trim() && !seen.has(fileKey)) {
+          seen.add(fileKey);
+          jobs.push({ key: fileKey, contentType: 'application/octet-stream' });
+        } else if (seen.has(fileKey)) {
+          this.logger.debug(`Skipping duplicate attachment key: ${fileKey}`);
         }
       }
     }
 
-    return resolvedAttachments;
+    if (jobs.length === 0) return [];
+
+    // Download all unique attachments in parallel
+    const results = await Promise.all(
+      jobs.map(({ key, contentType }) => this.resolveAttachment(key, contentType)),
+    );
+
+    return results.filter(Boolean);
   }
 
   /**
@@ -980,21 +995,21 @@ export class LeadsService {
         throw new Error('File key is empty');
       }
 
-      this.logger.debug(`Resolving attachment: ${fileKey}`);
+      this.logger.debug(`Generating presigned URL for attachment: ${fileKey}`);
 
-      const fileBuffer = await this.mediaService.getFileBuffer(fileKey);
+      const url = await this.mediaService.generateDownloadUrl(fileKey);
 
-      if (!fileBuffer || fileBuffer.length === 0) {
-        throw new Error('File buffer is empty');
+      if (!url) {
+        throw new Error('Failed to generate presigned URL');
       }
 
       const filename = this.extractFilenameFromKey(fileKey) || 'attachment';
 
-      this.logger.debug(`Resolved attachment: ${filename} (${fileBuffer.length} bytes)`);
+      this.logger.debug(`Resolved attachment URL for: ${filename}`);
 
       return {
         filename,
-        content: fileBuffer,
+        path: url,
         contentType,
       };
     } catch (error) {
@@ -1009,7 +1024,7 @@ export class LeadsService {
   /**
    * Create follow-up activity if requested
    */
-  private async createFollowUpActivity(dto: SendGenericEmailDto): Promise<string | null> {
+  private async createFollowUpActivity(dto: SendGenericEmailDto, user?: { userId: string; name: string; email: string; role: string }): Promise<string | null> {
     if (!dto.followUpDays || dto.followUpDays <= 0 || !dto.leadId) {
       return null;
     }
@@ -1036,10 +1051,10 @@ export class LeadsService {
           followUpType: 'email',
         },
         {
-          userId: 'system',
-          name: 'System',
-          email: 'system@company.com',
-          role: 'SYSTEM',
+          userId: user?.userId || 'system',
+          name: user?.name || 'System',
+          email: user?.email || 'system@company.com',
+          role: user?.role || 'SYSTEM',
         },
       );
 
@@ -1097,9 +1112,9 @@ export class LeadsService {
   ) {
     // Check if ID is a valid MongoDB ObjectId format (24 hex characters)
     const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(id);
-    
+
     let lead: any = null;
-    
+
     // Only try to fetch lead if ID is valid ObjectId format
     if (isValidObjectId) {
       try {
@@ -1178,7 +1193,7 @@ export class LeadsService {
     return { success: true };
   }
 
-  async sendRenewalLetter(id: string, dto: SendRenewalLetterDto,user: { userId: string; email: string; name: string; role: string }) {
+  async sendRenewalLetter(id: string, dto: SendRenewalLetterDto, user: { userId: string; email: string; name: string; role: string }) {
     const lead = await this.findOne(id);
 
     // Resolve attachments if any
@@ -1506,7 +1521,7 @@ export class LeadsService {
     // Upload to S3 (DRY - reuse existing MediaService)
     const folderPath = `leads/${leadId}/loi`;
     const mimeType = 'application/pdf';
-    
+
     const { key } = await this.mediaService.uploadFile(file, mimeType, folderPath);
 
     this.logger.log(`LOI document uploaded to S3: ${key}`);
@@ -1595,16 +1610,16 @@ export class LeadsService {
   private getMimeTypeFromKey(key: string): string | null {
     const ext = key.split('.').pop()?.toLowerCase();
     const map: Record<string, string> = {
-      pdf:  'application/pdf',
+      pdf: 'application/pdf',
       docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      doc:  'application/msword',
-      png:  'image/png',
-      jpg:  'image/jpeg',
+      doc: 'application/msword',
+      png: 'image/png',
+      jpg: 'image/jpeg',
       jpeg: 'image/jpeg',
       tiff: 'image/tiff',
-      tif:  'image/tiff',
-      gif:  'image/gif',
-      bmp:  'image/bmp',
+      tif: 'image/tiff',
+      gif: 'image/gif',
+      bmp: 'image/bmp',
       webp: 'image/webp',
     };
     return map[ext ?? ''] ?? null;
@@ -1627,12 +1642,12 @@ export class LeadsService {
 
     // Update lead with LOI document URL
     const updateResult = await this.repo.update(leadId, { loiDocumentUrl: key });
-    
+
     if (!updateResult) {
       this.logger.error(`Failed to update lead ${leadId} with LOI document URL: ${key}`);
       throw new InternalServerErrorException('Failed to save LOI document URL to database');
     }
-    
+
     this.logger.log(`Successfully saved LOI document URL to database: ${key}`);
     this.logger.debug(`Updated lead loiDocumentUrl field: ${updateResult.loiDocumentUrl}`);
 
@@ -1683,10 +1698,10 @@ export class LeadsService {
 
     this.logger.log(`Updating lead ${leadId} with LOI extraction results`);
     this.logger.log(`Document AI Overall Confidence: ${result.overallConfidence}`);
-    
+
     const CONFIDENCE_THRESHOLD = 0.40;
     const data = result.data || {};
-    
+
     // Log ALL extracted fields from Document AI
     this.logger.log(`=== Document AI Extracted Fields (${Object.keys(data).length} total) ===`);
     Object.keys(data).forEach(key => {
@@ -1755,11 +1770,11 @@ export class LeadsService {
       try {
         // First, try to parse as a regular date
         let date = new Date(dateString);
-        
+
         // If it's not a valid date, check if it contains day count text
         if (isNaN(date.getTime())) {
           let daysToAdd: number | null = null;
-          
+
           // Look for ANY number in the text (most flexible approach)
           // This will catch 120, 121, 122, etc. anywhere in the text
           const anyNumberMatch = dateString.match(/\b(\d{1,4})\b/);
@@ -1771,7 +1786,7 @@ export class LeadsService {
               this.logger.debug(`Found number ${foundNumber} in text, treating as days to add`);
             }
           }
-          
+
           // If no reasonable number found, try specific patterns
           if (!daysToAdd) {
             const dayPatterns = [
@@ -1783,7 +1798,7 @@ export class LeadsService {
               /thirty\s*\((\d+)\)/i,                      // "thirty (30)"
               /\((\d+)\)/,                                // Any number in parentheses
             ];
-            
+
             // Try each pattern to extract the number of days
             for (const pattern of dayPatterns) {
               const match = dateString.match(pattern);
@@ -1797,7 +1812,7 @@ export class LeadsService {
               }
             }
           }
-          
+
           // If still no number found, try written numbers without parentheses
           if (!daysToAdd) {
             const writtenNumbers: Record<string, number> = {
@@ -1808,7 +1823,7 @@ export class LeadsService {
               'one hundred twenty': 120,
               'two hundred': 200,
             };
-            
+
             for (const [written, number] of Object.entries(writtenNumbers)) {
               if (dateString.toLowerCase().includes(written)) {
                 daysToAdd = number;
@@ -1817,7 +1832,7 @@ export class LeadsService {
               }
             }
           }
-          
+
           // If we found a day count, calculate future date from today
           if (daysToAdd && !isNaN(daysToAdd)) {
             date = new Date();
@@ -1828,12 +1843,12 @@ export class LeadsService {
             return dateString; // Return original if can't parse
           }
         }
-        
+
         // Convert to MM/DD/YY format
         const year = date.getFullYear().toString().slice(-2); // Last 2 digits of year
         const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Month with leading zero
         const day = date.getDate().toString().padStart(2, '0'); // Day with leading zero
-        
+
         return `${day}/${month}/${year}`;
       } catch (error) {
         this.logger.warn(`Error converting date ${dateString}:`, error);
@@ -1865,14 +1880,14 @@ export class LeadsService {
     const rawBaseRent = getValue(data.base_rent);
     const parsedBaseRent = rawBaseRent
       ? (() => {
-          const m = rawBaseRent.match(/\$?([\d,]+\.?\d*)/);
-          return m ? m[1].replace(',', '') : null;
-        })()
+        const m = rawBaseRent.match(/\$?([\d,]+\.?\d*)/);
+        return m ? m[1].replace(',', '') : null;
+      })()
       : null;
-    
+
     // Priority order: base_rent (primary) > rent_psf > rent_per_sf > base_rent_per_sf
     const rentPerSf = parsedBaseRent || getValue(data.rent_psf) || getValue(data.rent_per_sf) || getValue(data.base_rent_per_sf);
-    
+
     // annual_increase may return multiple values like "10% 12.5%" - take the first number only
     const annInc = getAnnIncValue(data.annual_increase) || getAnnIncValue(data.ann_inc) || getAnnIncValue(data.rent_increase);
     const freeMonths = getValue(data.free_rent_months) || getValue(data.free_months);
@@ -1991,13 +2006,13 @@ export class LeadsService {
     const isPlaceholderLast = PLACEHOLDER_NAMES.includes((lead.general.lastName || '').toLowerCase());
     if (resolvedTenant && (isPlaceholderFirst || isPlaceholderLast || !lead.general.firstName || !lead.general.lastName)) {
       const parts = resolvedTenant.trim().split(/\s+/);
-      if (!lead.general.firstName || isPlaceholderFirst) { 
-        lead.general.firstName = parts[0] || ''; 
-        generalUpdated = true; 
+      if (!lead.general.firstName || isPlaceholderFirst) {
+        lead.general.firstName = parts[0] || '';
+        generalUpdated = true;
       }
-      if (!lead.general.lastName || isPlaceholderLast) { 
-        lead.general.lastName = parts.slice(1).join(' ') || ''; 
-        generalUpdated = true; 
+      if (!lead.general.lastName || isPlaceholderLast) {
+        lead.general.lastName = parts.slice(1).join(' ') || '';
+        generalUpdated = true;
       }
       this.logger.debug(`Split tenantName "${resolvedTenant}" into firstName: "${lead.general.firstName}", lastName: "${lead.general.lastName}"`);
     }
@@ -2021,9 +2036,9 @@ export class LeadsService {
       extractedAt: new Date(),
       confidence: result.overallConfidence,
       rawData: data,
-      fieldsUpdated: hasUpdates ? Object.keys(lead.current_negotiation).filter(key => 
-        lead.current_negotiation[key] !== null && 
-        lead.current_negotiation[key] !== undefined && 
+      fieldsUpdated: hasUpdates ? Object.keys(lead.current_negotiation).filter(key =>
+        lead.current_negotiation[key] !== null &&
+        lead.current_negotiation[key] !== undefined &&
         lead.current_negotiation[key] !== ''
       ) : [],
     };
@@ -2138,14 +2153,14 @@ export class LeadsService {
       // Special handling for LOI documents - trigger Document AI processing
       if (documentType === 'loi' && recordType === 'LEAD') {
         this.logger.log(`Triggering Document AI processing for LOI document: ${key}`);
-        
+
         const detectedMime = this.getMimeTypeFromKey(key);
         if (!detectedMime) {
           this.logger.warn(`Unsupported file format for Document AI: ${key} — skipping AI processing`);
         } else {
           // Update lead with LOI document URL (for compatibility)
           await this.repo.update(id, { loiDocumentUrl: key });
-          
+
           // Queue for Document AI processing
           await this.leadsQueue.add(JOBNAME.PROCESS_DOCUMENT, {
             leadId: id,
@@ -2309,26 +2324,26 @@ export class LeadsService {
     if (formData.references) updatePayload.references = formData.references;
     if (formData.general) {
       updatePayload.general = formData.general;
-      
+
       // 🔥 CRITICAL: Handle submission status
       if (formData.general.applicationSubmitted === true) {
         updatePayload.general.applicationSubmitted = true;
         updatePayload.general.applicationSubmittedAt = new Date();
-        
+
         // Log submission attempt for audit trail
         this.logger.log(`Application submitted for lead ${leadId} via token at ${new Date().toISOString()}`);
       }
     }
-    
+
     // updatePayload.lead_status=LeadStatus.DRAFTING_LEASE
     if (Object.keys(updatePayload).length > 0) {
       await this.repo.update(leadId, updatePayload);
     }
 
-    return { 
-      success: true, 
-      message: updatePayload.general?.applicationSubmitted 
-        ? 'Application submitted successfully' 
+    return {
+      success: true,
+      message: updatePayload.general?.applicationSubmitted
+        ? 'Application submitted successfully'
         : 'Form updated successfully',
       last_saved: progress.last_saved,
       tenant_id: leadId,
@@ -2377,8 +2392,8 @@ export class LeadsService {
     // Log submission for audit trail
     this.logger.log(`Tenant form submitted for lead ${leadId} via token at ${new Date().toISOString()}`);
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       message: 'Application submitted successfully',
       submittedAt: updatePayload.general.applicationSubmittedAt?.toISOString() || new Date().toISOString(),
     };
@@ -2404,17 +2419,17 @@ export class LeadsService {
 
     // Build update payload with proper merging
     const updatePayload: any = {};
-    
+
     if (formData.business) {
       updatePayload.business = { ...(lead.business || {}), ...formData.business };
     }
-    
+
     if (formData.financial) {
       updatePayload.financial = {
         ...(lead.financial || {}),
         ...formData.financial,
         // Merge nested assets and liabilities
-        assets: formData.financial.assets 
+        assets: formData.financial.assets
           ? { ...(lead.financial?.assets || {}), ...formData.financial.assets }
           : lead.financial?.assets,
         liabilities: formData.financial.liabilities
@@ -2422,15 +2437,15 @@ export class LeadsService {
           : lead.financial?.liabilities,
       };
     }
-    
+
     if (formData.references) {
       updatePayload.references = { ...(lead.references || {}), ...formData.references };
     }
-    
+
     // Handle general field with name splitting and merging
     if (formData.general) {
       updatePayload.general = { ...(lead.general || {}), ...formData.general };
-      
+
       // If name field exists, split it into firstName and lastName
       if (formData.general.name) {
         const nameParts = formData.general.name.trim().split(/\s+/);
@@ -2443,7 +2458,7 @@ export class LeadsService {
       if (formData.general.applicationSubmitted === true) {
         updatePayload.general.applicationSubmitted = true;
         updatePayload.general.applicationSubmittedAt = new Date();
-        
+
         // Log submission attempt for audit trail
         this.logger.log(`Application submitted for lead ${leadId} at ${new Date().toISOString()}`);
       }
@@ -2466,8 +2481,8 @@ export class LeadsService {
 
     return {
       success: true,
-      message: updated.general?.applicationSubmitted 
-        ? 'Application submitted successfully' 
+      message: updated.general?.applicationSubmitted
+        ? 'Application submitted successfully'
         : 'Lead updated successfully',
       data: {
         id: updated._id?.toString() || leadId,
@@ -2566,10 +2581,12 @@ export class LeadsService {
         $addFields: {
           submittedDateConverted: {
             $cond: {
-              if: { $and: [
-                { $ne: ['$lease.submittedDate', null] },
-                { $ne: [{ $type: '$lease.submittedDate' }, 'missing'] }
-              ]},
+              if: {
+                $and: [
+                  { $ne: ['$lease.submittedDate', null] },
+                  { $ne: [{ $type: '$lease.submittedDate' }, 'missing'] }
+                ]
+              },
               then: {
                 $cond: {
                   if: { $eq: [{ $type: '$lease.submittedDate' }, 'string'] },
@@ -2675,10 +2692,12 @@ export class LeadsService {
         $addFields: {
           approvedDateConverted: {
             $cond: {
-              if: { $and: [
-                { $ne: ['$lease.approvedDate', null] },
-                { $ne: [{ $type: '$lease.approvedDate' }, 'missing'] }
-              ]},
+              if: {
+                $and: [
+                  { $ne: ['$lease.approvedDate', null] },
+                  { $ne: [{ $type: '$lease.approvedDate' }, 'missing'] }
+                ]
+              },
               then: {
                 $cond: {
                   if: { $eq: [{ $type: '$lease.approvedDate' }, 'string'] },
@@ -2808,7 +2827,7 @@ export class LeadsService {
     const result = await this.repo.aggregate([
       {
         $match: {
-          lead_status: { $nin: ['LEASE_NEGOTIATION','RENEWAL_NEGOTIATION', 'Renewal Negotiation'] },
+          lead_status: { $nin: ['LEASE_NEGOTIATION', 'RENEWAL_NEGOTIATION', 'Renewal Negotiation'] },
         },
       },
       {
@@ -2884,10 +2903,12 @@ export class LeadsService {
         $addFields: {
           signedAtConverted: {
             $cond: {
-              if: { $and: [
-                { $ne: ['$signedAt', null] },
-                { $ne: [{ $type: '$signedAt' }, 'missing'] }
-              ]},
+              if: {
+                $and: [
+                  { $ne: ['$signedAt', null] },
+                  { $ne: [{ $type: '$signedAt' }, 'missing'] }
+                ]
+              },
               then: {
                 $cond: {
                   if: { $eq: [{ $type: '$signedAt' }, 'string'] },
@@ -2986,7 +3007,7 @@ export class LeadsService {
     const result = await this.repo.aggregate([
       {
         $match: {
-          lead_status: { $in: ['LOI_NEGOTIATION', 'QUALIFYING', 'OUT_FOR_EXECUTION','DRAFTING_LEASE',''] },
+          lead_status: { $in: ['LOI_NEGOTIATION', 'QUALIFYING', 'OUT_FOR_EXECUTION', 'DRAFTING_LEASE', ''] },
         },
       },
       {
@@ -3183,7 +3204,7 @@ export class LeadsService {
       ]);
 
       // Calculate totals
-      const totalARBalance = 
+      const totalARBalance =
         tenantsWithAR.totalBalance +
         tenantsWith3Day.totalBalance +
         tenantsWithAttorney.totalBalance +

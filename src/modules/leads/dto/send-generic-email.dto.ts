@@ -65,5 +65,10 @@ export class SendGenericEmailDto {
 
   @IsOptional()
   @IsEnum(RecordType)
-  recordType?: RecordType; // Type of record: LEAD, RENEWAL, or LEASE
+  recordType?: RecordType;
+  
+  
+  @IsOptional()
+  @IsString()
+  docusignUri?:string;// Type of record: LEAD, RENEWAL, or LEASE
 }
